@@ -7,13 +7,13 @@
 
     <Menu>
         <MenuItem Header="_File">
-            <MenuItem Header="_New Recipe"
+            <MenuItem Header="_New Core"
                       Command="{Binding NewRecipeCommand}"
                       InputGesture="Ctrl+N" />
-            <MenuItem Header="_Open Recipe"
+            <MenuItem Header="_Open Core"
                       Command="{Binding LoadRecipeCommand}"
                       InputGesture="Ctrl+O" />
-            <MenuItem Header="_Save Recipe"
+            <MenuItem Header="_Save Core"
                       Command="{Binding SaveRecipeCommand}"
                       InputGesture="Ctrl+S" />
             <Separator />

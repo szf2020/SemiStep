@@ -40,7 +40,7 @@ public sealed class ActionRegistry : IActionRegistry
 		return action;
 	}
 
-	public bool ActionExists(short id) => _byId.ContainsKey(id);
+	public bool ActionExists(int id) => _byId.ContainsKey(id);
 
 	public bool ActionExistsByName(string name) => _byName.ContainsKey(name);
 

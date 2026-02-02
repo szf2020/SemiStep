@@ -1,4 +1,6 @@
-﻿namespace Domain.Ports;
+﻿using Core.Entities;
+
+namespace Domain.Ports;
 
 public interface IPlcConnection : IAsyncDisposable
 {
@@ -8,9 +10,9 @@ public interface IPlcConnection : IAsyncDisposable
 
 	Task DisconnectAsync(CancellationToken cancellationToken = default);
 
-	Task<Recipe.Entities.Recipe> ReadRecipeAsync(CancellationToken cancellationToken = default);
+	Task<Recipe> ReadRecipeAsync(CancellationToken cancellationToken = default);
 
-	Task WriteRecipeAsync(Recipe.Entities.Recipe recipe, CancellationToken cancellationToken = default);
+	Task WriteRecipeAsync(Recipe recipe, CancellationToken cancellationToken = default);
 
 	Task<PlcStatus> GetStatusAsync(CancellationToken cancellationToken = default);
 }

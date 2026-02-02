@@ -8,8 +8,6 @@ public static class CsvDi
 {
 	public static IServiceCollection AddCsv(this IServiceCollection services)
 	{
-		services.AddSingleton<IRecipeRepository, CsvRecipeRepository>();
-
 		return services;
 	}
 }

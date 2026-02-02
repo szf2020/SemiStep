@@ -2,7 +2,6 @@
 
 using Shared;
 using Shared.Registries;
-using Shared.Services;
 
 namespace Domain.Facade;
 
@@ -11,15 +10,13 @@ public sealed class DomainFacade(
 	IPropertyRegistry propertyRegistry,
 	IColumnRegistry columnRegistry,
 	IGroupRegistry groupRegistry,
-	IGridStyleProvider gridStyleProvider,
-	RecipeService recipeService)
+	CoreService coreService)
 	: IDisposable
 {
 	private bool _disposed;
 
-	public RecipeService Recipe => recipeService;
+	public CoreService Core => coreService;
 
-	public IGridStyleProvider GridStyle => gridStyleProvider;
 
 	public void Initialize(AppConfiguration appConfig)
 	{
@@ -27,9 +24,8 @@ public sealed class DomainFacade(
 		propertyRegistry.Initialize(appConfig.Properties);
 		columnRegistry.Initialize(appConfig.Columns);
 		groupRegistry.Initialize(appConfig.Groups);
-		gridStyleProvider.Initialize(appConfig.GridStyle);
 
-		recipeService.NewRecipe();
+		coreService.NewRecipe();
 	}
 
 	public void Dispose()

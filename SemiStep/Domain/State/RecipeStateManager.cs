@@ -1,36 +1,36 @@
-﻿using Recipe.Analysis;
+﻿using Core;
+using Core.Entities;
 
 namespace Domain.State;
 
 public sealed class RecipeStateManager
 {
-	private Recipe.Entities.Recipe _lastValid = Recipe.Entities.Recipe.Empty;
-	public Recipe.Entities.Recipe Current { get; private set; } = Recipe.Entities.Recipe.Empty;
-	public AnalysisResult? LastAnalysis { get; private set; }
-	public bool IsDirty { get; private set; }
-	public bool IsValid => LastAnalysis?.IsValid ?? false;
+	private Recipe _lastValid = Recipe.Empty;
 
-	public void Update(Recipe.Entities.Recipe newRecipe, AnalysisResult analysis)
+	public RecipeResult? LastResult { get; private set; }
+	public Recipe Current => LastResult?.Recipe ?? Recipe.Empty;
+	public bool IsDirty { get; private set; }
+	public bool IsValid => LastResult?.CanProceed ?? false;
+
+	public void Update(RecipeResult result)
 	{
-		Current = newRecipe;
-		LastAnalysis = analysis;
+		LastResult = result;
 		IsDirty = true;
 
-		if (analysis.IsValid)
+		if (result.CanProceed)
 		{
-			_lastValid = newRecipe;
+			_lastValid = result.Recipe;
 		}
 	}
 
-	public void Load(Recipe.Entities.Recipe recipe, AnalysisResult analysis)
+	public void Load(RecipeResult result)
 	{
-		Current = recipe;
-		LastAnalysis = analysis;
+		LastResult = result;
 		IsDirty = false;
 
-		if (analysis.IsValid)
+		if (result.CanProceed)
 		{
-			_lastValid = recipe;
+			_lastValid = result.Recipe;
 		}
 	}
 
@@ -41,9 +41,8 @@ public sealed class RecipeStateManager
 
 	public void Reset()
 	{
-		Current = Recipe.Entities.Recipe.Empty;
-		_lastValid = Recipe.Entities.Recipe.Empty;
-		LastAnalysis = null;
+		LastResult = RecipeResult.Empty;
+		_lastValid = Recipe.Empty;
 		IsDirty = false;
 	}
 }

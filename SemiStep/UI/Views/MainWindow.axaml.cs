@@ -8,7 +8,6 @@ namespace UI.Views;
 public partial class MainWindow : Window
 {
 	private ColumnBuilder? _columnBuilder;
-	private GridStyleApplier? _styleApplier;
 
 	public MainWindow()
 	{
@@ -23,27 +22,20 @@ public partial class MainWindow : Window
 			return;
 		}
 
-		var gridStyles = viewModel.GridStyleProvider.Current;
 
 		_columnBuilder = new ColumnBuilder(
-			viewModel.ActionRegistry,
-			gridStyles);
-
-		_styleApplier = new GridStyleApplier();
-
-		viewModel.GridStyleProvider.StylesChanged += OnStylesChanged;
+			viewModel.ActionRegistry);
 
 		BuildGrid();
 	}
 
 	private void OnStylesChanged(object? sender, Shared.Entities.GridStyleOptions styles)
 	{
-		if (_columnBuilder is null || _styleApplier is null)
+		if (_columnBuilder is null)
 		{
 			return;
 		}
 
-		_columnBuilder.UpdateStyles(styles);
 		BuildGrid();
 	}
 
@@ -54,16 +46,13 @@ public partial class MainWindow : Window
 			return;
 		}
 
-		if (_columnBuilder is null || _styleApplier is null)
+		if (_columnBuilder is null)
 		{
 			return;
 		}
 
-		var gridStyles = viewModel.GridStyleProvider.Current;
 
 		_columnBuilder.BuildColumnsFromConfiguration(RecipeGrid, viewModel.Configuration);
-		_styleApplier.ApplyGridStyles(RecipeGrid, gridStyles);
-		_styleApplier.ApplyControlStyles(ValidationPanel, StatusBar, gridStyles);
 	}
 
 	private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)

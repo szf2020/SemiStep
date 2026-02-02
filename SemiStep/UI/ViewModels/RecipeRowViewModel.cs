@@ -1,8 +1,8 @@
-﻿using Domain.Services;
+﻿using Core.Entities;
+
+using Domain.Services;
 
 using ReactiveUI;
-
-using Recipe.Entities;
 
 using Shared.Entities;
 using Shared.Registries;
@@ -25,7 +25,7 @@ public class RecipeRowViewModel(
 
 	public int StepNumber { get; } = stepNumber;
 
-	public short ActionId => short.Parse(step.ActionKey);
+	public int ActionId => step.ActionKey;
 
 	public string ActionName => action.UiName;
 

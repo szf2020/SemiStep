@@ -13,8 +13,7 @@ using UI.ViewModels;
 namespace UI.Helpers;
 
 public sealed class ColumnBuilder(
-	IActionRegistry actionRegistry,
-	GridStyleOptions gridStyles)
+	IActionRegistry actionRegistry)
 {
 	private const string ActionColumnKey = "action";
 	private const string ActionTargetComboBoxType = "action_target_combo_box";
@@ -23,13 +22,6 @@ public sealed class ColumnBuilder(
 	private const string CellReadonlyClass = "cell-readonly";
 	private const string CellDisabledClass = "cell-disabled";
 	private const string SelectedClass = "selected";
-
-	private GridStyleOptions _gridStyles = gridStyles;
-
-	public void UpdateStyles(GridStyleOptions gridStyles)
-	{
-		_gridStyles = gridStyles;
-	}
 
 	public void BuildColumnsFromConfiguration(DataGrid grid, AppConfiguration config)
 	{
@@ -156,7 +148,6 @@ public sealed class ColumnBuilder(
 
 		var border = new Border
 		{
-			Padding = GetCellPadding(),
 			VerticalAlignment = VerticalAlignment.Stretch,
 			HorizontalAlignment = HorizontalAlignment.Stretch
 		};
@@ -165,7 +156,6 @@ public sealed class ColumnBuilder(
 		{
 			ItemsSource = items,
 			DisplayMemberBinding = new Binding("DisplayText"),
-			FontSize = _gridStyles.CellFontSize,
 			HorizontalAlignment = HorizontalAlignment.Stretch,
 			VerticalAlignment = VerticalAlignment.Center,
 			Background = Avalonia.Media.Brushes.Transparent,
@@ -246,7 +236,6 @@ public sealed class ColumnBuilder(
 
 		var border = new Border
 		{
-			Padding = GetCellPadding(),
 			VerticalAlignment = VerticalAlignment.Stretch,
 			HorizontalAlignment = HorizontalAlignment.Stretch
 		};
@@ -255,7 +244,6 @@ public sealed class ColumnBuilder(
 		{
 			ItemsSource = items,
 			DisplayMemberBinding = new Binding("DisplayText"),
-			FontSize = _gridStyles.CellFontSize,
 			HorizontalAlignment = HorizontalAlignment.Stretch,
 			VerticalAlignment = VerticalAlignment.Center,
 			Background = Avalonia.Media.Brushes.Transparent,
@@ -322,20 +310,7 @@ public sealed class ColumnBuilder(
 
 	private static TextBlock CreateDisplayTextBlock(string text)
 	{
-		return new TextBlock
-		{
-			Text = text,
-			VerticalAlignment = VerticalAlignment.Center
-		};
-	}
-
-	private Thickness GetCellPadding()
-	{
-		return StyleHelper.ToThickness(
-			_gridStyles.CellPaddingLeft,
-			_gridStyles.CellPaddingTop,
-			_gridStyles.CellPaddingRight,
-			_gridStyles.CellPaddingBottom);
+		return new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center };
 	}
 
 	private static void ApplyCellClasses(Control control, RecipeRowViewModel row, string columnKey)

@@ -1,4 +1,6 @@
-﻿using Domain.Ports;
+﻿using Core.Entities;
+
+using Domain.Ports;
 
 namespace S7;
 
@@ -28,14 +30,14 @@ public sealed class ModbusTcpConnection : IPlcConnection
 		_isConnected = false;
 	}
 
-	public async Task<Recipe.Entities.Recipe> ReadRecipeAsync(CancellationToken cancellationToken = default)
+	public async Task<Recipe> ReadRecipeAsync(CancellationToken cancellationToken = default)
 	{
 		EnsureConnected();
 		await Task.Delay(100, cancellationToken);
-		return Recipe.Entities.Recipe.Empty;
+		return Recipe.Empty;
 	}
 
-	public async Task WriteRecipeAsync(Recipe.Entities.Recipe recipe, CancellationToken cancellationToken = default)
+	public async Task WriteRecipeAsync(Recipe recipe, CancellationToken cancellationToken = default)
 	{
 		EnsureConnected();
 		await Task.Delay(100, cancellationToken);

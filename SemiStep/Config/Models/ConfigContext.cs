@@ -1,6 +1,7 @@
 ﻿using Config.Dto;
 
 using Shared;
+using Shared.Reasons;
 
 namespace Config.Models;
 
@@ -20,26 +21,36 @@ public sealed class ConfigContext
 
 	public AppConfiguration? Configuration { get; set; }
 
-	public List<ConfigError> Errors { get; } = [];
+	public List<AbstractReason> Reasons { get; } = [];
 
 	public Dictionary<string, object> Metadata { get; } = [];
 
-	public bool HasErrors => Errors.Any(e => e.Severity == ErrorSeverity.Error);
+	public bool HasErrors => Reasons.Any(r => r is AbstractError);
 
-	public bool HasWarnings => Errors.Any(e => e.Severity == ErrorSeverity.Warning);
+	public bool HasWarnings => Reasons.Any(r => r is AbstractWarning);
+
+	public IEnumerable<AbstractError> Errors => Reasons.OfType<AbstractError>();
+
+	public IEnumerable<AbstractWarning> Warnings => Reasons.OfType<AbstractWarning>();
 
 	public void AddError(string message, string? location = null)
 	{
-		Errors.Add(new ConfigError(ErrorSeverity.Error, message, location));
+		Reasons.Add(ConfigLoadError.General(message, location));
 	}
 
 	public void AddWarning(string message, string? location = null)
 	{
-		Errors.Add(new ConfigError(ErrorSeverity.Warning, message, location));
+		Reasons.Add(ConfigWarning.General(message, location));
 	}
 
 	public void AddInfo(string message, string? location = null)
 	{
-		Errors.Add(new ConfigError(ErrorSeverity.Info, message, location));
+		// Info messages are treated as warnings (informational, non-blocking)
+		Reasons.Add(ConfigWarning.General(message, location));
+	}
+
+	public void Add(AbstractReason reason)
+	{
+		Reasons.Add(reason);
 	}
 }

@@ -1,16 +1,17 @@
 ﻿using Config;
 using Config.Facade;
 
+using Core;
+
 using Domain;
 using Domain.Facade;
 
 using Microsoft.Extensions.DependencyInjection;
 
-using Recipe;
-
 using Serilog;
 
 using Shared;
+using Shared.Reasons;
 
 using UI;
 
@@ -69,7 +70,8 @@ public class Program
 		{
 			foreach (var error in context.Errors)
 			{
-				Log.Error("{Severity}: {Message} at {Location}", error.Severity, error.Message, error.Location);
+				var location = error is ConfigLoadError configError ? configError.Location : null;
+				Log.Error("Error: {Message} at {Location}", error.Message, location ?? "unknown");
 			}
 
 			throw new InvalidOperationException("Configuration loading failed with errors");

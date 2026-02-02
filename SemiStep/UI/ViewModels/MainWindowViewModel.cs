@@ -6,15 +6,11 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 
 using Domain.Facade;
-using Domain.Services;
 
 using ReactiveUI;
 
-using Recipe.Exceptions;
-
 using Shared;
 using Shared.Registries;
-using Shared.Services;
 
 namespace UI.ViewModels;
 
@@ -24,23 +20,17 @@ public class MainWindowViewModel : ReactiveObject
 	private readonly IActionRegistry _actionRegistry;
 	private readonly IGroupRegistry _groupRegistry;
 	private readonly IColumnRegistry _columnRegistry;
-	private readonly CellStateResolver _cellStateResolver;
-	private readonly IGridStyleProvider _gridStyleProvider;
 
 	public MainWindowViewModel(
 		DomainFacade domainFacade,
 		IActionRegistry actionRegistry,
 		IGroupRegistry groupRegistry,
-		IColumnRegistry columnRegistry,
-		CellStateResolver cellStateResolver,
-		IGridStyleProvider gridStyleProvider)
+		IColumnRegistry columnRegistry)
 	{
 		_domainFacade = domainFacade;
 		_actionRegistry = actionRegistry;
 		_groupRegistry = groupRegistry;
 		_columnRegistry = columnRegistry;
-		_cellStateResolver = cellStateResolver;
-		_gridStyleProvider = gridStyleProvider;
 
 		RecipeRows = new ObservableCollection<RecipeRowViewModel>();
 		ValidationErrors = new ObservableCollection<string>();
@@ -57,8 +47,6 @@ public class MainWindowViewModel : ReactiveObject
 	public IActionRegistry ActionRegistry => _actionRegistry;
 
 	public IGroupRegistry GroupRegistry => _groupRegistry;
-
-	public IGridStyleProvider GridStyleProvider => _gridStyleProvider;
 
 	public ObservableCollection<RecipeRowViewModel> RecipeRows { get; }
 
@@ -78,9 +66,9 @@ public class MainWindowViewModel : ReactiveObject
 
 	public ReactiveCommand<Unit, Unit> ExitCommand { get; }
 
-	public string WindowTitle => "SemiStep - Recipe Editor";
+	public string WindowTitle => "SemiStep - Core Editor";
 
-	public bool IsDirty => _domainFacade.Recipe.IsDirty;
+	public bool IsDirty => _domainFacade.Core.IsDirty;
 
 	public bool IsConnectedToPlc => false;
 
@@ -104,7 +92,7 @@ public class MainWindowViewModel : ReactiveObject
 			return;
 		}
 
-		_domainFacade.Recipe.AddStep(firstAction.Id);
+		_domainFacade.Core.AddStep(firstAction.Id);
 		RefreshRecipeRows();
 		this.RaisePropertyChanged(nameof(IsDirty));
 		this.RaisePropertyChanged(nameof(StatusText));
@@ -117,7 +105,7 @@ public class MainWindowViewModel : ReactiveObject
 			return;
 		}
 
-		_domainFacade.Recipe.RemoveStep(stepIndex);
+		_domainFacade.Core.RemoveStep(stepIndex);
 		RefreshRecipeRows();
 		this.RaisePropertyChanged(nameof(IsDirty));
 		this.RaisePropertyChanged(nameof(StatusText));
@@ -125,14 +113,14 @@ public class MainWindowViewModel : ReactiveObject
 
 	private void SaveRecipe()
 	{
-		_domainFacade.Recipe.MarkSaved();
+		_domainFacade.Core.MarkSaved();
 		this.RaisePropertyChanged(nameof(IsDirty));
 		this.RaisePropertyChanged(nameof(StatusText));
 	}
 
 	private void LoadRecipe()
 	{
-		_domainFacade.Recipe.NewRecipe();
+		_domainFacade.Core.NewRecipe();
 		RefreshRecipeRows();
 		this.RaisePropertyChanged(nameof(IsDirty));
 		this.RaisePropertyChanged(nameof(StatusText));
@@ -140,7 +128,7 @@ public class MainWindowViewModel : ReactiveObject
 
 	private void NewRecipe()
 	{
-		_domainFacade.Recipe.NewRecipe();
+		_domainFacade.Core.NewRecipe();
 		RefreshRecipeRows();
 		this.RaisePropertyChanged(nameof(IsDirty));
 		this.RaisePropertyChanged(nameof(StatusText));
@@ -148,14 +136,14 @@ public class MainWindowViewModel : ReactiveObject
 
 	private void RefreshRecipeRows()
 	{
-		var recipe = _domainFacade.Recipe.CurrentRecipe;
+		var recipe = _domainFacade.Core.CurrentRecipe;
 		RecipeRows.Clear();
 		ValidationErrors.Clear();
 
 		for (var i = 0; i < recipe.StepCount; i++)
 		{
 			var step = recipe.Steps[i];
-			var action = _actionRegistry.GetAction(short.Parse(step.ActionKey));
+			var action = _actionRegistry.GetAction(step.ActionKey);
 			var rowVm = new RecipeRowViewModel(
 				i + 1,
 				step,
@@ -183,24 +171,25 @@ public class MainWindowViewModel : ReactiveObject
 			return;
 		}
 
-		try
+		var result = _domainFacade.Core.UpdateProperty(stepIndex, columnKey, value);
+		if (!result.CanProceed)
 		{
-			_domainFacade.Recipe.UpdateProperty(stepIndex, columnKey, value);
-			RefreshRecipeRows();
-			this.RaisePropertyChanged(nameof(IsDirty));
-			this.RaisePropertyChanged(nameof(StatusText));
+			foreach (var error in result.Errors)
+			{
+				ValidationErrors.Add($"Step {stepIndex + 1}: {error.Message}");
+			}
 		}
-		catch (PropertyValidationException ex)
-		{
-			ValidationErrors.Add($"Step {stepIndex + 1}: {ex.Message}");
-		}
+
+		RefreshRecipeRows();
+		this.RaisePropertyChanged(nameof(IsDirty));
+		this.RaisePropertyChanged(nameof(StatusText));
 	}
 
 	private void OnActionChanged(int stepIndex, int newActionId)
 	{
 		try
 		{
-			_domainFacade.Recipe.ChangeStepAction(stepIndex, newActionId);
+			_domainFacade.Core.ChangeStepAction(stepIndex, newActionId);
 			RefreshRecipeRows();
 			this.RaisePropertyChanged(nameof(IsDirty));
 			this.RaisePropertyChanged(nameof(StatusText));
