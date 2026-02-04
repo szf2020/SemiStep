@@ -152,4 +152,9 @@
         <Setter Property="Foreground" Value="#FFFFFF" />
     </Style>
 
+    <!-- ComboBox with direct cell-disabled class (for disabled dropdown styling) -->
+    <Style Selector="ComboBox.cell-disabled">
+        <Setter Property="Foreground" Value="#808080" />
+    </Style>
+
 </Styles>

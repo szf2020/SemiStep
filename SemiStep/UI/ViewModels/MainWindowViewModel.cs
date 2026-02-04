@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Reactive;
+using System.Reactive.Linq;
 
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -20,6 +21,8 @@ public class MainWindowViewModel : ReactiveObject
 	private readonly IActionRegistry _actionRegistry;
 	private readonly IGroupRegistry _groupRegistry;
 	private readonly IColumnRegistry _columnRegistry;
+	private int _selectedRowIndex = -1;
+	private string? _currentFileName;
 
 	public MainWindowViewModel(
 		DomainFacade domainFacade,
@@ -36,9 +39,15 @@ public class MainWindowViewModel : ReactiveObject
 		ValidationErrors = new ObservableCollection<string>();
 		ValidationErrors.CollectionChanged += OnValidationErrorsChanged;
 
-		DeleteStepCommand = ReactiveCommand.Create<int>(DeleteStep);
-		SaveRecipeCommand = ReactiveCommand.Create(SaveRecipe);
-		LoadRecipeCommand = ReactiveCommand.Create(LoadRecipe);
+		// File dialog interactions
+		OpenFileInteraction = new Interaction<Unit, string?>();
+		SaveFileInteraction = new Interaction<string?, string?>();
+		ShowMessageInteraction = new Interaction<(string Title, string Message), Unit>();
+
+		AddStepCommand = ReactiveCommand.Create(AddStep);
+		DeleteStepCommand = ReactiveCommand.Create(DeleteStep);
+		SaveRecipeCommand = ReactiveCommand.CreateFromTask(SaveRecipeAsync);
+		LoadRecipeCommand = ReactiveCommand.CreateFromTask(LoadRecipeAsync);
 		NewRecipeCommand = ReactiveCommand.Create(NewRecipe);
 		UndoCommand = ReactiveCommand.Create(Undo);
 		RedoCommand = ReactiveCommand.Create(Redo);
@@ -55,7 +64,16 @@ public class MainWindowViewModel : ReactiveObject
 
 	public AppConfiguration? Configuration { get; private set; }
 
-	public ReactiveCommand<int, Unit> DeleteStepCommand { get; }
+	// File dialog interactions - handled by the View
+	public Interaction<Unit, string?> OpenFileInteraction { get; }
+
+	public Interaction<string?, string?> SaveFileInteraction { get; }
+
+	public Interaction<(string Title, string Message), Unit> ShowMessageInteraction { get; }
+
+	public ReactiveCommand<Unit, Unit> AddStepCommand { get; }
+
+	public ReactiveCommand<Unit, Unit> DeleteStepCommand { get; }
 
 	public ReactiveCommand<Unit, Unit> SaveRecipeCommand { get; }
 
@@ -69,13 +87,29 @@ public class MainWindowViewModel : ReactiveObject
 
 	public ReactiveCommand<Unit, Unit> ExitCommand { get; }
 
-	public string WindowTitle => "SemiStep - Core Editor";
+	public string WindowTitle
+	{
+		get
+		{
+			var fileName = _currentFileName ?? "Untitled";
+			var dirtyIndicator = IsDirty ? " *" : "";
+			return $"SemiStep - {fileName}{dirtyIndicator}";
+		}
+	}
 
 	public bool IsDirty => _domainFacade.IsDirty;
 
 	public bool CanUndo => _domainFacade.CanUndo;
 
 	public bool CanRedo => _domainFacade.CanRedo;
+
+	public int SelectedRowIndex
+	{
+		get => _selectedRowIndex;
+		set => this.RaiseAndSetIfChanged(ref _selectedRowIndex, value);
+	}
+
+	public bool CanDeleteStep => SelectedRowIndex >= 0;
 
 	public bool IsConnectedToPlc => false;
 
@@ -91,34 +125,86 @@ public class MainWindowViewModel : ReactiveObject
 		RefreshRecipeRows();
 	}
 
-	private void DeleteStep(int stepIndex)
+	private void AddStep()
 	{
-		if (stepIndex < 0 || stepIndex >= RecipeRows.Count)
+		var firstAction = _actionRegistry.GetAll().First();
+		int newRowIndex;
+
+		if (SelectedRowIndex >= 0)
+		{
+			// Insert after selected row
+			newRowIndex = SelectedRowIndex + 1;
+			_domainFacade.InsertStep(newRowIndex, firstAction.Id);
+		}
+		else
+		{
+			// Append to end
+			newRowIndex = RecipeRows.Count; // Current count = index of new row after refresh
+			_domainFacade.AppendStep(firstAction.Id);
+		}
+
+		RefreshRecipeRows();
+		SelectedRowIndex = newRowIndex;
+		RaiseStateChanged();
+	}
+
+	private void DeleteStep()
+	{
+		if (SelectedRowIndex < 0)
 		{
 			return;
 		}
 
-		_domainFacade.RemoveStep(stepIndex);
+		var indexToDelete = SelectedRowIndex;
+		_domainFacade.RemoveStep(indexToDelete);
+
 		RefreshRecipeRows();
+
+		// Keep selection at same position if possible, otherwise select the new last row
+		if (RecipeRows.Count > 0)
+		{
+			SelectedRowIndex = Math.Min(indexToDelete, RecipeRows.Count - 1);
+		}
+		else
+		{
+			SelectedRowIndex = -1;
+		}
+
 		RaiseStateChanged();
 	}
 
-	private void SaveRecipe()
+	private async Task SaveRecipeAsync()
 	{
-		_domainFacade.SaveRecipe();
-		RaiseStateChanged();
+		// Show save file dialog
+		var filePath = await SaveFileInteraction.Handle(null);
+		if (filePath is null)
+		{
+			return; // User cancelled
+		}
+
+		// TODO: Implement file saving when backend is ready
+		// For now, show "Not implemented" message
+		await ShowMessageInteraction.Handle(("Save Recipe", "File saving is not yet implemented.\n\nSelected path: " + filePath));
 	}
 
-	private void LoadRecipe()
+	private async Task LoadRecipeAsync()
 	{
-		_domainFacade.LoadRecipe();
-		RefreshRecipeRows();
-		RaiseStateChanged();
+		// Show open file dialog
+		var filePath = await OpenFileInteraction.Handle(Unit.Default);
+		if (filePath is null)
+		{
+			return; // User cancelled
+		}
+
+		// TODO: Implement file loading when backend is ready
+		// For now, show "Not implemented" message
+		await ShowMessageInteraction.Handle(("Open Recipe", "File loading is not yet implemented.\n\nSelected path: " + filePath));
 	}
 
 	private void NewRecipe()
 	{
 		_domainFacade.NewRecipe();
+		ValidationErrors.Clear();
 		RefreshRecipeRows();
 		RaiseStateChanged();
 	}
@@ -146,8 +232,14 @@ public class MainWindowViewModel : ReactiveObject
 	private void RefreshRecipeRows()
 	{
 		var recipe = _domainFacade.CurrentRecipe;
+
+		// Dispose old rows to unsubscribe event handlers
+		foreach (var row in RecipeRows)
+		{
+			row.Dispose();
+		}
+
 		RecipeRows.Clear();
-		ValidationErrors.Clear();
 
 		for (var i = 0; i < recipe.StepCount; i++)
 		{
@@ -218,5 +310,7 @@ public class MainWindowViewModel : ReactiveObject
 		this.RaisePropertyChanged(nameof(StatusText));
 		this.RaisePropertyChanged(nameof(CanUndo));
 		this.RaisePropertyChanged(nameof(CanRedo));
+		this.RaisePropertyChanged(nameof(CanDeleteStep));
+		this.RaisePropertyChanged(nameof(WindowTitle));
 	}
 }

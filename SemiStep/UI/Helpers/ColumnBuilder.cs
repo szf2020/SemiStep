@@ -1,4 +1,6 @@
-﻿using Avalonia;
+﻿using System.ComponentModel;
+
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
@@ -44,7 +46,7 @@ public sealed class ColumnBuilder(
 
 	private void AddColumnsFromConfig(DataGrid grid, AppConfiguration config)
 	{
-		foreach (var columnDef in config.Columns.Values.OrderBy(c => c.Key))
+		foreach (var columnDef in config.Columns.Values)
 		{
 			var column = CreateColumn(columnDef);
 			grid.Columns.Add(column);
@@ -80,26 +82,84 @@ public sealed class ColumnBuilder(
 
 	private static DataGridColumn CreateReadOnlyTextColumn(GridColumnDefinition columnDef, int width)
 	{
-		return new DataGridTextColumn
+		return new DataGridTemplateColumn
 		{
 			Header = columnDef.UiName,
 			Width = new DataGridLength(width),
 			IsReadOnly = true,
 			CanUserSort = false,
-			Binding = new Binding($"[{columnDef.Key}]")
+			CellTemplate = CreateTextCellTemplate(columnDef.Key, isEditing: false, isColumnReadOnly: true)
 		};
 	}
 
 	private static DataGridColumn CreateTextColumn(GridColumnDefinition columnDef, int width)
 	{
-		return new DataGridTextColumn
+		return new DataGridTemplateColumn
 		{
 			Header = columnDef.UiName,
 			Width = new DataGridLength(width),
 			IsReadOnly = false,
 			CanUserSort = false,
-			Binding = new Binding($"[{columnDef.Key}]") { Mode = BindingMode.TwoWay }
+			CellTemplate = CreateTextCellTemplate(columnDef.Key, isEditing: false, isColumnReadOnly: false),
+			CellEditingTemplate = CreateTextCellTemplate(columnDef.Key, isEditing: true, isColumnReadOnly: false)
 		};
+	}
+
+	private static FuncDataTemplate<RecipeRowViewModel> CreateTextCellTemplate(string columnKey, bool isEditing, bool isColumnReadOnly)
+	{
+		return new FuncDataTemplate<RecipeRowViewModel>(
+			(row, _) => BuildTextCell(row, columnKey, isEditing, isColumnReadOnly),
+			supportsRecycling: false);
+	}
+
+	private static Control BuildTextCell(RecipeRowViewModel? row, string columnKey, bool isEditing, bool isColumnReadOnly)
+	{
+		if (row is null)
+		{
+			return CreateEmptyTextBlock();
+		}
+
+		var cellState = row.CellStates.TryGetValue(columnKey, out var state) ? state : CellState.Enabled;
+
+		if (cellState == CellState.Disabled)
+		{
+			var disabledBlock = CreateEmptyTextBlock();
+			ApplyCellClasses(disabledBlock, row, columnKey);
+			SubscribeToRowChanges(disabledBlock, row, columnKey);
+			return disabledBlock;
+		}
+
+		if (!isEditing || isColumnReadOnly || cellState == CellState.Readonly)
+		{
+			var value = row.GetPropertyValue(columnKey);
+			var displayText = value?.ToString() ?? string.Empty;
+			var textBlock = new TextBlock
+			{
+				Text = displayText,
+				VerticalAlignment = VerticalAlignment.Center,
+				Padding = new Thickness(4, 2)
+			};
+			ApplyCellClasses(textBlock, row, columnKey);
+			SubscribeToRowChanges(textBlock, row, columnKey);
+			return textBlock;
+		}
+
+		// Editable text box
+		var textBox = new TextBox
+		{
+			VerticalAlignment = VerticalAlignment.Center,
+			HorizontalAlignment = HorizontalAlignment.Stretch,
+			BorderThickness = new Thickness(0),
+			Padding = new Thickness(4, 2)
+		};
+
+		// Bind to the indexer
+		textBox.Bind(TextBox.TextProperty, new Binding($"[{columnKey}]") { Mode = BindingMode.TwoWay });
+
+		ApplyCellClasses(textBox, row, columnKey);
+		SubscribeToRowChanges(textBox, row, columnKey);
+
+		return textBox;
 	}
 
 	private DataGridColumn CreateActionColumn(GridColumnDefinition columnDef, int width)
@@ -131,15 +191,12 @@ public sealed class ColumnBuilder(
 			return CreateEmptyTextBlock();
 		}
 
-		if (!isEditing || isColumnReadOnly)
-		{
-			return CreateDisplayTextBlock(row.ActionName);
-		}
-
-		return CreateActionComboBox(row);
+		// Always show ComboBox so dropdown arrow is visible
+		var isEnabled = isEditing && !isColumnReadOnly;
+		return CreateActionComboBox(row, isEnabled);
 	}
 
-	private Control CreateActionComboBox(RecipeRowViewModel row)
+	private Control CreateActionComboBox(RecipeRowViewModel row, bool isEnabled)
 	{
 		var actions = actionRegistry.GetAll();
 		var items = actions
@@ -160,24 +217,28 @@ public sealed class ColumnBuilder(
 			VerticalAlignment = VerticalAlignment.Center,
 			Background = Avalonia.Media.Brushes.Transparent,
 			BorderThickness = new Thickness(0),
-			IsEnabled = true
+			IsHitTestVisible = isEnabled // Use IsHitTestVisible to prevent interaction without graying out
 		};
 
 		var currentActionId = row.ActionId;
 		comboBox.SelectedItem = items.FirstOrDefault(item => item.Id == currentActionId);
 
-		comboBox.SelectionChanged += (_, _) =>
+		if (isEnabled)
 		{
-			if (comboBox.SelectedItem is ActionComboBoxItemViewModel selectedItem)
+			comboBox.SelectionChanged += (_, _) =>
 			{
-				row.SetPropertyValue(ActionColumnKey, selectedItem.Id);
-			}
-		};
+				if (comboBox.SelectedItem is ActionComboBoxItemViewModel selectedItem)
+				{
+					row.SetPropertyValue(ActionColumnKey, selectedItem.Id);
+				}
+			};
+		}
 
 		border.Child = comboBox;
 
 		ApplyCellClasses(border, row, ActionColumnKey);
-		SubscribeToRowChanges(border, row, ActionColumnKey);
+		ApplyComboBoxDisabledClass(comboBox, row, ActionColumnKey);
+		SubscribeToRowChanges(border, row, ActionColumnKey, comboBox);
 
 		return border;
 	}
@@ -213,23 +274,14 @@ public sealed class ColumnBuilder(
 
 		var cellState = row.CellStates.TryGetValue(columnKey, out var state) ? state : CellState.Enabled;
 
-		if (cellState == CellState.Disabled)
-		{
-			return CreateEmptyTextBlock();
-		}
+		// Determine if ComboBox should be enabled
+		var isEnabled = isEditing && !isColumnReadOnly && cellState == CellState.Enabled;
 
-		if (!isEditing || isColumnReadOnly || cellState == CellState.Readonly)
-		{
-			var groupItems = row.GetGroupItemsForColumn(columnKey);
-			var currentValue = row.GetPropertyValue(columnKey);
-			var displayText = GetGroupItemDisplayText(groupItems, currentValue);
-			return CreateDisplayTextBlock(displayText);
-		}
-
-		return CreateGroupComboBox(row, columnKey);
+		// Always show ComboBox so dropdown arrow is visible (even when disabled)
+		return CreateGroupComboBox(row, columnKey, isEnabled, cellState);
 	}
 
-	private Control CreateGroupComboBox(RecipeRowViewModel row, string columnKey)
+	private Control CreateGroupComboBox(RecipeRowViewModel row, string columnKey, bool isEnabled, CellState cellState)
 	{
 		var groupItems = row.GetGroupItemsForColumn(columnKey);
 		var items = CreateGroupComboBoxItems(groupItems);
@@ -248,7 +300,7 @@ public sealed class ColumnBuilder(
 			VerticalAlignment = VerticalAlignment.Center,
 			Background = Avalonia.Media.Brushes.Transparent,
 			BorderThickness = new Thickness(0),
-			IsEnabled = true
+			IsHitTestVisible = isEnabled // Use IsHitTestVisible to prevent interaction without graying out
 		};
 
 		var currentValue = row.GetPropertyValue(columnKey);
@@ -257,18 +309,23 @@ public sealed class ColumnBuilder(
 			comboBox.SelectedItem = items.FirstOrDefault(item => item.Id == intValue);
 		}
 
-		comboBox.SelectionChanged += (_, _) =>
+		if (isEnabled)
 		{
-			if (comboBox.SelectedItem is GroupComboBoxItemViewModel selectedItem)
+			comboBox.SelectionChanged += (_, _) =>
 			{
-				row.SetPropertyValue(columnKey, selectedItem.Id);
-			}
-		};
+				if (comboBox.SelectedItem is GroupComboBoxItemViewModel selectedItem)
+				{
+					row.SetPropertyValue(columnKey, selectedItem.Id);
+				}
+			};
+		}
 
 		border.Child = comboBox;
 
-		ApplyCellClasses(border, row, columnKey);
-		SubscribeToRowChanges(border, row, columnKey);
+		// Apply cell class based on cell state (for proper disabled styling)
+		ApplyCellClassesWithState(border, row, cellState);
+		ApplyComboBoxDisabledClassWithState(comboBox, cellState);
+		SubscribeToRowChanges(border, row, columnKey, comboBox);
 
 		return border;
 	}
@@ -286,40 +343,23 @@ public sealed class ColumnBuilder(
 			.ToList();
 	}
 
-	private static string GetGroupItemDisplayText(IReadOnlyDictionary<int, string>? groupItems, object? value)
-	{
-		if (groupItems is null || value is null)
-		{
-			return string.Empty;
-		}
-
-		if (value is not int intValue)
-		{
-			return value.ToString() ?? string.Empty;
-		}
-
-		return groupItems.TryGetValue(intValue, out var displayText)
-			? displayText
-			: intValue.ToString();
-	}
-
 	private static TextBlock CreateEmptyTextBlock()
 	{
 		return new TextBlock { Text = string.Empty };
 	}
 
-	private static TextBlock CreateDisplayTextBlock(string text)
+	private static void ApplyCellClasses(Control control, RecipeRowViewModel row, string columnKey)
 	{
-		return new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center };
+		var cellState = row.CellStates.TryGetValue(columnKey, out var state) ? state : CellState.Enabled;
+		ApplyCellClassesWithState(control, row, cellState);
 	}
 
-	private static void ApplyCellClasses(Control control, RecipeRowViewModel row, string columnKey)
+	private static void ApplyCellClassesWithState(Control control, RecipeRowViewModel row, CellState cellState)
 	{
 		control.Classes.Remove(CellEnabledClass);
 		control.Classes.Remove(CellReadonlyClass);
 		control.Classes.Remove(CellDisabledClass);
 
-		var cellState = row.CellStates.TryGetValue(columnKey, out var state) ? state : CellState.Enabled;
 		var stateClass = GetCellStateClass(cellState);
 
 		control.Classes.Add(stateClass);
@@ -337,16 +377,37 @@ public sealed class ColumnBuilder(
 		};
 	}
 
-	private static void SubscribeToRowChanges(Control control, RecipeRowViewModel row, string columnKey)
+	private static void ApplyComboBoxDisabledClass(ComboBox comboBox, RecipeRowViewModel row, string columnKey)
 	{
-		row.PropertyChanged += (_, e) =>
+		var cellState = row.CellStates.TryGetValue(columnKey, out var state) ? state : CellState.Enabled;
+		ApplyComboBoxDisabledClassWithState(comboBox, cellState);
+	}
+
+	private static void ApplyComboBoxDisabledClassWithState(ComboBox comboBox, CellState cellState)
+	{
+		// Only add disabled class when cell state is actually Disabled
+		comboBox.Classes.Set(CellDisabledClass, cellState == CellState.Disabled);
+	}
+
+	private static void SubscribeToRowChanges(Control control, RecipeRowViewModel row, string columnKey, ComboBox? comboBox = null)
+	{
+		PropertyChangedEventHandler handler = (_, e) =>
 		{
 			if (e.PropertyName == nameof(RecipeRowViewModel.IsSelected) ||
 				e.PropertyName == nameof(RecipeRowViewModel.CellStates))
 			{
 				ApplyCellClasses(control, row, columnKey);
+				if (comboBox is not null)
+				{
+					ApplyComboBoxDisabledClass(comboBox, row, columnKey);
+				}
 			}
 		};
+
+		row.PropertyChanged += handler;
+
+		// Register cleanup action to unsubscribe when row is disposed
+		row.RegisterCleanup(() => row.PropertyChanged -= handler);
 	}
 }
 

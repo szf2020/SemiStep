@@ -7,13 +7,12 @@
 
     <Menu>
         <MenuItem Header="_File">
-            <MenuItem Header="_New Core"
-                      Command="{Binding NewRecipeCommand}"
-                      InputGesture="Ctrl+N" />
-            <MenuItem Header="_Open Core"
+            <MenuItem Header="_New Recipe"
+                      Command="{Binding NewRecipeCommand}" />
+            <MenuItem Header="_Open Recipe..."
                       Command="{Binding LoadRecipeCommand}"
                       InputGesture="Ctrl+O" />
-            <MenuItem Header="_Save Core"
+            <MenuItem Header="_Save Recipe"
                       Command="{Binding SaveRecipeCommand}"
                       InputGesture="Ctrl+S" />
             <Separator />
@@ -25,16 +24,19 @@
         <MenuItem Header="_Edit">
             <MenuItem Header="_Add Step"
                       Command="{Binding AddStepCommand}"
-                      InputGesture="Ctrl+Insert" />
+                      InputGesture="Ctrl+N" />
             <MenuItem Header="_Delete Step"
-                      IsEnabled="False"
-                      InputGesture="Ctrl+Delete" />
+                      Command="{Binding DeleteStepCommand}"
+                      IsEnabled="{Binding CanDeleteStep}"
+                      InputGesture="Delete" />
             <Separator />
             <MenuItem Header="_Undo"
-                      IsEnabled="False"
+                      Command="{Binding UndoCommand}"
+                      IsEnabled="{Binding CanUndo}"
                       InputGesture="Ctrl+Z" />
             <MenuItem Header="_Redo"
-                      IsEnabled="False"
+                      Command="{Binding RedoCommand}"
+                      IsEnabled="{Binding CanRedo}"
                       InputGesture="Ctrl+Y" />
         </MenuItem>
 

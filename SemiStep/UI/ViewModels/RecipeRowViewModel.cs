@@ -17,11 +17,13 @@ public class RecipeRowViewModel(
 	IColumnRegistry columnRegistry,
 	Action<int, string, object?> onPropertyChanged,
 	Action<int, int> onActionChanged)
-	: ReactiveObject
+	: ReactiveObject, IDisposable
 {
 	private bool _isExecuting;
 	private bool _isSelected;
 	private IReadOnlyDictionary<string, CellState>? _cellStatesCache;
+	private readonly List<Action> _cleanupActions = [];
+	private bool _disposed;
 
 	public int StepNumber { get; } = stepNumber;
 
@@ -141,5 +143,45 @@ public class RecipeRowViewModel(
 	{
 		var actionColumn = action.Columns.FirstOrDefault(c => c.Key == columnKey);
 		return actionColumn?.GroupName is not null && groupRegistry.GroupExists(actionColumn.GroupName);
+	}
+
+	/// <summary>
+	/// Registers a cleanup action to be called when this row is disposed.
+	/// Used to unsubscribe event handlers.
+	/// </summary>
+	public void RegisterCleanup(Action cleanupAction)
+	{
+		if (_disposed)
+		{
+			// Already disposed, execute immediately
+			cleanupAction();
+			return;
+		}
+
+		_cleanupActions.Add(cleanupAction);
+	}
+
+	public void Dispose()
+	{
+		if (_disposed)
+		{
+			return;
+		}
+
+		_disposed = true;
+
+		foreach (var cleanup in _cleanupActions)
+		{
+			try
+			{
+				cleanup();
+			}
+			catch
+			{
+				// Ignore cleanup errors
+			}
+		}
+
+		_cleanupActions.Clear();
 	}
 }

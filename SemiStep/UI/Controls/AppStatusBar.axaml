@@ -5,15 +5,55 @@
              mc:Ignorable="d"
              x:Class="UI.Controls.AppStatusBar">
 
-    <Border Name="StatusBarBorder">
-        <StackPanel Name="StatusBarPanel"
-                    Orientation="Horizontal">
-            <TextBlock Name="StatusText"
-                       Text="{Binding StatusText}" />
-            <TextBlock Text="|" />
-            <TextBlock Name="ConnectionText"
-                       Text="{Binding ConnectionStatus}" />
-        </StackPanel>
+    <Border Name="StatusBarBorder"
+            Background="#F0F0F0"
+            BorderBrush="#D0D0D0"
+            BorderThickness="0,1,0,0"
+            Padding="8,4">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Status Text (Modified/Saved) -->
+            <TextBlock Grid.Column="0"
+                       Name="StatusText"
+                       Text="{Binding StatusText}"
+                       VerticalAlignment="Center"
+                       FontSize="12" />
+
+            <!-- Separator -->
+            <Border Grid.Column="1"
+                    Width="1"
+                    Background="#C0C0C0"
+                    Margin="12,2" />
+
+            <!-- Spacer -->
+            <Panel Grid.Column="2" />
+
+            <!-- Connection Status -->
+            <StackPanel Grid.Column="3"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <Ellipse Width="8"
+                         Height="8"
+                         Margin="0,0,6,0"
+                         VerticalAlignment="Center">
+                    <Ellipse.Styles>
+                        <Style Selector="Ellipse">
+                            <Setter Property="Fill" Value="#FF4444" />
+                        </Style>
+                    </Ellipse.Styles>
+                </Ellipse>
+                <TextBlock Name="ConnectionText"
+                           Text="{Binding ConnectionStatus}"
+                           VerticalAlignment="Center"
+                           FontSize="12" />
+            </StackPanel>
+        </Grid>
     </Border>
 
 </UserControl>

@@ -87,7 +87,7 @@ public sealed class CoreFacade(
 
 	private static void ValidateIndexOrThrow(Recipe recipe, int index)
 	{
-		if (index < 0 || index >= recipe.Steps.Count)
+		if (index < 0 || index > recipe.Steps.Count)
 		{
 			throw new IndexOutOfRangeException(
 				$"Index {index} is out of range for recipe with {recipe.Steps.Count} steps.");

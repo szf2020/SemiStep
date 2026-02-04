@@ -12,6 +12,15 @@
         Width="1200"
         Height="800">
 
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding LoadRecipeCommand}" />
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveRecipeCommand}" />
+        <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
+        <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
+        <KeyBinding Gesture="Ctrl+N" Command="{Binding AddStepCommand}" />
+        <KeyBinding Gesture="Delete" Command="{Binding DeleteStepCommand}" />
+    </Window.KeyBindings>
+
     <Grid RowDefinitions="Auto,*,Auto,Auto">
 
         <controls:RecipeMenuBar Grid.Row="0" />
@@ -19,6 +28,7 @@
         <DataGrid Grid.Row="1"
                   x:Name="RecipeGrid"
                   ItemsSource="{Binding RecipeRows}"
+                  SelectedIndex="{Binding SelectedRowIndex}"
                   AutoGenerateColumns="False"
                   CanUserReorderColumns="True"
                   CanUserResizeColumns="True"
