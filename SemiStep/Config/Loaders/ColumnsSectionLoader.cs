@@ -19,6 +19,7 @@ public sealed class ColumnsSectionLoader : ISectionLoader<List<ColumnDto>>
 		if (!Directory.Exists(columnsDir))
 		{
 			context.AddError($"Columns directory not found: {columnsDir}");
+
 			return [];
 		}
 
@@ -29,6 +30,7 @@ public sealed class ColumnsSectionLoader : ISectionLoader<List<ColumnDto>>
 		if (yamlFiles.Count == 0)
 		{
 			context.AddError($"No YAML files found in columns directory: {columnsDir}");
+
 			return [];
 		}
 
@@ -45,6 +47,7 @@ public sealed class ColumnsSectionLoader : ISectionLoader<List<ColumnDto>>
 				if (columnsDict == null || columnsDict.Count == 0)
 				{
 					context.AddWarning($"Empty or invalid YAML file: {Path.GetFileName(file)}", file);
+
 					continue;
 				}
 
@@ -79,6 +82,7 @@ public sealed class ColumnsSectionLoader : ISectionLoader<List<ColumnDto>>
 		if (string.IsNullOrWhiteSpace(column.Key))
 		{
 			context.AddError("Column Key is required", fileName);
+
 			return;
 		}
 

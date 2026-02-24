@@ -5,9 +5,9 @@ namespace Domain.State;
 public sealed class RecipeHistoryManager
 {
 	private const int MaxHistoryDepth = 100;
+	private readonly List<Recipe> _redoStack = new(MaxHistoryDepth);
 
 	private readonly List<Recipe> _undoStack = new(MaxHistoryDepth);
-	private readonly List<Recipe> _redoStack = new(MaxHistoryDepth);
 
 	public bool CanUndo => _undoStack.Count > 0;
 	public bool CanRedo => _redoStack.Count > 0;

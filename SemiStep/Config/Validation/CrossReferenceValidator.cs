@@ -17,6 +17,7 @@ public sealed class CrossReferenceValidator
 			|| context.Actions == null)
 		{
 			context.AddError("Cannot perform cross-reference validation: some sections are not loaded");
+
 			return context;
 		}
 

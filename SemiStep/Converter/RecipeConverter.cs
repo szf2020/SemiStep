@@ -44,6 +44,7 @@ public sealed class RecipeConverter
 				if (!step.Properties.TryGetValue(columnId, out var propertyValue))
 				{
 					AppendDefaultValue(propertyType, intValues, floatValues, stringValues);
+
 					continue;
 				}
 
@@ -51,12 +52,15 @@ public sealed class RecipeConverter
 				{
 					case PropertyType.Int:
 						intValues.Add(propertyValue.AsInt());
+
 						break;
 					case PropertyType.Float:
 						floatValues.Add(propertyValue.AsFloat());
+
 						break;
 					case PropertyType.String:
 						stringValues.Add(propertyValue.AsString());
+
 						break;
 				}
 			}
@@ -112,6 +116,7 @@ public sealed class RecipeConverter
 								$"Insufficient int values at step {stepIndex}, column '{columnDef.Key}'");
 						}
 						propertyValue = new PropertyValue(data.IntValues[intIndex++], PropertyType.Int);
+
 						break;
 
 					case PropertyType.Float:
@@ -121,6 +126,7 @@ public sealed class RecipeConverter
 								$"Insufficient float values at step {stepIndex}, column '{columnDef.Key}'");
 						}
 						propertyValue = new PropertyValue(data.FloatValues[floatIndex++], PropertyType.Float);
+
 						break;
 
 					case PropertyType.String:
@@ -130,6 +136,7 @@ public sealed class RecipeConverter
 								$"Insufficient string values at step {stepIndex}, column '{columnDef.Key}'");
 						}
 						propertyValue = new PropertyValue(data.StringValues[stringIndex++], PropertyType.String);
+
 						break;
 
 					default:
@@ -166,12 +173,15 @@ public sealed class RecipeConverter
 		{
 			case PropertyType.Int:
 				intValues.Add(0);
+
 				break;
 			case PropertyType.Float:
 				floatValues.Add(0f);
+
 				break;
 			case PropertyType.String:
 				stringValues.Add(string.Empty);
+
 				break;
 		}
 	}

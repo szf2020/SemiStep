@@ -9,12 +9,15 @@ public sealed class RecipeMutator(StepFactory stepFactory)
 	public Recipe AddStep(Recipe recipe, ActionDefinition action, IReadOnlyList<PropertyDefinition> properties)
 	{
 		var step = stepFactory.Create(action, properties);
+
 		return recipe with { Steps = recipe.Steps.Add(step) };
 	}
 
-	public Recipe InsertStep(Recipe recipe, int index, ActionDefinition action, IReadOnlyList<PropertyDefinition> properties)
+	public Recipe InsertStep(Recipe recipe, int index, ActionDefinition action,
+		IReadOnlyList<PropertyDefinition> properties)
 	{
 		var step = stepFactory.Create(action, properties);
+
 		return recipe with { Steps = recipe.Steps.Insert(index, step) };
 	}
 
@@ -28,6 +31,7 @@ public sealed class RecipeMutator(StepFactory stepFactory)
 		var step = recipe.Steps[stepIndex];
 		var newProperties = step.Properties.SetItem(columnId, value);
 		var newStep = step with { Properties = newProperties };
+
 		return recipe with { Steps = recipe.Steps.SetItem(stepIndex, newStep) };
 	}
 
@@ -38,6 +42,7 @@ public sealed class RecipeMutator(StepFactory stepFactory)
 		IReadOnlyList<PropertyDefinition> properties)
 	{
 		var newStep = stepFactory.Create(newAction, properties);
+
 		return recipe with { Steps = recipe.Steps.SetItem(stepIndex, newStep) };
 	}
 }

@@ -19,6 +19,7 @@ public sealed class ActionsSectionLoader : ISectionLoader<List<ActionDto>>
 		if (!Directory.Exists(actionsDir))
 		{
 			context.AddError($"Actions directory not found: {actionsDir}");
+
 			return [];
 		}
 
@@ -29,6 +30,7 @@ public sealed class ActionsSectionLoader : ISectionLoader<List<ActionDto>>
 		if (yamlFiles.Count == 0)
 		{
 			context.AddError($"No YAML files found in actions directory: {actionsDir}");
+
 			return [];
 		}
 
@@ -45,6 +47,7 @@ public sealed class ActionsSectionLoader : ISectionLoader<List<ActionDto>>
 				if (actionsDict == null || actionsDict.Count == 0)
 				{
 					context.AddWarning($"Empty or invalid YAML file: {Path.GetFileName(file)}", file);
+
 					continue;
 				}
 

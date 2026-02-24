@@ -19,19 +19,19 @@ public enum SyncStatus
 public sealed class PlcSyncCoordinator : IDisposable
 {
 	private const int DebounceDelayMs = 1000;
+	private readonly PlcConnectionManager _connectionManager;
+	private readonly object _lock = new();
+	private readonly ILogger _logger;
+	private readonly RecipeStateManager _stateManager;
 
 	private readonly PlcSyncService _syncService;
-	private readonly PlcConnectionManager _connectionManager;
-	private readonly RecipeStateManager _stateManager;
-	private readonly ILogger _logger;
-	private readonly object _lock = new();
 
 	private CancellationTokenSource? _debounceCts;
-	private Task? _syncTask;
+	private bool _disposed;
+	private string? _lastError;
 	private Recipe? _pendingSnapshot;
 	private SyncStatus _status = SyncStatus.Idle;
-	private string? _lastError;
-	private bool _disposed;
+	private Task? _syncTask;
 
 	public PlcSyncCoordinator(
 		PlcSyncService syncService,
@@ -46,9 +46,6 @@ public sealed class PlcSyncCoordinator : IDisposable
 
 		_stateManager.RecipeChanged += OnRecipeChanged;
 	}
-
-	public event Action<SyncStatus>? StatusChanged;
-	public event Action<string?>? ErrorChanged;
 
 	public SyncStatus Status
 	{
@@ -92,6 +89,22 @@ public sealed class PlcSyncCoordinator : IDisposable
 		}
 	}
 
+	public void Dispose()
+	{
+		if (_disposed)
+		{
+			return;
+		}
+
+		_disposed = true;
+		_stateManager.RecipeChanged -= OnRecipeChanged;
+		_debounceCts?.Cancel();
+		_debounceCts?.Dispose();
+	}
+
+	public event Action<SyncStatus>? StatusChanged;
+	public event Action<string?>? ErrorChanged;
+
 	public async Task WaitForPendingSyncAsync(CancellationToken ct = default)
 	{
 		Task? taskToWait;
@@ -112,19 +125,6 @@ public sealed class PlcSyncCoordinator : IDisposable
 		}
 	}
 
-	public void Dispose()
-	{
-		if (_disposed)
-		{
-			return;
-		}
-
-		_disposed = true;
-		_stateManager.RecipeChanged -= OnRecipeChanged;
-		_debounceCts?.Cancel();
-		_debounceCts?.Dispose();
-	}
-
 	private void OnRecipeChanged(Recipe recipe)
 	{
 		if (_disposed)
@@ -139,6 +139,7 @@ public sealed class PlcSyncCoordinator : IDisposable
 			if (_syncTask is not null && !_syncTask.IsCompleted)
 			{
 				_logger.Debug("Sync in progress, queueing new snapshot");
+
 				return;
 			}
 
@@ -183,6 +184,7 @@ public sealed class PlcSyncCoordinator : IDisposable
 		if (!_connectionManager.IsConnected)
 		{
 			_logger.Debug("Skipping sync: not connected to PLC");
+
 			return;
 		}
 
@@ -194,6 +196,7 @@ public sealed class PlcSyncCoordinator : IDisposable
 				Status = SyncStatus.BlockedByExecution;
 				LastError = "Recipe is being executed on PLC";
 				_logger.Warning("Sync blocked: recipe is being executed on PLC");
+
 				return;
 			}
 

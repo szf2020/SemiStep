@@ -40,9 +40,18 @@ public sealed class ActionRegistry : IActionRegistry
 		return action;
 	}
 
-	public bool ActionExists(int id) => _byId.ContainsKey(id);
+	public bool ActionExists(int id)
+	{
+		return _byId.ContainsKey(id);
+	}
 
-	public bool ActionExistsByName(string name) => _byName.ContainsKey(name);
+	public bool ActionExistsByName(string name)
+	{
+		return _byName.ContainsKey(name);
+	}
 
-	public IReadOnlyList<ActionDefinition> GetAll() => _byId.Values.ToList();
+	public IReadOnlyList<ActionDefinition> GetAll()
+	{
+		return _byId.Values.ToList();
+	}
 }

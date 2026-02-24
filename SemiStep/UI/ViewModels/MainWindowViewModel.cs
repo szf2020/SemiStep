@@ -17,12 +17,10 @@ namespace UI.ViewModels;
 
 public class MainWindowViewModel : ReactiveObject
 {
-	private readonly DomainFacade _domainFacade;
-	private readonly IActionRegistry _actionRegistry;
-	private readonly IGroupRegistry _groupRegistry;
 	private readonly IColumnRegistry _columnRegistry;
+	private readonly string? _currentFileName;
+	private readonly DomainFacade _domainFacade;
 	private int _selectedRowIndex = -1;
-	private string? _currentFileName;
 
 	public MainWindowViewModel(
 		DomainFacade domainFacade,
@@ -31,8 +29,8 @@ public class MainWindowViewModel : ReactiveObject
 		IColumnRegistry columnRegistry)
 	{
 		_domainFacade = domainFacade;
-		_actionRegistry = actionRegistry;
-		_groupRegistry = groupRegistry;
+		ActionRegistry = actionRegistry;
+		GroupRegistry = groupRegistry;
 		_columnRegistry = columnRegistry;
 
 		RecipeRows = new ObservableCollection<RecipeRowViewModel>();
@@ -52,11 +50,13 @@ public class MainWindowViewModel : ReactiveObject
 		UndoCommand = ReactiveCommand.Create(Undo);
 		RedoCommand = ReactiveCommand.Create(Redo);
 		ExitCommand = ReactiveCommand.Create(Exit);
+
+		_currentFileName = "New Recipe";
 	}
 
-	public IActionRegistry ActionRegistry => _actionRegistry;
+	public IActionRegistry ActionRegistry { get; }
 
-	public IGroupRegistry GroupRegistry => _groupRegistry;
+	public IGroupRegistry GroupRegistry { get; }
 
 	public ObservableCollection<RecipeRowViewModel> RecipeRows { get; }
 
@@ -93,6 +93,7 @@ public class MainWindowViewModel : ReactiveObject
 		{
 			var fileName = _currentFileName ?? "Untitled";
 			var dirtyIndicator = IsDirty ? " *" : "";
+
 			return $"SemiStep - {fileName}{dirtyIndicator}";
 		}
 	}
@@ -127,7 +128,7 @@ public class MainWindowViewModel : ReactiveObject
 
 	private void AddStep()
 	{
-		var firstAction = _actionRegistry.GetAll().First();
+		var firstAction = ActionRegistry.GetAll().First();
 		int newRowIndex;
 
 		if (SelectedRowIndex >= 0)
@@ -184,7 +185,8 @@ public class MainWindowViewModel : ReactiveObject
 
 		// TODO: Implement file saving when backend is ready
 		// For now, show "Not implemented" message
-		await ShowMessageInteraction.Handle(("Save Recipe", "File saving is not yet implemented.\n\nSelected path: " + filePath));
+		await ShowMessageInteraction.Handle(("Save Recipe",
+			"File saving is not yet implemented.\n\nSelected path: " + filePath));
 	}
 
 	private async Task LoadRecipeAsync()
@@ -198,7 +200,8 @@ public class MainWindowViewModel : ReactiveObject
 
 		// TODO: Implement file loading when backend is ready
 		// For now, show "Not implemented" message
-		await ShowMessageInteraction.Handle(("Open Recipe", "File loading is not yet implemented.\n\nSelected path: " + filePath));
+		await ShowMessageInteraction.Handle(("Open Recipe",
+			"File loading is not yet implemented.\n\nSelected path: " + filePath));
 	}
 
 	private void NewRecipe()
@@ -244,12 +247,12 @@ public class MainWindowViewModel : ReactiveObject
 		for (var i = 0; i < recipe.StepCount; i++)
 		{
 			var step = recipe.Steps[i];
-			var action = _actionRegistry.GetAction(step.ActionKey);
+			var action = ActionRegistry.GetAction(step.ActionKey);
 			var rowVm = new RecipeRowViewModel(
 				i + 1,
 				step,
 				action,
-				_groupRegistry,
+				GroupRegistry,
 				_columnRegistry,
 				OnCellValueChanged,
 				OnActionChanged);
@@ -275,13 +278,17 @@ public class MainWindowViewModel : ReactiveObject
 		try
 		{
 			_domainFacade.UpdateStepProperty(stepIndex, columnKey, value);
+
+			// After domain mutation, update the row VM's step reference
+			// so GetPropertyValue reads from the latest immutable step
+			var updatedStep = _domainFacade.CurrentRecipe.Steps[stepIndex];
+			RecipeRows[stepIndex].UpdateStep(updatedStep);
 		}
 		catch (Exception ex)
 		{
 			ValidationErrors.Add($"Step {stepIndex + 1}: {ex.Message}");
 		}
 
-		RefreshRecipeRows();
 		RaiseStateChanged();
 	}
 

@@ -19,6 +19,7 @@ public sealed class GridStyleLoader : ISectionLoader<GridStyleOptionsDto?>
 		if (!Directory.Exists(uiDir))
 		{
 			context.AddInfo($"UI directory not found, using default grid styles: {uiDir}");
+
 			return null;
 		}
 
@@ -27,6 +28,7 @@ public sealed class GridStyleLoader : ISectionLoader<GridStyleOptionsDto?>
 		if (!File.Exists(filePath))
 		{
 			context.AddInfo($"Grid style file not found, using defaults: {filePath}");
+
 			return null;
 		}
 
@@ -38,6 +40,7 @@ public sealed class GridStyleLoader : ISectionLoader<GridStyleOptionsDto?>
 			if (dto == null)
 			{
 				context.AddWarning("Grid style file is empty, using defaults", filePath);
+
 				return null;
 			}
 
@@ -46,6 +49,7 @@ public sealed class GridStyleLoader : ISectionLoader<GridStyleOptionsDto?>
 		catch (Exception ex)
 		{
 			context.AddWarning($"Failed to parse grid style file, using defaults: {ex.Message}", filePath);
+
 			return null;
 		}
 	}

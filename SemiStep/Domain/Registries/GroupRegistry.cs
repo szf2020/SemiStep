@@ -27,7 +27,13 @@ public sealed class GroupRegistry : IGroupRegistry
 		return group;
 	}
 
-	public bool GroupExists(string groupId) => _groups.ContainsKey(groupId);
+	public bool GroupExists(string groupId)
+	{
+		return _groups.ContainsKey(groupId);
+	}
 
-	public IReadOnlyList<GroupDefinition> GetAll() => _groups.Values.ToList();
+	public IReadOnlyList<GroupDefinition> GetAll()
+	{
+		return _groups.Values.ToList();
+	}
 }

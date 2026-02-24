@@ -22,6 +22,7 @@ public sealed class StepFactory
 	{
 		var type = ParsePropertyType(property.SystemType);
 		var defaultValue = GetDefaultForType(type);
+
 		return new PropertyValue(defaultValue, type);
 	}
 

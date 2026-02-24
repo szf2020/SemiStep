@@ -22,6 +22,7 @@ public sealed class CoreFacade(
 		IReadOnlyList<PropertyDefinition> properties)
 	{
 		var newRecipe = mutator.AddStep(recipe, action, properties);
+
 		return analyzer.Analyze(newRecipe);
 	}
 
@@ -34,6 +35,7 @@ public sealed class CoreFacade(
 		ValidateIndexOrThrow(recipe, stepIndex);
 
 		var newRecipe = mutator.InsertStep(recipe, stepIndex, action, properties);
+
 		return analyzer.Analyze(newRecipe);
 	}
 
@@ -42,6 +44,7 @@ public sealed class CoreFacade(
 		ValidateIndexOrThrow(recipe, stepIndex);
 
 		var newRecipe = mutator.RemoveStep(recipe, stepIndex);
+
 		return analyzer.Analyze(newRecipe);
 	}
 
@@ -54,6 +57,7 @@ public sealed class CoreFacade(
 		ValidateIndexOrThrow(recipe, stepIndex);
 
 		var newRecipe = mutator.ChangeStepAction(recipe, stepIndex, newAction, properties);
+
 		return analyzer.Analyze(newRecipe);
 	}
 

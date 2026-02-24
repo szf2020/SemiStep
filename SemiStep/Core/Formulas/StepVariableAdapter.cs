@@ -37,10 +37,7 @@ public sealed class StepVariableAdapter : IStepVariableAdapter
 				continue;
 			}
 
-			var updatedProperty = existingProperty with
-			{
-				Value = ConvertOrThrow(formulaValue, existingProperty.Type)
-			};
+			var updatedProperty = existingProperty with { Value = ConvertOrThrow(formulaValue, existingProperty.Type) };
 
 			propertyUpdates.Add(KeyValuePair.Create(columnId, updatedProperty));
 		}

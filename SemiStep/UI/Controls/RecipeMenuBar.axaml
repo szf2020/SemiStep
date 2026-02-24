@@ -37,9 +37,8 @@
             <MenuItem Header="_Redo"
                       Command="{Binding RedoCommand}"
                       IsEnabled="{Binding CanRedo}"
-                      InputGesture="Ctrl+Y" />
+                      InputGesture="Ctrl+Shift+Z" />
         </MenuItem>
-
         <MenuItem Header="_View">
             <MenuItem Header="_Validation Errors"
                       IsEnabled="False" />

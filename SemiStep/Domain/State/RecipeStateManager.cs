@@ -7,12 +7,12 @@ public sealed class RecipeStateManager
 {
 	private Recipe _lastValid = Recipe.Empty;
 
-	public event Action<Recipe>? RecipeChanged;
-
 	public RecipeSnapshot? LastSnapshot { get; private set; }
 	public Recipe Current => LastSnapshot?.Recipe ?? Recipe.Empty;
 	public bool IsDirty { get; private set; }
 	public bool IsValid => LastSnapshot?.IsValid ?? false;
+
+	public event Action<Recipe>? RecipeChanged;
 
 	public void Update(RecipeSnapshot snapshot)
 	{

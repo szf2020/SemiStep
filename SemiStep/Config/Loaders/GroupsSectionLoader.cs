@@ -20,6 +20,7 @@ public sealed class GroupsSectionLoader : ISectionLoader<Dictionary<string, Dict
 		if (!Directory.Exists(groupsDir))
 		{
 			context.AddError($"Groups directory not found: {groupsDir}");
+
 			return new Dictionary<string, Dictionary<int, string>>();
 		}
 
@@ -30,6 +31,7 @@ public sealed class GroupsSectionLoader : ISectionLoader<Dictionary<string, Dict
 		if (yamlFiles.Count == 0)
 		{
 			context.AddError($"No YAML files found in groups directory: {groupsDir}");
+
 			return new Dictionary<string, Dictionary<int, string>>();
 		}
 
@@ -45,6 +47,7 @@ public sealed class GroupsSectionLoader : ISectionLoader<Dictionary<string, Dict
 				if (fileGroups == null)
 				{
 					context.AddWarning($"Empty or invalid YAML file: {Path.GetFileName(file)}", file);
+
 					continue;
 				}
 
@@ -53,6 +56,7 @@ public sealed class GroupsSectionLoader : ISectionLoader<Dictionary<string, Dict
 					if (allGroups.ContainsKey(groupId))
 					{
 						context.AddError($"Duplicate group_id '{groupId}'", file);
+
 						continue;
 					}
 

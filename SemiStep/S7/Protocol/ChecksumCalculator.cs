@@ -17,6 +17,7 @@ public static class ChecksumCalculator
 	{
 		var bytes = new byte[values.Length * sizeof(int)];
 		Buffer.BlockCopy(values, 0, bytes, 0, bytes.Length);
+
 		return Crc32.HashToUInt32(bytes);
 	}
 
@@ -24,6 +25,7 @@ public static class ChecksumCalculator
 	{
 		var bytes = new byte[values.Length * sizeof(float)];
 		Buffer.BlockCopy(values, 0, bytes, 0, bytes.Length);
+
 		return Crc32.HashToUInt32(bytes);
 	}
 

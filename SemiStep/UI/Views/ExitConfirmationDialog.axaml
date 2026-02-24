@@ -28,13 +28,13 @@
                     HorizontalAlignment="Right"
                     Spacing="10"
                     Margin="0,20,0,0">
-            <Button Content="Save" 
+            <Button Content="Save"
                     Width="80"
                     Click="OnSaveClick" />
-            <Button Content="Don't Save" 
+            <Button Content="Don't Save"
                     Width="90"
                     Click="OnDontSaveClick" />
-            <Button Content="Cancel" 
+            <Button Content="Cancel"
                     Width="80"
                     Click="OnCancelClick"
                     IsCancel="True" />

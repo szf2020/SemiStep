@@ -6,13 +6,10 @@ using Core;
 using Domain;
 using Domain.Facade;
 using Domain.Ports;
-using Domain.Services;
-using Domain.State;
 
 using Microsoft.Extensions.DependencyInjection;
 
 using Serilog;
-using Serilog.Core;
 
 using Tests.Helpers;
 
@@ -41,6 +38,7 @@ public static class CoreTestHelper
 		if (context.HasErrors || context.Configuration is null)
 		{
 			var errors = string.Join("; ", context.Errors.Select(e => e.Message));
+
 			throw new InvalidOperationException($"Failed to load config '{configName}': {errors}");
 		}
 

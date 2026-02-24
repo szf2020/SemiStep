@@ -21,6 +21,7 @@ public sealed class CoreService(
 		var recipeSnapshot = coreFacade.Analyze(Recipe.Empty);
 		stateManager.Reset();
 		stateManager.Update(recipeSnapshot);
+
 		return recipeSnapshot;
 	}
 
@@ -34,6 +35,7 @@ public sealed class CoreService(
 		var action = actionRegistry.GetAction(actionId);
 		var properties = ResolvePropertiesForAction(action);
 		var recipeSnapshot = coreFacade.AppendStep(stateManager.Current, action, properties);
+
 		return recipeSnapshot;
 	}
 
@@ -42,6 +44,7 @@ public sealed class CoreService(
 		var action = actionRegistry.GetAction(actionId);
 		var properties = ResolvePropertiesForAction(action);
 		var recipeSnapshot = coreFacade.InsertStep(stateManager.Current, index, action, properties);
+
 		return recipeSnapshot;
 	}
 
@@ -50,12 +53,14 @@ public sealed class CoreService(
 		var newAction = actionRegistry.GetAction(newActionId);
 		var properties = ResolvePropertiesForAction(newAction);
 		var recipeSnapshot = coreFacade.ChangeStepAction(stateManager.Current, stepIndex, newAction, properties);
+
 		return recipeSnapshot;
 	}
 
 	public RecipeSnapshot RemoveStep(int index)
 	{
 		var recipeSnapshot = coreFacade.RemoveStep(stateManager.Current, index);
+
 		return recipeSnapshot;
 	}
 
@@ -99,6 +104,7 @@ public sealed class CoreService(
 			string => PropertyType.String,
 			_ => throw new ArgumentException($"Unsupported value type: {value.GetType()}")
 		};
+
 		return new PropertyValue(value, type);
 	}
 }

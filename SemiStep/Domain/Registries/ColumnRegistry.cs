@@ -27,7 +27,13 @@ public sealed class ColumnRegistry : IColumnRegistry
 		return column;
 	}
 
-	public bool ColumnExists(string key) => _columns.ContainsKey(key);
+	public bool ColumnExists(string key)
+	{
+		return _columns.ContainsKey(key);
+	}
 
-	public IReadOnlyList<GridColumnDefinition> GetAll() => _columns.Values.ToList();
+	public IReadOnlyList<GridColumnDefinition> GetAll()
+	{
+		return _columns.Values.ToList();
+	}
 }

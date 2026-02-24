@@ -1,8 +1,4 @@
-﻿using Domain.State;
-
-using FluentAssertions;
-
-using Microsoft.Extensions.DependencyInjection;
+﻿using FluentAssertions;
 
 using Tests.Core.Helpers;
 
@@ -41,7 +37,8 @@ public sealed class CoreLoopTests
 		var driver = new RecipeTestDriver(facade);
 		driver.AddFor(DefaultIterationCount).AddWait(SingleIterationDuration).AddEndFor();
 
-		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.FromSeconds(SingleIterationDuration * DefaultIterationCount));
+		driver.Snapshot.TotalDuration.Should()
+			.Be(TimeSpan.FromSeconds(SingleIterationDuration * DefaultIterationCount));
 
 		var loop = driver.Snapshot.LoopByStart[0];
 		loop.Iterations.Should().Be(DefaultIterationCount);

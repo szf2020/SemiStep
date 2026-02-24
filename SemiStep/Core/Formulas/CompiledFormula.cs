@@ -43,7 +43,8 @@ public sealed class CompiledFormula(
 		return recalcOrder.FirstOrDefault(v => string.Equals(v, changedVariable, StringComparison.OrdinalIgnoreCase));
 	}
 
-	private Dictionary<string, double> ComputeTargetValue(string targetVariable, IReadOnlyDictionary<string, double> values)
+	private Dictionary<string, double> ComputeTargetValue(string targetVariable,
+		IReadOnlyDictionary<string, double> values)
 	{
 		if (!solvers.TryGetValue(targetVariable, out var solver))
 		{
@@ -59,16 +60,14 @@ public sealed class CompiledFormula(
 				$"Computation for target variable '{targetVariable}' resulted as NaN or Infinity.");
 		}
 
-		return new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
-		{
-			[targetVariable] = calculatedValue
-		};
+		return new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase) { [targetVariable] = calculatedValue };
 	}
 
 	public override string ToString()
 	{
 		var variablesStr = string.Join(", ", variables);
 		var orderStr = string.Join(" -> ", recalcOrder);
+
 		return $"Variables: [{variablesStr}], Order: [{orderStr}]";
 	}
 }

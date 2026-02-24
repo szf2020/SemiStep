@@ -11,6 +11,7 @@ public static class S7Di
 	public static IServiceCollection AddS7(this IServiceCollection services)
 	{
 		services.AddSingleton<IPlcConnection, S7Facade>();
+
 		return services;
 	}
 }

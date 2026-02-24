@@ -32,6 +32,7 @@ public sealed class S7Facade : IPlcConnection
 	{
 		_plc?.Close();
 		_plc = null;
+
 		return Task.CompletedTask;
 	}
 
@@ -163,6 +164,7 @@ public sealed class S7Facade : IPlcConnection
 	public async Task<byte[]> ReadBytesAsync(int dbNumber, int startByte, int count, CancellationToken ct = default)
 	{
 		CheckIfConnectedOrThrow();
+
 		return await ReadBytesInternalAsync(dbNumber, startByte, count, ct);
 	}
 
@@ -183,6 +185,7 @@ public sealed class S7Facade : IPlcConnection
 	private async Task<byte[]> ReadBytesInternalAsync(int dbNumber, int startByte, int count, CancellationToken ct)
 	{
 		ct.ThrowIfCancellationRequested();
+
 		return await _plc!.ReadBytesAsync(DataType.DataBlock, dbNumber, startByte, count);
 	}
 
@@ -215,10 +218,12 @@ public sealed class S7Facade : IPlcConnection
 				case PlcSyncStatus.CrcComputing:
 				case PlcSyncStatus.Busy:
 					await Task.Delay(ProtocolConstants.PollIntervalMs, ct);
+
 					break;
 
 				default:
 					await Task.Delay(ProtocolConstants.PollIntervalMs, ct);
+
 					break;
 			}
 		}

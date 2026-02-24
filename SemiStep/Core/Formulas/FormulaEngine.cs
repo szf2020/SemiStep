@@ -3,7 +3,8 @@
 public sealed class FormulaEngine(
 	IReadOnlyDictionary<int, CompiledFormula> compiledFormulas) : IFormulaEngine
 {
-	private readonly IReadOnlyDictionary<int, CompiledFormula> _compiledFormulas = compiledFormulas ?? throw new ArgumentNullException(nameof(compiledFormulas));
+	private readonly IReadOnlyDictionary<int, CompiledFormula> _compiledFormulas =
+		compiledFormulas ?? throw new ArgumentNullException(nameof(compiledFormulas));
 
 	public Dictionary<string, double> Calculate(
 		int actionId,

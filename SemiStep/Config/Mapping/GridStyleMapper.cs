@@ -32,7 +32,8 @@ public sealed class GridStyleMapper
 			ReadonlyCellSelectedColor: dto.Colors?.Cells?.Readonly?.Selected ?? defaults.ReadonlyCellSelectedColor,
 			DisabledCellNormalColor: dto.Colors?.Cells?.Disabled?.Normal ?? defaults.DisabledCellNormalColor,
 			DisabledCellSelectedColor: dto.Colors?.Cells?.Disabled?.Selected ?? defaults.DisabledCellSelectedColor,
-			AlternatingRowBackgroundColor: dto.Colors?.Rows?.AlternatingBackground ?? defaults.AlternatingRowBackgroundColor,
+			AlternatingRowBackgroundColor: dto.Colors?.Rows?.AlternatingBackground ??
+										   defaults.AlternatingRowBackgroundColor,
 			NormalRowBackgroundColor: dto.Colors?.Rows?.NormalBackground ?? defaults.NormalRowBackgroundColor,
 			GridLineThickness: dto.Borders?.GridLineThickness ?? defaults.GridLineThickness,
 			GridLineColor: dto.Colors?.GridLine ?? defaults.GridLineColor,

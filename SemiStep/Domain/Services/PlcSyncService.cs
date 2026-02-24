@@ -6,8 +6,6 @@ using Domain.Ports;
 
 using Serilog;
 
-using Shared.Entities;
-
 namespace Domain.Services;
 
 public sealed class PlcSyncService
@@ -31,6 +29,7 @@ public sealed class PlcSyncService
 	public async Task<bool> IsRecipeActiveAsync(CancellationToken ct = default)
 	{
 		var state = await _connection.ReadExecutionStateAsync(ct);
+
 		return state.RecipeActive;
 	}
 
@@ -46,6 +45,7 @@ public sealed class PlcSyncService
 				_logger.Information(
 					"Recipe synced to PLC successfully ({StepCount} steps)",
 					recipe.StepCount);
+
 				return;
 			}
 			catch (PlcSyncException ex) when (attempt < MaxRetryAttempts && IsRetryableError(ex.ErrorCode))
@@ -65,6 +65,7 @@ public sealed class PlcSyncService
 	public async Task<Recipe> LoadRecipeAsync(CancellationToken ct = default)
 	{
 		var recipeData = await _connection.ReadRecipeDataAsync(ct);
+
 		return _converter.ToRecipe(recipeData);
 	}
 

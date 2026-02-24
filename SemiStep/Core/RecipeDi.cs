@@ -38,8 +38,7 @@ public static class RecipeDi
 		services.AddSingleton<RecipeAnalyzer>();
 
 		// Formulas (placeholder - empty formulas dictionary for now)
-		services.AddSingleton<IReadOnlyDictionary<int, CompiledFormula>>(
-			_ => new Dictionary<int, CompiledFormula>());
+		services.AddSingleton<IReadOnlyDictionary<int, CompiledFormula>>(_ => new Dictionary<int, CompiledFormula>());
 		services.AddSingleton<IFormulaEngine, FormulaEngine>();
 		services.AddSingleton<IStepVariableAdapter, StepVariableAdapter>();
 		services.AddSingleton<FormulaApplicationCoordinator>();

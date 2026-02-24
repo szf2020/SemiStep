@@ -25,6 +25,7 @@ public static class TestDataCopier
 		}
 
 		CopyDirectory(sourceDir, tempDir.Path);
+
 		return tempDir;
 	}
 
@@ -53,6 +54,7 @@ public static class TestDataCopier
 		}
 
 		CopyDirectory(invalidDir, tempDir.Path);
+
 		return tempDir;
 	}
 
@@ -71,6 +73,7 @@ public static class TestDataCopier
 		}
 
 		CopyDirectory(sourceDir, tempDir.Path);
+
 		return tempDir;
 	}
 

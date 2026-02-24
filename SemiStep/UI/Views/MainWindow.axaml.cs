@@ -48,11 +48,13 @@ public partial class MainWindow : Window
 					_forceClose = true;
 					Close();
 				});
+
 				break;
 
 			case ExitConfirmationResult.DontSave:
 				_forceClose = true;
 				Close();
+
 				break;
 
 			case ExitConfirmationResult.Cancel:
@@ -124,7 +126,8 @@ public partial class MainWindow : Window
 
 	private void BuildGrid()
 	{
-		if (_columnBuilder is null || DataContext is not MainWindowViewModel viewModel || viewModel.Configuration is null)
+		if (_columnBuilder is null || DataContext is not MainWindowViewModel viewModel ||
+			viewModel.Configuration is null)
 		{
 			return;
 		}

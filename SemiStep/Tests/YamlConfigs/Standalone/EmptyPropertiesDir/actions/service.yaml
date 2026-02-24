@@ -2,4 +2,4 @@
 10:
   ui_name: "Test"
   deploy_duration: immediate
-  columns: []
+  columns: [ ]

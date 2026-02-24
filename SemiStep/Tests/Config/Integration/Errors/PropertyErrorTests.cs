@@ -34,7 +34,7 @@ public class PropertyErrorTests
 
 		// Assert
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("int", StringComparison.OrdinalIgnoreCase),
+				e.Message.Contains("int", StringComparison.OrdinalIgnoreCase),
 			"error should identify 'int' as the duplicate PropertyTypeId");
 	}
 
@@ -58,7 +58,7 @@ public class PropertyErrorTests
 
 		// Assert
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("boolean", StringComparison.OrdinalIgnoreCase),
+				e.Message.Contains("boolean", StringComparison.OrdinalIgnoreCase),
 			"error should show 'boolean' as the invalid value");
 	}
 
@@ -83,7 +83,7 @@ public class PropertyErrorTests
 
 		// Assert
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("100") && e.Message.Contains("10"),
+				e.Message.Contains("100") && e.Message.Contains("10"),
 			"error should show the actual Min (100) and Max (10) values");
 	}
 

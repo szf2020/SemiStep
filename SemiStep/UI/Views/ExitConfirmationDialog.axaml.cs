@@ -5,12 +5,12 @@ namespace UI.Views;
 
 public partial class ExitConfirmationDialog : Window
 {
-	public ExitConfirmationResult Result { get; private set; } = ExitConfirmationResult.Cancel;
-
 	public ExitConfirmationDialog()
 	{
 		InitializeComponent();
 	}
+
+	public ExitConfirmationResult Result { get; private set; } = ExitConfirmationResult.Cancel;
 
 	private void OnSaveClick(object? sender, RoutedEventArgs e)
 	{

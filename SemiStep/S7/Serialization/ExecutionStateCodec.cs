@@ -17,9 +17,11 @@ internal static class ExecutionStateCodec
 		}
 
 		return new PlcExecutionState(
-			RecipeActive: data[ExecutionAreaLayout.RecipeActiveOffset] != 0 || data[ExecutionAreaLayout.RecipeActiveOffset + 1] != 0,
+			RecipeActive: data[ExecutionAreaLayout.RecipeActiveOffset] != 0 ||
+						  data[ExecutionAreaLayout.RecipeActiveOffset + 1] != 0,
 			ActualLine: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(ExecutionAreaLayout.ActualLineOffset)),
-			StepCurrentTime: BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(ExecutionAreaLayout.StepCurrentTimeOffset))),
+			StepCurrentTime: BitConverter.Int32BitsToSingle(
+				BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(ExecutionAreaLayout.StepCurrentTimeOffset))),
 			ForLoopCount1: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(ExecutionAreaLayout.ForLoopCount1Offset)),
 			ForLoopCount2: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(ExecutionAreaLayout.ForLoopCount2Offset)),
 			ForLoopCount3: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(ExecutionAreaLayout.ForLoopCount3Offset)));

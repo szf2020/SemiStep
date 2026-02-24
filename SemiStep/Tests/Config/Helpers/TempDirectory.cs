@@ -8,8 +8,6 @@ public sealed class TempDirectory : IDisposable
 {
 	private bool _disposed;
 
-	public string Path { get; }
-
 	public TempDirectory()
 	{
 		Path = System.IO.Path.Combine(
@@ -19,6 +17,8 @@ public sealed class TempDirectory : IDisposable
 
 		Directory.CreateDirectory(Path);
 	}
+
+	public string Path { get; }
 
 	public void Dispose()
 	{

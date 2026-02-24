@@ -28,9 +28,18 @@ public sealed class DomainFacade(
 	public bool IsValid => stateManager.IsValid;
 	public RecipeSnapshot Snapshot => stateManager.LastSnapshot ?? RecipeSnapshot.Empty;
 
-
 	public bool CanUndo => historyManager.CanUndo;
 	public bool CanRedo => historyManager.CanRedo;
+
+	public void Dispose()
+	{
+		if (_disposed)
+		{
+			return;
+		}
+
+		_disposed = true;
+	}
 
 	public void Initialize(AppConfiguration appConfig)
 	{
@@ -71,15 +80,17 @@ public sealed class DomainFacade(
 
 	public void RemoveStep(int index)
 	{
-		historyManager.Push(stateManager.Current);
 		var snapshot = coreService.RemoveStep(index);
+
+		HistoryPushOnlyValidState(snapshot);
 		stateManager.Update(snapshot);
 	}
 
 	public void UpdateStepProperty(int stepIndex, string columnKey, object value)
 	{
-		historyManager.Push(stateManager.Current);
 		var snapshot = coreService.UpdateStepProperty(stepIndex, columnKey, value);
+
+		HistoryPushOnlyValidState(snapshot);
 		stateManager.Update(snapshot);
 	}
 
@@ -93,6 +104,7 @@ public sealed class DomainFacade(
 
 		var snapshot = coreService.AnalyzeRecipe(previous);
 		stateManager.Update(snapshot);
+
 		return snapshot;
 	}
 
@@ -106,6 +118,7 @@ public sealed class DomainFacade(
 
 		var snapshot = coreService.AnalyzeRecipe(next);
 		stateManager.Update(snapshot);
+
 		return snapshot;
 	}
 
@@ -133,13 +146,11 @@ public sealed class DomainFacade(
 		stateManager.MarkSaved();
 	}
 
-	public void Dispose()
+	private void HistoryPushOnlyValidState(RecipeSnapshot snapshot)
 	{
-		if (_disposed)
+		if (snapshot.IsValid)
 		{
-			return;
+			historyManager.Push(stateManager.Current);
 		}
-
-		_disposed = true;
 	}
 }

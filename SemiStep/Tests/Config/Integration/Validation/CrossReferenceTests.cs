@@ -34,7 +34,7 @@ public class CrossReferenceTests
 
 		// Assert
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("nonexistent_property", StringComparison.OrdinalIgnoreCase),
+				e.Message.Contains("nonexistent_property", StringComparison.OrdinalIgnoreCase),
 			"error should identify 'nonexistent_property' as the unknown property_type_id");
 	}
 
@@ -58,7 +58,7 @@ public class CrossReferenceTests
 
 		// Assert
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("nonexistent_column", StringComparison.OrdinalIgnoreCase),
+				e.Message.Contains("nonexistent_column", StringComparison.OrdinalIgnoreCase),
 			"error should identify 'nonexistent_column' as the unknown column");
 	}
 
@@ -82,7 +82,7 @@ public class CrossReferenceTests
 
 		// Assert
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("nonexistent_group", StringComparison.OrdinalIgnoreCase),
+				e.Message.Contains("nonexistent_group", StringComparison.OrdinalIgnoreCase),
 			"error should identify 'nonexistent_group' as the unknown group_name");
 	}
 
@@ -106,7 +106,7 @@ public class CrossReferenceTests
 
 		// Assert
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("nonexistent_property", StringComparison.OrdinalIgnoreCase),
+				e.Message.Contains("nonexistent_property", StringComparison.OrdinalIgnoreCase),
 			"error should identify 'nonexistent_property' as the unknown property_type_id");
 	}
 
@@ -131,7 +131,7 @@ public class CrossReferenceTests
 
 		// Assert
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("step_duration"),
+				e.Message.Contains("step_duration"),
 			"error should reference the column 'step_duration' that has the broken reference");
 	}
 
@@ -143,7 +143,7 @@ public class CrossReferenceTests
 
 		// Assert
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("Wait") || e.Message.Contains("10"),
+				e.Message.Contains("Wait") || e.Message.Contains("10"),
 			"error should reference the action 'Wait' (Id=10) that has the broken reference");
 	}
 }

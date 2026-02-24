@@ -24,6 +24,7 @@ public static class ConfigTestHelper
 		if (context.HasErrors || context.Configuration is null)
 		{
 			var errors = string.Join("; ", context.Errors.Select(e => e.Message));
+
 			throw new InvalidOperationException($"Expected valid config but got errors: {errors}");
 		}
 
@@ -38,6 +39,7 @@ public static class ConfigTestHelper
 	{
 		using var tempDir = TestDataCopier.PrepareInvalidCase(invalidCaseName);
 		var facade = new ConfigFacade();
+
 		return await facade.LoadAsync(tempDir.Path);
 	}
 
@@ -62,6 +64,7 @@ public static class ConfigTestHelper
 		if (matchingError is null)
 		{
 			var actualErrors = string.Join("\n", context.Errors.Select(e => $"  - {e.Message}"));
+
 			throw new InvalidOperationException(
 				$"Expected error containing '{expectedMessageContains}' but got:\n{actualErrors}");
 		}
@@ -73,6 +76,7 @@ public static class ConfigTestHelper
 	public static async Task<ConfigContext> LoadFromTempDirAsync(TempDirectory tempDir)
 	{
 		var facade = new ConfigFacade();
+
 		return await facade.LoadAsync(tempDir.Path);
 	}
 
@@ -84,6 +88,7 @@ public static class ConfigTestHelper
 	{
 		using var tempDir = TestDataCopier.PrepareStandaloneCase(caseName);
 		var facade = new ConfigFacade();
+
 		return await facade.LoadAsync(tempDir.Path);
 	}
 

@@ -17,7 +17,7 @@ using Shared.Reasons;
 
 using UI;
 
-namespace SemiStep.Application;
+namespace Application;
 
 public class Program
 {
@@ -83,6 +83,7 @@ public class Program
 		if (context.Configuration is null)
 		{
 			Log.Error("Configuration is null after successful loading");
+
 			throw new InvalidOperationException("Configuration is null");
 		}
 

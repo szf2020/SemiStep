@@ -6,20 +6,26 @@ namespace Tests.Helpers;
 
 public sealed class StubPlcConnection : IPlcConnection, IDisposable
 {
-	private bool _isConnected;
 	private PlcRecipeData _storedData = new([], [], [], 0);
 
-	public bool IsConnected => _isConnected;
+	public void Dispose()
+	{
+		IsConnected = false;
+	}
+
+	public bool IsConnected { get; private set; }
 
 	public Task ConnectAsync(PlcConnectionSettings settings, CancellationToken ct = default)
 	{
-		_isConnected = true;
+		IsConnected = true;
+
 		return Task.CompletedTask;
 	}
 
 	public Task DisconnectAsync(CancellationToken ct = default)
 	{
-		_isConnected = false;
+		IsConnected = false;
+
 		return Task.CompletedTask;
 	}
 
@@ -31,6 +37,7 @@ public sealed class StubPlcConnection : IPlcConnection, IDisposable
 	public Task WriteRecipeDataAsync(PlcRecipeData data, CancellationToken ct = default)
 	{
 		_storedData = data;
+
 		return Task.CompletedTask;
 	}
 
@@ -79,12 +86,8 @@ public sealed class StubPlcConnection : IPlcConnection, IDisposable
 
 	public ValueTask DisposeAsync()
 	{
-		_isConnected = false;
-		return ValueTask.CompletedTask;
-	}
+		IsConnected = false;
 
-	public void Dispose()
-	{
-		_isConnected = false;
+		return ValueTask.CompletedTask;
 	}
 }

@@ -19,15 +19,21 @@ public class RecipeRowViewModel(
 	Action<int, int> onActionChanged)
 	: ReactiveObject, IDisposable
 {
+	private Step _step = step;
+	private readonly List<Action> _cleanupActions = [];
+	private IReadOnlyDictionary<string, CellState>? _cellStatesCache;
+	private bool _disposed;
 	private bool _isExecuting;
 	private bool _isSelected;
-	private IReadOnlyDictionary<string, CellState>? _cellStatesCache;
-	private readonly List<Action> _cleanupActions = [];
-	private bool _disposed;
 
 	public int StepNumber { get; } = stepNumber;
 
-	public int ActionId => step.ActionKey;
+	public void UpdateStep(Step newStep)
+	{
+		_step = newStep;
+	}
+
+	public int ActionId => _step.ActionKey;
 
 	public string ActionName => action.UiName;
 
@@ -64,6 +70,7 @@ public class RecipeRowViewModel(
 				states[columnDef.Key] = CellStateResolver.GetCellState(columnDef, action);
 			}
 			_cellStatesCache = states;
+
 			return _cellStatesCache;
 		}
 	}
@@ -74,6 +81,30 @@ public class RecipeRowViewModel(
 		set => SetPropertyValue(columnKey, value);
 	}
 
+	public void Dispose()
+	{
+		if (_disposed)
+		{
+			return;
+		}
+
+		_disposed = true;
+
+		foreach (var cleanup in _cleanupActions)
+		{
+			try
+			{
+				cleanup();
+			}
+			catch
+			{
+				// Ignore cleanup errors
+			}
+		}
+
+		_cleanupActions.Clear();
+	}
+
 	public object? GetPropertyValue(string columnKey)
 	{
 		if (columnKey is "action")
@@ -82,7 +113,7 @@ public class RecipeRowViewModel(
 		}
 
 		var columnId = new ColumnId(columnKey);
-		if (step.Properties.TryGetValue(columnId, out var propertyValue))
+		if (_step.Properties.TryGetValue(columnId, out var propertyValue))
 		{
 			return propertyValue.Value;
 		}
@@ -98,6 +129,7 @@ public class RecipeRowViewModel(
 			{
 				onActionChanged(StepNumber - 1, actionId);
 			}
+
 			return;
 		}
 
@@ -142,6 +174,7 @@ public class RecipeRowViewModel(
 	private bool HasGroupForColumn(string columnKey)
 	{
 		var actionColumn = action.Columns.FirstOrDefault(c => c.Key == columnKey);
+
 		return actionColumn?.GroupName is not null && groupRegistry.GroupExists(actionColumn.GroupName);
 	}
 
@@ -155,33 +188,10 @@ public class RecipeRowViewModel(
 		{
 			// Already disposed, execute immediately
 			cleanupAction();
+
 			return;
 		}
 
 		_cleanupActions.Add(cleanupAction);
-	}
-
-	public void Dispose()
-	{
-		if (_disposed)
-		{
-			return;
-		}
-
-		_disposed = true;
-
-		foreach (var cleanup in _cleanupActions)
-		{
-			try
-			{
-				cleanup();
-			}
-			catch
-			{
-				// Ignore cleanup errors
-			}
-		}
-
-		_cleanupActions.Clear();
 	}
 }

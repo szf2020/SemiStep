@@ -1,8 +1,4 @@
-﻿using Domain.State;
-
-using FluentAssertions;
-
-using Microsoft.Extensions.DependencyInjection;
+﻿using FluentAssertions;
 
 using Tests.Core.Helpers;
 

@@ -11,27 +11,26 @@ namespace Config.Facade;
 
 public sealed class ConfigFacade(ILogger? logger = null)
 {
-	private readonly ActionsSectionLoader _actionsLoader = new();
-	private readonly ColumnsSectionLoader _columnsLoader = new();
-	private readonly PropertiesSectionLoader _propertiesLoader = new();
-	private readonly GroupsSectionLoader _groupsLoader = new();
-	private readonly GridStyleLoader _gridStyleLoader = new();
 	private readonly ActionMapper _actionMapper = new();
+	private readonly ActionsSectionLoader _actionsLoader = new();
 	private readonly ColumnMapper _columnMapper = new();
-	private readonly PropertyMapper _propertyMapper = new();
-	private readonly GroupMapper _groupMapper = new();
+	private readonly ColumnsSectionLoader _columnsLoader = new();
+	private readonly GridStyleLoader _gridStyleLoader = new();
 	private readonly GridStyleMapper _gridStyleMapper = new();
+	private readonly GroupMapper _groupMapper = new();
+	private readonly GroupsSectionLoader _groupsLoader = new();
+	private readonly PropertiesSectionLoader _propertiesLoader = new();
+	private readonly PropertyMapper _propertyMapper = new();
 
 	public async Task<ConfigContext> LoadAsync(string configDirectory)
 	{
-		var context = new ConfigContext
-		{
-			FilePaths = [configDirectory]
-		};
+		var context = new ConfigContext { FilePaths = [configDirectory] };
 
 		if (!Directory.Exists(configDirectory))
 		{
 			context.AddError($"Configuration directory not found: {configDirectory}");
+			logger?.Error("Configuration directory not found: {ConfigDirectory}", configDirectory);
+
 			return context;
 		}
 
@@ -55,6 +54,7 @@ public sealed class ConfigFacade(ILogger? logger = null)
 		}
 		catch (Exception ex)
 		{
+			logger?.Error("Failed to map configuration to domain: {message}", ex.Message);
 			context.AddError($"Failed to map configuration to domain: {ex.Message}");
 		}
 

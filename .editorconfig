@@ -50,9 +50,9 @@ dotnet_style_parentheses_in_other_binary_operators = always_for_clarity:silent
 dotnet_style_parentheses_in_other_operators = never_if_unnecessary:silent
 
 # Modifier preferences
-dotnet_style_require_accessibility_modifiers = for_non_interface_members:suggestion
-dotnet_style_readonly_field = true:suggestion
-csharp_preferred_modifier_order = public,private,protected,internal,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,volatile,async:suggestion
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+dotnet_style_readonly_field = true:warning
+csharp_preferred_modifier_order = public, private, protected, internal, static, extern, new, virtual, abstract, sealed, override, readonly, unsafe, volatile, async:warning
 
 # Expression-level preferences
 dotnet_style_object_initializer = true:suggestion
@@ -73,33 +73,33 @@ dotnet_style_prefer_is_null_check_over_reference_equality_method = true:suggesti
 #### C# Coding Conventions ####
 
 # var preferences
-csharp_style_var_for_built_in_types = true:suggestion
-csharp_style_var_when_type_is_apparent = true:suggestion
-csharp_style_var_elsewhere = true:suggestion
+csharp_style_var_for_built_in_types = true:warning
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = true:warning
 
 # Expression-bodied members
-csharp_style_expression_bodied_methods = false:silent
-csharp_style_expression_bodied_constructors = false:silent
-csharp_style_expression_bodied_operators = false:silent
-csharp_style_expression_bodied_properties = true:silent
-csharp_style_expression_bodied_indexers = true:silent
-csharp_style_expression_bodied_accessors = true:silent
-csharp_style_expression_bodied_lambdas = true:silent
-csharp_style_expression_bodied_local_functions = false:silent
+csharp_style_expression_bodied_methods = false:warning
+csharp_style_expression_bodied_constructors = false:warning
+csharp_style_expression_bodied_operators = false:warning
+csharp_style_expression_bodied_properties = true:warning
+csharp_style_expression_bodied_indexers = true:warning
+csharp_style_expression_bodied_accessors = true:warning
+csharp_style_expression_bodied_lambdas = true:warning
+csharp_style_expression_bodied_local_functions = false:warning
 
 # Pattern matching preferences
-csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
-csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+csharp_style_pattern_matching_over_is_with_cast_check = true:warning
+csharp_style_pattern_matching_over_as_with_null_check = true:warning
 csharp_style_prefer_switch_expression = true:suggestion
 csharp_style_prefer_pattern_matching = true:silent
-csharp_style_prefer_not_pattern = true:suggestion
+csharp_style_prefer_not_pattern = true:warning
 
 # Null-checking preferences
 csharp_style_throw_expression = true:suggestion
 csharp_style_conditional_delegate_call = true:suggestion
 
 # Code-block preferences
-csharp_prefer_braces = true:suggestion
+csharp_prefer_braces = true:warning
 csharp_prefer_simple_using_statement = true:suggestion
 
 # Expression preferences
@@ -110,7 +110,7 @@ csharp_style_implicit_object_creation_when_type_is_apparent = true:suggestion
 csharp_style_prefer_tuple_swap = true:suggestion
 
 # 'using' directive preferences
-csharp_using_directive_placement = outside_namespace:suggestion
+csharp_using_directive_placement = outside_namespace:warning
 
 # Inlined variable declarations
 csharp_style_inlined_variable_declaration = true:suggestion
@@ -124,7 +124,7 @@ csharp_style_unused_value_assignment_preference = discard_variable:suggestion
 
 #### C# Formatting Rules ####
 
-# New line preferences - IMPORTANT: Your request for return on new line
+# New line preferences
 csharp_preserve_single_line_statements = false
 csharp_preserve_single_line_blocks = true
 
@@ -220,11 +220,33 @@ dotnet_naming_style.pascal_case.capitalization = pascal_case
 dotnet_naming_style.underscore_camel_case.required_prefix = _
 dotnet_naming_style.underscore_camel_case.capitalization = camel_case
 
-#### ReSharper/Rider specific properties (keep only important ones) ####
-# These work only in JetBrains IDEs but provide extra control
+#### ReSharper/Rider specific properties ####
 
 # Place simple embedded statements on separate lines
 resharper_csharp_place_simple_embedded_statement_on_same_line = false
+
+# Blank lines — max consecutive
+resharper_csharp_keep_blank_lines_in_code = 1
+resharper_csharp_keep_blank_lines_in_declarations = 1
+
+# Blank lines — around members
+resharper_csharp_blank_lines_around_field = 0
+resharper_csharp_blank_lines_around_auto_property = 1
+resharper_csharp_blank_lines_around_single_line_auto_property = 0
+resharper_csharp_blank_lines_around_property = 1
+resharper_csharp_blank_lines_around_single_line_property = 0
+resharper_csharp_blank_lines_around_invocable_member = 1
+resharper_csharp_blank_lines_around_single_line_invocable_member = 1
+
+# Blank lines — around types and namespaces
+resharper_csharp_blank_lines_around_type = 1
+resharper_csharp_blank_lines_around_namespace = 1
+resharper_csharp_blank_lines_inside_type = 0
+resharper_csharp_blank_lines_inside_namespace = 0
+
+# Blank lines — control flow
+resharper_csharp_blank_lines_after_block_statements = 0
+resharper_csharp_blank_lines_before_control_transfer_statements = 1
 
 ###############################
 # XML Files (csproj, config, etc)

@@ -27,7 +27,13 @@ public sealed class PropertyRegistry : IPropertyRegistry
 		return property;
 	}
 
-	public bool PropertyExists(string propertyTypeId) => _properties.ContainsKey(propertyTypeId);
+	public bool PropertyExists(string propertyTypeId)
+	{
+		return _properties.ContainsKey(propertyTypeId);
+	}
 
-	public IReadOnlyList<PropertyDefinition> GetAll() => _properties.Values.ToList();
+	public IReadOnlyList<PropertyDefinition> GetAll()
+	{
+		return _properties.Values.ToList();
+	}
 }

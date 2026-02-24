@@ -11,7 +11,6 @@ namespace Tests.Core.Helpers;
 /// </summary>
 public sealed class RecipeTestDriver(DomainFacade domainFacade)
 {
-
 	/// <summary>
 	/// Gets the current recipe snapshot.
 	/// </summary>
@@ -31,6 +30,20 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	/// Gets the step count of the current recipe.
 	/// </summary>
 	public int StepCount => Recipe.StepCount;
+
+	#region Recipe Management
+
+	/// <summary>
+	/// Creates a new empty recipe.
+	/// </summary>
+	public RecipeTestDriver NewRecipe()
+	{
+		domainFacade.NewRecipe();
+
+		return this;
+	}
+
+	#endregion
 
 	#region Service Action IDs
 
@@ -59,6 +72,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 		domainFacade.AppendStep(WaitActionId);
 		var lastIndex = Recipe.StepCount - 1;
 		domainFacade.UpdateStepProperty(lastIndex, StepDurationColumn, durationSeconds);
+
 		return this;
 	}
 
@@ -70,6 +84,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 		domainFacade.AppendStep(ForLoopActionId);
 		var lastIndex = Recipe.StepCount - 1;
 		domainFacade.UpdateStepProperty(lastIndex, TaskColumn, (float)iterations);
+
 		return this;
 	}
 
@@ -79,6 +94,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	public RecipeTestDriver AddEndFor()
 	{
 		domainFacade.AppendStep(EndForLoopActionId);
+
 		return this;
 	}
 
@@ -88,6 +104,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	public RecipeTestDriver AddPause()
 	{
 		domainFacade.AppendStep(PauseActionId);
+
 		return this;
 	}
 
@@ -97,6 +114,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	public RecipeTestDriver AddStep(int actionId)
 	{
 		domainFacade.AppendStep(actionId);
+
 		return this;
 	}
 
@@ -111,6 +129,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	{
 		domainFacade.InsertStep(index, WaitActionId);
 		domainFacade.UpdateStepProperty(index, StepDurationColumn, durationSeconds);
+
 		return this;
 	}
 
@@ -121,6 +140,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	{
 		domainFacade.InsertStep(index, ForLoopActionId);
 		domainFacade.UpdateStepProperty(index, TaskColumn, (float)iterations);
+
 		return this;
 	}
 
@@ -130,6 +150,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	public RecipeTestDriver InsertEndFor(int index)
 	{
 		domainFacade.InsertStep(index, EndForLoopActionId);
+
 		return this;
 	}
 
@@ -143,6 +164,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	public RecipeTestDriver SetDuration(int index, float seconds)
 	{
 		domainFacade.UpdateStepProperty(index, StepDurationColumn, seconds);
+
 		return this;
 	}
 
@@ -152,6 +174,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	public RecipeTestDriver SetTask(int index, float value)
 	{
 		domainFacade.UpdateStepProperty(index, TaskColumn, value);
+
 		return this;
 	}
 
@@ -161,6 +184,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	public RecipeTestDriver ReplaceAction(int index, int actionId)
 	{
 		domainFacade.ChangeStepAction(index, actionId);
+
 		return this;
 	}
 
@@ -170,19 +194,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	public RecipeTestDriver RemoveStep(int index)
 	{
 		domainFacade.RemoveStep(index);
-		return this;
-	}
 
-	#endregion
-
-	#region Recipe Management
-
-	/// <summary>
-	/// Creates a new empty recipe.
-	/// </summary>
-	public RecipeTestDriver NewRecipe()
-	{
-		domainFacade.NewRecipe();
 		return this;
 	}
 

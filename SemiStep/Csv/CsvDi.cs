@@ -1,6 +1,4 @@
-﻿using Domain.Ports;
-
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 
 namespace Csv;
 

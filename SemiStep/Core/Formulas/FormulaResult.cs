@@ -9,8 +9,12 @@ public sealed record FormulaResult(
 	public bool IsSuccess => Error is null;
 
 	public static FormulaResult Success(IReadOnlyDictionary<string, double> values)
-		=> new(values, null);
+	{
+		return new(values, null);
+	}
 
 	public static FormulaResult Failure(AbstractError error)
-		=> new(null, error);
+	{
+		return new(null, error);
+	}
 }

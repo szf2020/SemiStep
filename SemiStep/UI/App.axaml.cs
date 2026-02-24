@@ -36,16 +36,14 @@ public class App : Application
 
 			if (Configuration is null)
 			{
-				throw new InvalidOperationException("Configuration not set. Call Run() with configuration before starting the app.");
+				throw new InvalidOperationException(
+					"Configuration not set. Call Run() with configuration before starting the app.");
 			}
 
 			var mainWindowViewModel = ServiceProvider.GetRequiredService<MainWindowViewModel>();
 			mainWindowViewModel.Initialize(Configuration);
 
-			desktop.MainWindow = new MainWindow
-			{
-				DataContext = mainWindowViewModel
-			};
+			desktop.MainWindow = new MainWindow { DataContext = mainWindowViewModel };
 		}
 
 		base.OnFrameworkInitializationCompleted();

@@ -19,6 +19,7 @@ public sealed class PropertiesSectionLoader : ISectionLoader<List<PropertyDto>>
 		if (!Directory.Exists(propertiesDir))
 		{
 			context.AddError($"Properties directory not found: {propertiesDir}");
+
 			return [];
 		}
 
@@ -29,6 +30,7 @@ public sealed class PropertiesSectionLoader : ISectionLoader<List<PropertyDto>>
 		if (yamlFiles.Count == 0)
 		{
 			context.AddError($"No YAML files found in properties directory: {propertiesDir}");
+
 			return [];
 		}
 
@@ -45,6 +47,7 @@ public sealed class PropertiesSectionLoader : ISectionLoader<List<PropertyDto>>
 				if (propertiesDict == null || propertiesDict.Count == 0)
 				{
 					context.AddWarning($"Empty or invalid YAML file: {Path.GetFileName(file)}", file);
+
 					continue;
 				}
 
@@ -86,6 +89,7 @@ public sealed class PropertiesSectionLoader : ISectionLoader<List<PropertyDto>>
 		if (string.IsNullOrWhiteSpace(property.PropertyTypeId))
 		{
 			context.AddError("Property PropertyTypeId is required", fileName);
+
 			return;
 		}
 

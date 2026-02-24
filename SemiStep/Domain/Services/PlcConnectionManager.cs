@@ -18,20 +18,18 @@ public sealed class PlcConnectionManager : IAsyncDisposable
 	private readonly IPlcConnection _connection;
 	private readonly ILogger _logger;
 	private readonly object _stateLock = new();
+	private bool _autoReconnectEnabled;
+	private CancellationTokenSource? _reconnectCts;
+	private Task? _reconnectTask;
 
 	private PlcConnectionSettings? _settings;
 	private PlcConnectionState _state = PlcConnectionState.Disconnected;
-	private CancellationTokenSource? _reconnectCts;
-	private Task? _reconnectTask;
-	private bool _autoReconnectEnabled;
 
 	public PlcConnectionManager(IPlcConnection connection, ILogger logger)
 	{
 		_connection = connection;
 		_logger = logger;
 	}
-
-	public event Action<PlcConnectionState>? StateChanged;
 
 	public PlcConnectionState State
 	{
@@ -58,6 +56,14 @@ public sealed class PlcConnectionManager : IAsyncDisposable
 
 	public bool IsConnected => State == PlcConnectionState.Connected;
 
+	public async ValueTask DisposeAsync()
+	{
+		await DisconnectAsync();
+		await _connection.DisposeAsync();
+	}
+
+	public event Action<PlcConnectionState>? StateChanged;
+
 	public async Task ConnectAsync(PlcConnectionSettings settings, CancellationToken ct = default)
 	{
 		_settings = settings;
@@ -78,12 +84,6 @@ public sealed class PlcConnectionManager : IAsyncDisposable
 
 		State = PlcConnectionState.Disconnected;
 		_logger.Information("Disconnected from PLC");
-	}
-
-	public async ValueTask DisposeAsync()
-	{
-		await DisconnectAsync();
-		await _connection.DisposeAsync();
 	}
 
 	internal void OnConnectionLost()
@@ -117,6 +117,7 @@ public sealed class PlcConnectionManager : IAsyncDisposable
 		{
 			State = PlcConnectionState.Disconnected;
 			_logger.Error(ex, "Failed to connect to PLC at {IpAddress}", _settings.IpAddress);
+
 			throw;
 		}
 	}
@@ -153,6 +154,7 @@ public sealed class PlcConnectionManager : IAsyncDisposable
 				await ConnectInternalAsync(ct);
 
 				_reconnectTask = null;
+
 				return;
 			}
 			catch (OperationCanceledException)

@@ -25,11 +25,13 @@ public sealed class LoopParser
 					var depth = stack.Count + 1;
 
 					stack.Push(new ForFrame(i, iterations, depth));
+
 					break;
 				}
 				case (int)ServiceActionId.EndForLoop when stack.Count == 0:
 				{
 					reasons.Add(new LoopIntegrityError($"Unmatched EndFor at step {i}"));
+
 					break;
 				}
 				case (int)ServiceActionId.EndForLoop:
@@ -41,6 +43,7 @@ public sealed class LoopParser
 						Depth: frame.Depth,
 						Iterations: frame.Iterations);
 					validLoops.Add(validLoop);
+
 					break;
 				}
 			}
