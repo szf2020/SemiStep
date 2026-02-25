@@ -29,7 +29,7 @@ public static class CoreTestHelper
 			.AddRecipe()
 			.AddConfig()
 			.AddDomain()
-			.AddSingleton<IRecipeRepository, StubRecipeRepository>()
+			.AddSingleton<ICsvService, StubCsvService>()
 			.BuildServiceProvider();
 
 		var configFacade = services.GetRequiredService<ConfigFacade>();

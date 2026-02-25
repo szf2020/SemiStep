@@ -3,6 +3,8 @@ using Config.Facade;
 
 using Core;
 
+using Csv;
+
 using Domain;
 using Domain.Facade;
 
@@ -19,9 +21,9 @@ using UI;
 
 namespace Application;
 
-public class Program
+public static class Program
 {
-	public static void Main(string[] args)
+	public static void Main()
 	{
 		var logger = new LoggerConfiguration()
 			.MinimumLevel.Debug()
@@ -32,9 +34,25 @@ public class Program
 
 		try
 		{
-			var services = ConfigureServices(logger);
-			var configuration = InitializeConfigurationAsync(services).GetAwaiter().GetResult();
-			RunAvaloniaApp(services, configuration);
+			var services = new ServiceCollection();
+
+			services.AddSingleton(logger);
+			services.AddRecipe(logger);
+			services.AddConfig(logger);
+			services.AddDomain(logger);
+			services.AddS7(logger);
+			services.AddCsv(logger);
+			services.AddUi(logger);
+
+			var configuration = LoadConfigurationAsync(services).GetAwaiter().GetResult();
+
+			services.AddSingleton(configuration.PlcConfiguration);
+
+			var provider = services.BuildServiceProvider();
+
+			InitializeServices(provider, configuration);
+
+			RunAvaloniaApp(provider, configuration);
 		}
 		catch (Exception ex)
 		{
@@ -46,24 +64,10 @@ public class Program
 		}
 	}
 
-	private static IServiceProvider ConfigureServices(ILogger logger)
+	private static async Task<AppConfiguration> LoadConfigurationAsync(ServiceCollection services)
 	{
-		var services = new ServiceCollection();
-
-		services.AddSingleton(logger);
-
-		services.AddRecipe(logger);
-		services.AddConfig(logger);
-		services.AddDomain(logger);
-		services.AddS7();
-		services.AddUi(logger);
-
-		return services.BuildServiceProvider();
-	}
-
-	private static async Task<AppConfiguration> InitializeConfigurationAsync(IServiceProvider services)
-	{
-		var configLoader = services.GetRequiredService<ConfigFacade>();
+		var tempProvider = services.BuildServiceProvider();
+		var configLoader = tempProvider.GetRequiredService<ConfigFacade>();
 
 		const string ConfigDirectory = @"C:\Users\admin\projects\SemiStep\ConfigFiles";
 
@@ -87,12 +91,15 @@ public class Program
 			throw new InvalidOperationException("Configuration is null");
 		}
 
-		var domainFacade = services.GetRequiredService<DomainFacade>();
-		domainFacade.Initialize(context.Configuration);
-
 		Log.Information("Configuration loaded successfully");
 
 		return context.Configuration;
+	}
+
+	private static void InitializeServices(IServiceProvider provider, AppConfiguration configuration)
+	{
+		var domainFacade = provider.GetRequiredService<DomainFacade>();
+		domainFacade.Initialize(configuration);
 	}
 
 	private static void RunAvaloniaApp(IServiceProvider services, AppConfiguration configuration)

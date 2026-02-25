@@ -6,10 +6,12 @@ namespace Domain.Registries;
 public sealed class GroupRegistry : IGroupRegistry
 {
 	private readonly Dictionary<string, GroupDefinition> _groups = new(StringComparer.OrdinalIgnoreCase);
+	private IReadOnlyList<GroupDefinition>? _cachedAll;
 
 	public void Initialize(IReadOnlyDictionary<string, GroupDefinition> groups)
 	{
 		_groups.Clear();
+		_cachedAll = null;
 
 		foreach (var (key, group) in groups)
 		{
@@ -34,6 +36,6 @@ public sealed class GroupRegistry : IGroupRegistry
 
 	public IReadOnlyList<GroupDefinition> GetAll()
 	{
-		return _groups.Values.ToList();
+		return _cachedAll ??= _groups.Values.ToList();
 	}
 }

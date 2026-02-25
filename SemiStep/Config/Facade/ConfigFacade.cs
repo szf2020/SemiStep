@@ -11,17 +11,6 @@ namespace Config.Facade;
 
 public sealed class ConfigFacade(ILogger? logger = null)
 {
-	private readonly ActionMapper _actionMapper = new();
-	private readonly ActionsSectionLoader _actionsLoader = new();
-	private readonly ColumnMapper _columnMapper = new();
-	private readonly ColumnsSectionLoader _columnsLoader = new();
-	private readonly GridStyleLoader _gridStyleLoader = new();
-	private readonly GridStyleMapper _gridStyleMapper = new();
-	private readonly GroupMapper _groupMapper = new();
-	private readonly GroupsSectionLoader _groupsLoader = new();
-	private readonly PropertiesSectionLoader _propertiesLoader = new();
-	private readonly PropertyMapper _propertyMapper = new();
-
 	public async Task<ConfigContext> LoadAsync(string configDirectory)
 	{
 		var context = new ConfigContext { FilePaths = [configDirectory] };
@@ -61,35 +50,35 @@ public sealed class ConfigFacade(ILogger? logger = null)
 		return context;
 	}
 
-	private async Task<ConfigContext> LoadAllSectionsAsync(string configDirectory, ConfigContext context)
+	private static async Task<ConfigContext> LoadAllSectionsAsync(string configDirectory, ConfigContext context)
 	{
-		context.Properties = await _propertiesLoader.LoadAsync(configDirectory, context);
-		context.Columns = await _columnsLoader.LoadAsync(configDirectory, context);
-		context.Groups = await _groupsLoader.LoadAsync(configDirectory, context);
-		context.Actions = await _actionsLoader.LoadAsync(configDirectory, context);
-		context.GridStyle = await _gridStyleLoader.LoadAsync(configDirectory, context);
+		context.Properties = await PropertiesSectionLoader.LoadAsync(configDirectory, context);
+		context.Columns = await ColumnsSectionLoader.LoadAsync(configDirectory, context);
+		context.Groups = await GroupsSectionLoader.LoadAsync(configDirectory, context);
+		context.Actions = await ActionsSectionLoader.LoadAsync(configDirectory, context);
+		context.GridStyle = await GridStyleLoader.LoadAsync(configDirectory, context);
+		context.Connection = await ConnectionLoader.LoadAsync(configDirectory, context);
 
 		return context;
 	}
 
-	private AppConfiguration MapToDomain(ConfigContext context)
+	private static AppConfiguration MapToDomain(ConfigContext context)
 	{
-		var properties = _propertyMapper
-			.MapMany(context.Properties!)
+		var properties = PropertyMapper.MapMany(context.Properties!)
 			.ToDictionary(p => p.PropertyTypeId, StringComparer.OrdinalIgnoreCase);
 
-		var columns = _columnMapper
-			.MapMany(context.Columns!)
+		var columns = ColumnMapper.MapMany(context.Columns!)
 			.ToDictionary(c => c.Key, StringComparer.OrdinalIgnoreCase);
 
-		var groups = _groupMapper.Map(context.Groups!);
+		var groups = GroupMapper.Map(context.Groups!);
 
-		var actions = _actionMapper
-			.MapMany(context.Actions!)
+		var actions = ActionMapper.MapMany(context.Actions!)
 			.ToDictionary(a => a.Id);
 
-		var gridStyle = _gridStyleMapper.Map(context.GridStyle);
+		var gridStyle = GridStyleMapper.Map(context.GridStyle);
 
-		return new AppConfiguration(properties, columns, groups, actions, gridStyle);
+		var plcConfiguration = ConnectionMapper.Map(context.Connection);
+
+		return new AppConfiguration(properties, columns, groups, actions, gridStyle, plcConfiguration);
 	}
 }

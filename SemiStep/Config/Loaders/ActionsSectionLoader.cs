@@ -6,13 +6,13 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace Config.Loaders;
 
-public sealed class ActionsSectionLoader : ISectionLoader<List<ActionDto>>
+public sealed class ActionsSectionLoader
 {
-	private readonly IDeserializer _deserializer = new DeserializerBuilder()
+	private static readonly IDeserializer _deserializer = new DeserializerBuilder()
 		.WithNamingConvention(UnderscoredNamingConvention.Instance)
 		.Build();
 
-	public async Task<List<ActionDto>> LoadAsync(string configDirectory, ConfigContext context)
+	public static async Task<List<ActionDto>> LoadAsync(string configDirectory, ConfigContext context)
 	{
 		var actionsDir = Path.Combine(configDirectory, "actions");
 

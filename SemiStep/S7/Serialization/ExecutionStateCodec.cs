@@ -1,29 +1,29 @@
 ﻿using System.Buffers.Binary;
 
-using Domain.Ports;
-
 using S7.Protocol;
+
+using Shared.Entities;
 
 namespace S7.Serialization;
 
-internal static class ExecutionStateCodec
+internal sealed class ExecutionStateCodec(ExecutionDbLayout layout)
 {
-	public static PlcExecutionState Decode(byte[] data)
+	public PlcExecutionState Decode(byte[] data)
 	{
-		if (data.Length < ExecutionAreaLayout.TotalSize)
+		if (data.Length < layout.TotalSize)
 		{
 			throw new ArgumentException(
-				$"Data length {data.Length} is less than expected {ExecutionAreaLayout.TotalSize}");
+				$"Data length {data.Length} is less than expected {layout.TotalSize}");
 		}
 
 		return new PlcExecutionState(
-			RecipeActive: data[ExecutionAreaLayout.RecipeActiveOffset] != 0 ||
-						  data[ExecutionAreaLayout.RecipeActiveOffset + 1] != 0,
-			ActualLine: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(ExecutionAreaLayout.ActualLineOffset)),
+			RecipeActive: data[layout.RecipeActiveOffset] != 0 ||
+						  data[layout.RecipeActiveOffset + 1] != 0,
+			ActualLine: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(layout.ActualLineOffset)),
 			StepCurrentTime: BitConverter.Int32BitsToSingle(
-				BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(ExecutionAreaLayout.StepCurrentTimeOffset))),
-			ForLoopCount1: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(ExecutionAreaLayout.ForLoopCount1Offset)),
-			ForLoopCount2: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(ExecutionAreaLayout.ForLoopCount2Offset)),
-			ForLoopCount3: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(ExecutionAreaLayout.ForLoopCount3Offset)));
+				BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(layout.StepCurrentTimeOffset))),
+			ForLoopCount1: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(layout.ForLoopCount1Offset)),
+			ForLoopCount2: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(layout.ForLoopCount2Offset)),
+			ForLoopCount3: BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(layout.ForLoopCount3Offset)));
 	}
 }

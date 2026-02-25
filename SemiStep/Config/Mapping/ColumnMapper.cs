@@ -4,9 +4,9 @@ using Shared.Entities;
 
 namespace Config.Mapping;
 
-public sealed class ColumnMapper : IEntityMapper<ColumnDto, GridColumnDefinition>
+public sealed class ColumnMapper
 {
-	public GridColumnDefinition Map(ColumnDto dto)
+	public static GridColumnDefinition Map(ColumnDto dto)
 	{
 		if (string.IsNullOrWhiteSpace(dto.Key))
 		{
@@ -39,7 +39,7 @@ public sealed class ColumnMapper : IEntityMapper<ColumnDto, GridColumnDefinition
 			SaveToCsv: dto.BusinessLogic.SaveToCsv);
 	}
 
-	public IReadOnlyList<GridColumnDefinition> MapMany(IEnumerable<ColumnDto> dtos)
+	public static IReadOnlyList<GridColumnDefinition> MapMany(IEnumerable<ColumnDto> dtos)
 	{
 		return dtos.Select(Map).ToList();
 	}

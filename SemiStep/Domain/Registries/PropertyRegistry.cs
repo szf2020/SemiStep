@@ -6,10 +6,12 @@ namespace Domain.Registries;
 public sealed class PropertyRegistry : IPropertyRegistry
 {
 	private readonly Dictionary<string, PropertyDefinition> _properties = new(StringComparer.OrdinalIgnoreCase);
+	private IReadOnlyList<PropertyDefinition>? _cachedAll;
 
 	public void Initialize(IReadOnlyDictionary<string, PropertyDefinition> properties)
 	{
 		_properties.Clear();
+		_cachedAll = null;
 
 		foreach (var (key, property) in properties)
 		{
@@ -34,6 +36,6 @@ public sealed class PropertyRegistry : IPropertyRegistry
 
 	public IReadOnlyList<PropertyDefinition> GetAll()
 	{
-		return _properties.Values.ToList();
+		return _cachedAll ??= _properties.Values.ToList();
 	}
 }

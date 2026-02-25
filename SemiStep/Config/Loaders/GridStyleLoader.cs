@@ -6,13 +6,13 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace Config.Loaders;
 
-public sealed class GridStyleLoader : ISectionLoader<GridStyleOptionsDto?>
+public sealed class GridStyleLoader
 {
-	private readonly IDeserializer _deserializer = new DeserializerBuilder()
+	private static readonly IDeserializer _deserializer = new DeserializerBuilder()
 		.WithNamingConvention(UnderscoredNamingConvention.Instance)
 		.Build();
 
-	public async Task<GridStyleOptionsDto?> LoadAsync(string configDirectory, ConfigContext context)
+	public static async Task<GridStyleOptionsDto?> LoadAsync(string configDirectory, ConfigContext context)
 	{
 		var uiDir = Path.Combine(configDirectory, "ui");
 

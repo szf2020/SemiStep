@@ -49,7 +49,7 @@ public class App : Application
 		base.OnFrameworkInitializationCompleted();
 	}
 
-	public static AppBuilder BuildAvaloniaApp()
+	private static AppBuilder BuildAvaloniaApp()
 	{
 		return AppBuilder.Configure<App>()
 			.UseWin32()
@@ -63,6 +63,6 @@ public class App : Application
 		ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
 		Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
 		RxApp.MainThreadScheduler = AvaloniaScheduler.Instance;
-		BuildAvaloniaApp().StartWithClassicDesktopLifetime(Array.Empty<string>());
+		BuildAvaloniaApp().StartWithClassicDesktopLifetime([]);
 	}
 }

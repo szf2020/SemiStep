@@ -136,7 +136,6 @@ public class RecipeRowViewModel(
 		onPropertyChanged(StepNumber - 1, columnKey, value);
 		this.RaisePropertyChanged(columnKey);
 		this.RaisePropertyChanged("Item[]");
-		InvalidateCellStates();
 	}
 
 	public IReadOnlyDictionary<int, string>? GetGroupItemsForColumn(string columnKey)

@@ -26,9 +26,13 @@ public sealed class ColumnBuilder(
 	private const string CellDisabledClass = "cell-disabled";
 	private const string SelectedClass = "selected";
 
+	// Cached action items list -- built once, reused for every action cell
+	private List<ActionComboBoxItemViewModel>? _cachedActionItems;
+
 	public void BuildColumnsFromConfiguration(DataGrid grid, AppConfiguration config)
 	{
 		grid.Columns.Clear();
+		_cachedActionItems = null; // Invalidate cache when config changes
 		AddNumberingColumn(grid);
 		AddColumnsFromConfig(grid, config);
 	}
@@ -111,7 +115,7 @@ public sealed class ColumnBuilder(
 	{
 		return new FuncDataTemplate<RecipeRowViewModel>(
 			(row, _) => BuildTextCell(row, columnKey, isEditing, isColumnReadOnly),
-			supportsRecycling: false);
+			supportsRecycling: true);
 	}
 
 	private static Control BuildTextCell(RecipeRowViewModel? row, string columnKey, bool isEditing,
@@ -128,7 +132,7 @@ public sealed class ColumnBuilder(
 		{
 			var disabledBlock = CreateEmptyTextBlock();
 			ApplyCellClasses(disabledBlock, row, columnKey);
-			SubscribeToRowChanges(disabledBlock, row, columnKey);
+			SubscribeWithLifecycle(disabledBlock, row, columnKey);
 
 			return disabledBlock;
 		}
@@ -144,7 +148,7 @@ public sealed class ColumnBuilder(
 				Padding = new Thickness(4, 2)
 			};
 			ApplyCellClasses(textBlock, row, columnKey);
-			SubscribeToRowChanges(textBlock, row, columnKey);
+			SubscribeWithLifecycle(textBlock, row, columnKey);
 
 			return textBlock;
 		}
@@ -166,7 +170,7 @@ public sealed class ColumnBuilder(
 		});
 
 		ApplyCellClasses(textBox, row, columnKey, isEditing: true);
-		SubscribeToRowChanges(textBox, row, columnKey, isEditing: true);
+		SubscribeWithLifecycle(textBox, row, columnKey, isEditing: true);
 
 		return textBox;
 	}
@@ -190,7 +194,7 @@ public sealed class ColumnBuilder(
 	{
 		return new FuncDataTemplate<RecipeRowViewModel>(
 			(row, _) => BuildActionCell(row, isEditing, isColumnReadOnly),
-			supportsRecycling: false);
+			supportsRecycling: true);
 	}
 
 	private Control BuildActionCell(RecipeRowViewModel? row, bool isEditing, bool isColumnReadOnly)
@@ -206,12 +210,24 @@ public sealed class ColumnBuilder(
 		return CreateActionComboBox(row, isEnabled);
 	}
 
-	private Control CreateActionComboBox(RecipeRowViewModel row, bool isEnabled)
+	private List<ActionComboBoxItemViewModel> GetOrCreateActionItems()
 	{
+		if (_cachedActionItems is not null)
+		{
+			return _cachedActionItems;
+		}
+
 		var actions = actionRegistry.GetAll();
-		var items = actions
+		_cachedActionItems = actions
 			.Select(a => new ActionComboBoxItemViewModel(a.Id, a.UiName))
 			.ToList();
+
+		return _cachedActionItems;
+	}
+
+	private Control CreateActionComboBox(RecipeRowViewModel row, bool isEnabled)
+	{
+		var items = GetOrCreateActionItems();
 
 		var border = new Border
 		{
@@ -248,7 +264,7 @@ public sealed class ColumnBuilder(
 
 		ApplyCellClasses(border, row, ActionColumnKey);
 		ApplyComboBoxDisabledClass(comboBox, row, ActionColumnKey);
-		SubscribeToRowChanges(border, row, ActionColumnKey, comboBox);
+		SubscribeWithLifecycle(border, row, ActionColumnKey, comboBox: comboBox);
 
 		return border;
 	}
@@ -275,7 +291,7 @@ public sealed class ColumnBuilder(
 	{
 		return new FuncDataTemplate<RecipeRowViewModel>(
 			(row, _) => BuildGroupComboBoxCell(row, columnKey, isEditing, isColumnReadOnly),
-			supportsRecycling: false);
+			supportsRecycling: true);
 	}
 
 	private Control BuildGroupComboBoxCell(RecipeRowViewModel? row, string columnKey, bool isEditing,
@@ -339,7 +355,7 @@ public sealed class ColumnBuilder(
 		// Apply cell class based on cell state (for proper disabled styling)
 		ApplyCellClassesWithState(border, row, cellState);
 		ApplyComboBoxDisabledClassWithState(comboBox, cellState);
-		SubscribeToRowChanges(border, row, columnKey, comboBox);
+		SubscribeWithLifecycle(border, row, columnKey, comboBox: comboBox);
 
 		return border;
 	}
@@ -409,13 +425,18 @@ public sealed class ColumnBuilder(
 		comboBox.Classes.Set(CellDisabledClass, cellState == CellState.Disabled);
 	}
 
-	private static void SubscribeToRowChanges(Control control, RecipeRowViewModel row, string columnKey,
+	/// <summary>
+	/// Subscribes a PropertyChanged handler that is tied to the control's visual tree lifecycle.
+	/// The handler is added when the control attaches to the visual tree and removed when it detaches,
+	/// preventing event handler accumulation during DataGrid row virtualization/scrolling.
+	/// </summary>
+	private static void SubscribeWithLifecycle(Control control, RecipeRowViewModel row, string columnKey,
 		ComboBox? comboBox = null, bool isEditing = false)
 	{
 		PropertyChangedEventHandler handler = (_, e) =>
 		{
-			if (e.PropertyName == nameof(RecipeRowViewModel.IsSelected) ||
-				e.PropertyName == nameof(RecipeRowViewModel.CellStates))
+			if (e.PropertyName is nameof(RecipeRowViewModel.IsSelected)
+				or nameof(RecipeRowViewModel.CellStates))
 			{
 				ApplyCellClasses(control, row, columnKey, isEditing);
 				if (comboBox is not null)
@@ -425,13 +446,26 @@ public sealed class ColumnBuilder(
 			}
 		};
 
+		// Subscribe immediately (control is being built, it will be attached shortly)
 		row.PropertyChanged += handler;
 
-		// Register cleanup action to unsubscribe when row is disposed
-		row.RegisterCleanup(() => row.PropertyChanged -= handler);
+		// Unsubscribe when control leaves the visual tree (scroll out / recycling)
+		control.DetachedFromVisualTree += OnDetached;
+
+		// Re-subscribe when control re-enters the visual tree (scroll back in / recycling)
+		control.AttachedToVisualTree += OnAttached;
+
+		return;
+
+		void OnDetached(object? sender, VisualTreeAttachmentEventArgs e)
+		{
+			row.PropertyChanged -= handler;
+		}
+
+		void OnAttached(object? sender, VisualTreeAttachmentEventArgs e)
+		{
+			row.PropertyChanged -= handler; // Prevent double-subscribe
+			row.PropertyChanged += handler;
+		}
 	}
 }
-
-public sealed record ActionComboBoxItemViewModel(int Id, string DisplayText);
-
-public sealed record GroupComboBoxItemViewModel(int Id, string DisplayText);

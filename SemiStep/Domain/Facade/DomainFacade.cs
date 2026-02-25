@@ -5,7 +5,10 @@ using Domain.Ports;
 using Domain.Services;
 using Domain.State;
 
+using Serilog.Core;
+
 using Shared;
+using Shared.Entities;
 using Shared.Registries;
 
 namespace Domain.Facade;
@@ -18,7 +21,9 @@ public sealed class DomainFacade(
 	CoreService coreService,
 	RecipeStateManager stateManager,
 	RecipeHistoryManager historyManager,
-	IRecipeRepository recipeRepository)
+	ICsvService csvService,
+	IS7ConnectionService connectionService,
+	Logger logger)
 	: IDisposable
 {
 	private bool _disposed;
@@ -50,6 +55,8 @@ public sealed class DomainFacade(
 		groupRegistry.Initialize(appConfig.Groups);
 
 		coreService.NewRecipe();
+
+		StartPlcConnection(appConfig.PlcConfiguration);
 	}
 
 	public void NewRecipe()
@@ -125,7 +132,7 @@ public sealed class DomainFacade(
 
 	public async Task LoadRecipeAsync(string filePath, CancellationToken ct = default)
 	{
-		var recipe = await recipeRepository.LoadAsync(filePath, ct);
+		var recipe = await csvService.LoadAsync(filePath, ct);
 		historyManager.Clear();
 		var snapshot = coreService.AnalyzeRecipe(recipe);
 		stateManager.Update(snapshot);
@@ -134,13 +141,29 @@ public sealed class DomainFacade(
 
 	public async Task SaveRecipeAsync(string filePath, CancellationToken ct = default)
 	{
-		await recipeRepository.SaveAsync(stateManager.Current, filePath, ct);
+		await csvService.SaveAsync(stateManager.Current, filePath, ct);
 		stateManager.MarkSaved();
 	}
 
 	public void MarkSaved()
 	{
 		stateManager.MarkSaved();
+	}
+
+	private void StartPlcConnection(
+		PlcConfiguration plcConfiguration)
+	{
+		_ = Task.Run(async () =>
+		{
+			try
+			{
+				await connectionService.ConnectAsync(plcConfiguration.Connection);
+			}
+			catch (Exception ex)
+			{
+				logger.Warning(ex, "Initial PLC connection failed, auto-reconnect will retry");
+			}
+		});
 	}
 
 	private void HistoryPushOnlyValidState(RecipeSnapshot snapshot)

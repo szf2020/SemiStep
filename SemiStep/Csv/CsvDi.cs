@@ -16,7 +16,7 @@ public static class CsvDi
 		}
 
 		services.AddSingleton<CsvSerializer>();
-		services.AddSingleton<IRecipeRepository, CsvRecipeRepository>();
+		services.AddSingleton<ICsvService, CsvCsvService>();
 
 		return services;
 	}

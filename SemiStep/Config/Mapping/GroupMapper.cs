@@ -4,7 +4,7 @@ namespace Config.Mapping;
 
 public sealed class GroupMapper
 {
-	public IReadOnlyDictionary<string, GroupDefinition> Map(
+	public static IReadOnlyDictionary<string, GroupDefinition> Map(
 		Dictionary<string, Dictionary<int, string>> groupsDto)
 	{
 		var result = new Dictionary<string, GroupDefinition>(StringComparer.OrdinalIgnoreCase);

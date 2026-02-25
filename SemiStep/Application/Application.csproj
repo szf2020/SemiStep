@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Csv\Csv.csproj"/>
     <ProjectReference Include="..\Domain\Domain.csproj"/>
     <ProjectReference Include="..\Config\Config.csproj"/>
     <ProjectReference Include="..\S7\S7.csproj"/>

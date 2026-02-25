@@ -5,13 +5,13 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace Config.Loaders;
 
-public sealed class GroupsSectionLoader : ISectionLoader<Dictionary<string, Dictionary<int, string>>>
+public sealed class GroupsSectionLoader
 {
-	private readonly IDeserializer _deserializer = new DeserializerBuilder()
+	private static readonly IDeserializer _deserializer = new DeserializerBuilder()
 		.WithNamingConvention(UnderscoredNamingConvention.Instance)
 		.Build();
 
-	public async Task<Dictionary<string, Dictionary<int, string>>> LoadAsync(
+	public static async Task<Dictionary<string, Dictionary<int, string>>> LoadAsync(
 		string configDirectory,
 		ConfigContext context)
 	{

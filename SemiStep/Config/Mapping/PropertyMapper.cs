@@ -4,9 +4,9 @@ using Shared.Entities;
 
 namespace Config.Mapping;
 
-public sealed class PropertyMapper : IEntityMapper<PropertyDto, PropertyDefinition>
+public sealed class PropertyMapper
 {
-	public PropertyDefinition Map(PropertyDto dto)
+	public static PropertyDefinition Map(PropertyDto dto)
 	{
 		if (string.IsNullOrWhiteSpace(dto.PropertyTypeId))
 		{
@@ -33,7 +33,7 @@ public sealed class PropertyMapper : IEntityMapper<PropertyDto, PropertyDefiniti
 			MaxLength: dto.MaxLength);
 	}
 
-	public IReadOnlyList<PropertyDefinition> MapMany(IEnumerable<PropertyDto> dtos)
+	public static IReadOnlyList<PropertyDefinition> MapMany(IEnumerable<PropertyDto> dtos)
 	{
 		return dtos.Select(Map).ToList();
 	}

@@ -144,15 +144,22 @@ public partial class MainWindow : Window
 
 	private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
 	{
-		if (DataContext is not MainWindowViewModel viewModel)
+		// Only toggle the rows that actually changed selection, instead of iterating all rows.
+		// This reduces PropertyChanged notifications from O(N) to O(changed-count).
+		foreach (var item in e.RemovedItems)
 		{
-			return;
+			if (item is RecipeRowViewModel deselected)
+			{
+				deselected.IsSelected = false;
+			}
 		}
 
-		// Update row selection state for custom styling
-		foreach (var row in viewModel.RecipeRows)
+		foreach (var item in e.AddedItems)
 		{
-			row.IsSelected = RecipeGrid.SelectedItems?.Contains(row) ?? false;
+			if (item is RecipeRowViewModel selected)
+			{
+				selected.IsSelected = true;
+			}
 		}
 	}
 }

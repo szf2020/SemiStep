@@ -19,6 +19,8 @@ public sealed class ConfigContext
 
 	public GridStyleOptionsDto? GridStyle { get; set; }
 
+	public ConnectionDto? Connection { get; set; }
+
 	public AppConfiguration? Configuration { get; set; }
 
 	public List<AbstractReason> Reasons { get; } = [];

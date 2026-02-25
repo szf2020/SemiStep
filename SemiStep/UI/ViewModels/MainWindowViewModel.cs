@@ -27,6 +27,9 @@ public class MainWindowViewModel : ReactiveObject
 	private string? _currentFilePath;
 	private int _selectedRowIndex = -1;
 	private bool _isLogPanelVisible = true;
+	private int _errorCount;
+	private int _warningCount;
+	private bool _suppressLogNotifications;
 
 	public MainWindowViewModel(
 		DomainFacade domainFacade,
@@ -139,13 +142,13 @@ public class MainWindowViewModel : ReactiveObject
 
 	public bool HasLogEntries => LogEntries.Count > 0;
 
-	public bool HasErrors => LogEntries.Any(e => e.Severity == LogSeverity.Error);
+	public bool HasErrors => _errorCount > 0;
 
-	public bool HasWarnings => LogEntries.Any(e => e.Severity == LogSeverity.Warning);
+	public bool HasWarnings => _warningCount > 0;
 
-	public int ErrorCount => LogEntries.Count(e => e.Severity == LogSeverity.Error);
+	public int ErrorCount => _errorCount;
 
-	public int WarningCount => LogEntries.Count(e => e.Severity == LogSeverity.Warning);
+	public int WarningCount => _warningCount;
 
 	public string ErrorCountText => $"{ErrorCount} {(ErrorCount == 1 ? "Error" : "Errors")}";
 
@@ -309,7 +312,13 @@ public class MainWindowViewModel : ReactiveObject
 	{
 		_domainFacade.NewRecipe();
 		_currentFilePath = null;
+
+		_suppressLogNotifications = true;
 		LogEntries.Clear();
+		_errorCount = 0;
+		_warningCount = 0;
+		_suppressLogNotifications = false;
+
 		RefreshRecipeRows();
 		RefreshReasons();
 		RaiseStateChanged();
@@ -367,11 +376,15 @@ public class MainWindowViewModel : ReactiveObject
 
 	private void RefreshReasons()
 	{
-		// Remove previous structural reason entries
+		_suppressLogNotifications = true;
+
+		// Remove previous structural reason entries and adjust counters
 		for (var i = LogEntries.Count - 1; i >= 0; i--)
 		{
-			if (LogEntries[i].IsStructural)
+			var entry = LogEntries[i];
+			if (entry.IsStructural)
 			{
+				AdjustCountersForRemoval(entry);
 				LogEntries.RemoveAt(i);
 			}
 		}
@@ -382,20 +395,33 @@ public class MainWindowViewModel : ReactiveObject
 		{
 			var severity = reason is AbstractError ? LogSeverity.Error : LogSeverity.Warning;
 			var entry = new LogEntry(severity, reason.Message, LogEntry.StructuralSource, DateTime.Now);
+			AdjustCountersForAddition(entry);
 			LogEntries.Add(entry);
 		}
+
+		_suppressLogNotifications = false;
+
+		// Raise all log-related notifications once after batch completes
+		RaiseLogStateChanged();
 	}
 
 	private void ClearLog()
 	{
+		_suppressLogNotifications = true;
+
 		// Remove only non-structural entries; structural ones are managed by RefreshReasons
 		for (var i = LogEntries.Count - 1; i >= 0; i--)
 		{
-			if (!LogEntries[i].IsStructural)
+			var entry = LogEntries[i];
+			if (!entry.IsStructural)
 			{
+				AdjustCountersForRemoval(entry);
 				LogEntries.RemoveAt(i);
 			}
 		}
+
+		_suppressLogNotifications = false;
+		RaiseLogStateChanged();
 	}
 
 	private void ToggleLogPanel()
@@ -454,7 +480,60 @@ public class MainWindowViewModel : ReactiveObject
 
 	private void OnLogEntriesChanged(object? sender, NotifyCollectionChangedEventArgs e)
 	{
+		// When batch operations suppress notifications, counters are maintained manually
+		if (_suppressLogNotifications)
+		{
+			return;
+		}
+
+		// For individual (non-batch) adds/removes, update counters incrementally
+		if (e.NewItems is not null)
+		{
+			foreach (LogEntry entry in e.NewItems)
+			{
+				AdjustCountersForAddition(entry);
+			}
+		}
+
+		if (e.OldItems is not null)
+		{
+			foreach (LogEntry entry in e.OldItems)
+			{
+				AdjustCountersForRemoval(entry);
+			}
+		}
+
+		if (e.Action == NotifyCollectionChangedAction.Reset)
+		{
+			_errorCount = 0;
+			_warningCount = 0;
+		}
+
 		RaiseLogStateChanged();
+	}
+
+	private void AdjustCountersForAddition(LogEntry entry)
+	{
+		if (entry.Severity == LogSeverity.Error)
+		{
+			_errorCount++;
+		}
+		else if (entry.Severity == LogSeverity.Warning)
+		{
+			_warningCount++;
+		}
+	}
+
+	private void AdjustCountersForRemoval(LogEntry entry)
+	{
+		if (entry.Severity == LogSeverity.Error)
+		{
+			_errorCount = Math.Max(0, _errorCount - 1);
+		}
+		else if (entry.Severity == LogSeverity.Warning)
+		{
+			_warningCount = Math.Max(0, _warningCount - 1);
+		}
 	}
 
 	private void RaiseLogStateChanged()

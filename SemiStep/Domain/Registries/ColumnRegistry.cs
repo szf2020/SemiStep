@@ -6,10 +6,12 @@ namespace Domain.Registries;
 public sealed class ColumnRegistry : IColumnRegistry
 {
 	private readonly Dictionary<string, GridColumnDefinition> _columns = new(StringComparer.OrdinalIgnoreCase);
+	private IReadOnlyList<GridColumnDefinition>? _cachedAll;
 
 	public void Initialize(IReadOnlyDictionary<string, GridColumnDefinition> columns)
 	{
 		_columns.Clear();
+		_cachedAll = null;
 
 		foreach (var (key, column) in columns)
 		{
@@ -34,6 +36,6 @@ public sealed class ColumnRegistry : IColumnRegistry
 
 	public IReadOnlyList<GridColumnDefinition> GetAll()
 	{
-		return _columns.Values.ToList();
+		return _cachedAll ??= _columns.Values.ToList();
 	}
 }

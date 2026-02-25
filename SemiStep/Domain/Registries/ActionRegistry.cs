@@ -7,11 +7,13 @@ public sealed class ActionRegistry : IActionRegistry
 {
 	private readonly Dictionary<int, ActionDefinition> _byId = new();
 	private readonly Dictionary<string, ActionDefinition> _byName = new(StringComparer.OrdinalIgnoreCase);
+	private IReadOnlyList<ActionDefinition>? _cachedAll;
 
 	public void Initialize(IReadOnlyDictionary<int, ActionDefinition> actions)
 	{
 		_byId.Clear();
 		_byName.Clear();
+		_cachedAll = null;
 
 		foreach (var (id, action) in actions)
 		{
@@ -52,6 +54,6 @@ public sealed class ActionRegistry : IActionRegistry
 
 	public IReadOnlyList<ActionDefinition> GetAll()
 	{
-		return _byId.Values.ToList();
+		return _cachedAll ??= _byId.Values.ToList();
 	}
 }

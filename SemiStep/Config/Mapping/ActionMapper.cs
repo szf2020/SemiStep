@@ -4,9 +4,9 @@ using Shared.Entities;
 
 namespace Config.Mapping;
 
-public sealed class ActionMapper : IEntityMapper<ActionDto, ActionDefinition>
+public sealed class ActionMapper
 {
-	public ActionDefinition Map(ActionDto dto)
+	public static ActionDefinition Map(ActionDto dto)
 	{
 		if (dto.Id <= 0)
 		{
@@ -34,7 +34,7 @@ public sealed class ActionMapper : IEntityMapper<ActionDto, ActionDefinition>
 			Columns: columns);
 	}
 
-	public IReadOnlyList<ActionDefinition> MapMany(IEnumerable<ActionDto> dtos)
+	public static IReadOnlyList<ActionDefinition> MapMany(IEnumerable<ActionDto> dtos)
 	{
 		return dtos.Select(Map).ToList();
 	}

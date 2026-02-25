@@ -6,7 +6,7 @@ namespace Config.Mapping;
 
 public sealed class GridStyleMapper
 {
-	public GridStyleOptions Map(GridStyleOptionsDto? dto)
+	public static GridStyleOptions Map(GridStyleOptionsDto? dto)
 	{
 		if (dto is null)
 		{

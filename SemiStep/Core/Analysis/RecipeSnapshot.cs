@@ -19,7 +19,7 @@ public sealed record RecipeSnapshot(
 	public IEnumerable<AbstractError> Errors => Reasons.OfType<AbstractError>();
 	public IEnumerable<AbstractWarning> Warnings => Reasons.OfType<AbstractWarning>();
 
-	public static RecipeSnapshot Empty => new(
+	public static readonly RecipeSnapshot Empty = new(
 		Recipe.Empty,
 		TimeSpan.Zero,
 		new Dictionary<int, TimeSpan>(),
