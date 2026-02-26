@@ -15,9 +15,4 @@ public sealed class StubCsvService : ICsvService
 	{
 		throw new NotSupportedException("StubRecipeRepository does not support saving.");
 	}
-
-	public bool CanHandle(string filePath)
-	{
-		return false;
-	}
 }

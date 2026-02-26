@@ -1,19 +1,11 @@
 ﻿namespace Tests.Config.Helpers;
 
-/// <summary>
-/// Copies test data from YamlConfigs directory to temp directories.
-/// Supports overlay pattern: copies baseline first, then overlays invalid case files.
-/// Also supports standalone pattern for self-contained test cases.
-/// </summary>
 public static class TestDataCopier
 {
 	private const string BaselineCaseName = "Standard";
 	private const string InvalidCasesFolder = "Invalid";
 	private const string StandaloneCasesFolder = "Standalone";
 
-	/// <summary>
-	/// Prepares a valid test case by copying it to a temp directory.
-	/// </summary>
 	public static TempDirectory PrepareValidCase(string caseName = BaselineCaseName)
 	{
 		var tempDir = new TempDirectory();
@@ -29,10 +21,6 @@ public static class TestDataCopier
 		return tempDir;
 	}
 
-	/// <summary>
-	/// Prepares an invalid test case by copying baseline first, then overlaying the invalid case files.
-	/// This allows invalid cases to only contain the files that differ from baseline.
-	/// </summary>
 	public static TempDirectory PrepareInvalidCase(string invalidCaseName)
 	{
 		var tempDir = new TempDirectory();
@@ -58,10 +46,6 @@ public static class TestDataCopier
 		return tempDir;
 	}
 
-	/// <summary>
-	/// Prepares a standalone test case by copying it to a temp directory.
-	/// Standalone cases are self-contained (no baseline overlay).
-	/// </summary>
 	public static TempDirectory PrepareStandaloneCase(string caseName)
 	{
 		var tempDir = new TempDirectory();
@@ -77,17 +61,11 @@ public static class TestDataCopier
 		return tempDir;
 	}
 
-	/// <summary>
-	/// Creates an empty temp directory for tests that build config programmatically.
-	/// </summary>
 	public static TempDirectory CreateEmptyTempDirectory()
 	{
 		return new TempDirectory();
 	}
 
-	/// <summary>
-	/// Ensures required subdirectories exist in temp directory.
-	/// </summary>
 	public static void EnsureDirectories(TempDirectory tempDir, params string[] subdirectories)
 	{
 		foreach (var subdir in subdirectories)
@@ -97,9 +75,6 @@ public static class TestDataCopier
 		}
 	}
 
-	/// <summary>
-	/// Writes YAML content to a file in the temp directory.
-	/// </summary>
 	public static void WriteYaml(TempDirectory tempDir, string relativePath, string content)
 	{
 		var fullPath = Path.Combine(tempDir.Path, relativePath);
@@ -136,14 +111,12 @@ public static class TestDataCopier
 	{
 		Directory.CreateDirectory(destDir);
 
-		// Copy files
 		foreach (var file in Directory.GetFiles(sourceDir))
 		{
 			var destFile = Path.Combine(destDir, Path.GetFileName(file));
 			File.Copy(file, destFile, overwrite: true);
 		}
 
-		// Recursively copy subdirectories
 		foreach (var subDir in Directory.GetDirectories(sourceDir))
 		{
 			var destSubDir = Path.Combine(destDir, Path.GetFileName(subDir));

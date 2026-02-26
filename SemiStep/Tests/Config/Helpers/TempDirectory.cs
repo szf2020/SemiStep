@@ -1,9 +1,5 @@
 ﻿namespace Tests.Config.Helpers;
 
-/// <summary>
-/// IDisposable wrapper around a temporary directory.
-/// Creates a unique temp directory on construction, deletes it on disposal.
-/// </summary>
 public sealed class TempDirectory : IDisposable
 {
 	private bool _disposed;
@@ -42,7 +38,7 @@ public sealed class TempDirectory : IDisposable
 		}
 		catch
 		{
-			// Swallow exceptions during cleanup - temp files will be cleaned up eventually
+			// Ignore
 		}
 	}
 }

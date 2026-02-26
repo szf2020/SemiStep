@@ -25,7 +25,7 @@ public static class CoreTestHelper
 		var silentLogger = new LoggerConfiguration().CreateLogger();
 
 		var services = new ServiceCollection()
-			.AddSingleton<ILogger>(silentLogger)
+			.AddSingleton(silentLogger)
 			.AddRecipe()
 			.AddConfig()
 			.AddDomain()

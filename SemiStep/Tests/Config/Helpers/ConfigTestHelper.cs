@@ -1,24 +1,21 @@
 ﻿using Config.Facade;
 using Config.Models;
 
+using Serilog;
+using Serilog.Core;
+
 using Shared;
 
 namespace Tests.Config.Helpers;
 
-/// <summary>
-/// Helper class for config loading tests.
-/// Provides factory methods to load valid and invalid test configurations.
-/// </summary>
 public static class ConfigTestHelper
 {
-	/// <summary>
-	/// Loads a valid config case and returns the AppConfiguration.
-	/// Throws if loading fails.
-	/// </summary>
+	private static Logger LoggerStub { get; } = new LoggerConfiguration().CreateLogger();
+
 	public static async Task<AppConfiguration> LoadValidCaseAsync(string caseName = "Standard")
 	{
 		using var tempDir = TestDataCopier.PrepareValidCase(caseName);
-		var facade = new ConfigFacade();
+		var facade = new ConfigFacade(LoggerStub);
 		var context = await facade.LoadAsync(tempDir.Path);
 
 		if (context.HasErrors || context.Configuration is null)
@@ -31,21 +28,14 @@ public static class ConfigTestHelper
 		return context.Configuration;
 	}
 
-	/// <summary>
-	/// Loads an invalid config case (baseline + overlay) and returns the ConfigContext.
-	/// Use this to inspect errors and warnings.
-	/// </summary>
 	public static async Task<ConfigContext> LoadInvalidCaseAsync(string invalidCaseName)
 	{
 		using var tempDir = TestDataCopier.PrepareInvalidCase(invalidCaseName);
-		var facade = new ConfigFacade();
+		var facade = new ConfigFacade(LoggerStub);
 
 		return await facade.LoadAsync(tempDir.Path);
 	}
 
-	/// <summary>
-	/// Loads an invalid config case and verifies that an error with expected content is present.
-	/// </summary>
 	public static async Task LoadExpectingErrorAsync(
 		string invalidCaseName,
 		string expectedMessageContains)
@@ -70,33 +60,23 @@ public static class ConfigTestHelper
 		}
 	}
 
-	/// <summary>
-	/// Loads a config from a temp directory prepared by the test.
-	/// </summary>
 	public static async Task<ConfigContext> LoadFromTempDirAsync(TempDirectory tempDir)
 	{
-		var facade = new ConfigFacade();
+		var facade = new ConfigFacade(LoggerStub);
 
 		return await facade.LoadAsync(tempDir.Path);
 	}
 
-	/// <summary>
-	/// Loads a standalone config case and returns the ConfigContext.
-	/// Use this for self-contained test cases that don't use overlay pattern.
-	/// </summary>
 	public static async Task<ConfigContext> LoadStandaloneCaseAsync(string caseName)
 	{
 		using var tempDir = TestDataCopier.PrepareStandaloneCase(caseName);
-		var facade = new ConfigFacade();
+		var facade = new ConfigFacade(LoggerStub);
 
 		return await facade.LoadAsync(tempDir.Path);
 	}
 
-	/// <summary>
-	/// Creates a ConfigFacade instance for tests that need direct access.
-	/// </summary>
 	public static ConfigFacade CreateFacade()
 	{
-		return new ConfigFacade();
+		return new ConfigFacade(LoggerStub);
 	}
 }
