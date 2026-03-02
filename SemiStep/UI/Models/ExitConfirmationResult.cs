@@ -1,4 +1,4 @@
-﻿namespace UI.Views;
+﻿namespace UI.Models;
 
 public enum ExitConfirmationResult
 {

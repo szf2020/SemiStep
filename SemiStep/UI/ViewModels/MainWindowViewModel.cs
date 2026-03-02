@@ -187,7 +187,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 
 	public void Initialize()
 	{
-		RefreshRecipeRows();
+		RebuildAllRows(_domainFacade.CurrentRecipe);
 		LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
 		NotifyStateChanged();
 	}
@@ -211,14 +211,19 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		{
 			newRowIndex = SelectedRowIndex + 1;
 			_domainFacade.InsertStep(newRowIndex, firstAction.Id);
+			var insertedStep = _domainFacade.CurrentRecipe.Steps[newRowIndex];
+			InsertRow(newRowIndex, insertedStep);
 		}
 		else
 		{
 			newRowIndex = RecipeRows.Count;
 			_domainFacade.AppendStep(firstAction.Id);
+			var appendedStep = _domainFacade.CurrentRecipe.Steps[newRowIndex];
+			AppendRow(appendedStep);
 		}
 
-		RefreshAfterMutation();
+		LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
+		NotifyStateChanged();
 		SelectedRowIndex = newRowIndex;
 	}
 
@@ -231,8 +236,10 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 
 		var indexToDelete = SelectedRowIndex;
 		_domainFacade.RemoveStep(indexToDelete);
+		RemoveRow(indexToDelete);
 
-		RefreshAfterMutation();
+		LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
+		NotifyStateChanged();
 
 		if (RecipeRows.Count > 0)
 		{
@@ -298,7 +305,9 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		{
 			await _domainFacade.LoadRecipeAsync(filePath);
 			_currentFilePath = filePath;
-			RefreshAfterMutation();
+			RebuildAllRows(_domainFacade.CurrentRecipe);
+			LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
+			NotifyStateChanged();
 			_notificationService.ShowSuccess($"Loaded: {Path.GetFileName(filePath)}");
 		}
 		catch (Exception ex)
@@ -313,7 +322,9 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		_currentFilePath = null;
 
 		LogPanel.Clear();
-		RefreshAfterMutation();
+		RebuildAllRows(_domainFacade.CurrentRecipe);
+		LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
+		NotifyStateChanged();
 	}
 
 	private void Undo()
@@ -321,7 +332,9 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		var snapshot = _domainFacade.Undo();
 		if (snapshot is not null)
 		{
-			RefreshAfterMutation();
+			RebuildAllRows(snapshot.Recipe);
+			LogPanel.RefreshReasons(snapshot.Reasons);
+			NotifyStateChanged();
 		}
 	}
 
@@ -330,7 +343,9 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		var snapshot = _domainFacade.Redo();
 		if (snapshot is not null)
 		{
-			RefreshAfterMutation();
+			RebuildAllRows(snapshot.Recipe);
+			LogPanel.RefreshReasons(snapshot.Reasons);
+			NotifyStateChanged();
 		}
 	}
 
@@ -339,43 +354,15 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		_shutdownApplication();
 	}
 
-	private void RefreshAfterMutation()
-	{
-		RefreshRecipeRows();
-		LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
-		NotifyStateChanged();
-	}
-
-	private void RefreshRecipeRows()
-	{
-		var recipe = _domainFacade.CurrentRecipe;
-
-		foreach (var row in RecipeRows)
-		{
-			row.Dispose();
-		}
-
-		RecipeRows.Clear();
-
-		for (var i = 0; i < recipe.StepCount; i++)
-		{
-			var step = recipe.Steps[i];
-			var action = ActionRegistry.GetAction(step.ActionKey);
-			var rowVm = new RecipeRowViewModel(
-				i + 1,
-				step,
-				action,
-				GroupRegistry,
-				_columnRegistry,
-				OnCellValueChanged,
-				OnActionChanged);
-			RecipeRows.Add(rowVm);
-		}
-	}
-
-	private void OnCellValueChanged(int stepIndex, string columnKey, object? value)
+	private void OnCellValueChanged(RecipeRowViewModel row, string columnKey, object? value)
 	{
 		if (value is null)
+		{
+			return;
+		}
+
+		var stepIndex = RecipeRows.IndexOf(row);
+		if (stepIndex < 0)
 		{
 			return;
 		}
@@ -396,12 +383,21 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		NotifyStateChanged();
 	}
 
-	private void OnActionChanged(int stepIndex, int newActionId)
+	private void OnActionChanged(RecipeRowViewModel row, int newActionId)
 	{
+		var stepIndex = RecipeRows.IndexOf(row);
+		if (stepIndex < 0)
+		{
+			return;
+		}
+
 		try
 		{
 			_domainFacade.ChangeStepAction(stepIndex, newActionId);
-			RefreshRecipeRows();
+			var updatedStep = _domainFacade.CurrentRecipe.Steps[stepIndex];
+			var newAction = ActionRegistry.GetAction(newActionId);
+			RecipeRows[stepIndex].Dispose();
+			RecipeRows[stepIndex] = CreateRowViewModel(updatedStep, newAction, stepIndex + 1);
 		}
 		catch (Exception ex)
 		{
@@ -426,5 +422,65 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		var dirtyIndicator = _domainFacade.IsDirty ? " *" : "";
 
 		return $"SemiStep - {fileName}{dirtyIndicator}";
+	}
+
+	private RecipeRowViewModel CreateRowViewModel(
+		Core.Entities.Step step,
+		Shared.Entities.ActionDefinition action,
+		int stepNumber)
+	{
+		return new RecipeRowViewModel(
+			stepNumber,
+			step,
+			action,
+			GroupRegistry,
+			_columnRegistry,
+			OnCellValueChanged,
+			OnActionChanged);
+	}
+
+	private void AppendRow(Core.Entities.Step step)
+	{
+		var action = ActionRegistry.GetAction(step.ActionKey);
+		RecipeRows.Add(CreateRowViewModel(step, action, RecipeRows.Count + 1));
+	}
+
+	private void InsertRow(int index, Core.Entities.Step step)
+	{
+		var action = ActionRegistry.GetAction(step.ActionKey);
+		RecipeRows.Insert(index, CreateRowViewModel(step, action, index + 1));
+		RenumberRowsFrom(index + 1);
+	}
+
+	private void RemoveRow(int index)
+	{
+		RecipeRows[index].Dispose();
+		RecipeRows.RemoveAt(index);
+		RenumberRowsFrom(index);
+	}
+
+	private void RenumberRowsFrom(int startIndex)
+	{
+		for (var i = startIndex; i < RecipeRows.Count; i++)
+		{
+			RecipeRows[i].UpdateStepNumber(i + 1);
+		}
+	}
+
+	private void RebuildAllRows(Core.Entities.Recipe recipe)
+	{
+		foreach (var row in RecipeRows)
+		{
+			row.Dispose();
+		}
+
+		RecipeRows.Clear();
+
+		for (var i = 0; i < recipe.StepCount; i++)
+		{
+			var step = recipe.Steps[i];
+			var action = ActionRegistry.GetAction(step.ActionKey);
+			RecipeRows.Add(CreateRowViewModel(step, action, i + 1));
+		}
 	}
 }

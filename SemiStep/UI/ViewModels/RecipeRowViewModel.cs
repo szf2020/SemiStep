@@ -9,27 +9,48 @@ using Shared.Registries;
 
 namespace UI.ViewModels;
 
-public class RecipeRowViewModel(
-	int stepNumber,
-	Step step,
-	ActionDefinition action,
-	IGroupRegistry groupRegistry,
-	IColumnRegistry columnRegistry,
-	Action<int, string, object?> onPropertyChanged,
-	Action<int, int> onActionChanged)
-	: ReactiveObject, IDisposable
+public class RecipeRowViewModel : ReactiveObject, IDisposable
 {
 	private readonly List<Action> _cleanupActions = [];
+	private readonly IGroupRegistry _groupRegistry;
+	private readonly IColumnRegistry _columnRegistry;
+	private readonly Action<RecipeRowViewModel, string, object?> _onPropertyChanged;
+	private readonly Action<RecipeRowViewModel, int> _onActionChanged;
+
+	private ActionDefinition _action;
 	private IReadOnlyDictionary<string, CellState>? _cellStatesCache;
 	private bool _disposed;
 	private bool _isExecuting;
-	private Step _step = step;
+	private int _stepNumber;
+	private Step _step;
 
-	public int StepNumber { get; } = stepNumber;
+	public RecipeRowViewModel(
+		int stepNumber,
+		Step step,
+		ActionDefinition action,
+		IGroupRegistry groupRegistry,
+		IColumnRegistry columnRegistry,
+		Action<RecipeRowViewModel, string, object?> onPropertyChanged,
+		Action<RecipeRowViewModel, int> onActionChanged)
+	{
+		_stepNumber = stepNumber;
+		_step = step;
+		_action = action;
+		_groupRegistry = groupRegistry;
+		_columnRegistry = columnRegistry;
+		_onPropertyChanged = onPropertyChanged;
+		_onActionChanged = onActionChanged;
+	}
+
+	public int StepNumber
+	{
+		get => _stepNumber;
+		private set => this.RaiseAndSetIfChanged(ref _stepNumber, value);
+	}
 
 	public int ActionId => _step.ActionKey;
 
-	public string ActionName => action.UiName;
+	public string ActionName => _action.UiName;
 
 	public bool IsExecuting
 	{
@@ -47,10 +68,11 @@ public class RecipeRowViewModel(
 			}
 
 			var states = new Dictionary<string, CellState>();
-			foreach (var columnDef in columnRegistry.GetAll())
+			foreach (var columnDef in _columnRegistry.GetAll())
 			{
-				states[columnDef.Key] = CellStateResolver.GetCellState(columnDef, action);
+				states[columnDef.Key] = CellStateResolver.GetCellState(columnDef, _action);
 			}
+
 			_cellStatesCache = states;
 
 			return _cellStatesCache;
@@ -92,6 +114,21 @@ public class RecipeRowViewModel(
 		_step = newStep;
 	}
 
+	public void UpdateStep(Step newStep, ActionDefinition newAction)
+	{
+		_step = newStep;
+		_action = newAction;
+		_cellStatesCache = null;
+		this.RaisePropertyChanged(nameof(ActionId));
+		this.RaisePropertyChanged(nameof(ActionName));
+		this.RaisePropertyChanged(nameof(CellStates));
+	}
+
+	public void UpdateStepNumber(int newNumber)
+	{
+		StepNumber = newNumber;
+	}
+
 	public object? GetPropertyValue(string columnKey)
 	{
 		if (columnKey is "action")
@@ -114,54 +151,37 @@ public class RecipeRowViewModel(
 		{
 			if (value is int actionId)
 			{
-				onActionChanged(StepNumber - 1, actionId);
+				_onActionChanged(this, actionId);
 			}
 
 			return;
 		}
 
-		onPropertyChanged(StepNumber - 1, columnKey, value);
+		_onPropertyChanged(this, columnKey, value);
 		this.RaisePropertyChanged(columnKey);
 		this.RaisePropertyChanged("Item[]");
 	}
 
 	public IReadOnlyDictionary<int, string>? GetGroupItemsForColumn(string columnKey)
 	{
-		var actionColumn = action.Columns.FirstOrDefault(c => c.Key == columnKey);
-		if (actionColumn is null)
+		var actionColumn = _action.Columns.FirstOrDefault(c => c.Key == columnKey);
+		if (actionColumn?.GroupName is null)
 		{
 			return null;
 		}
 
-		if (HasGroupForColumn(columnKey) is false)
+		if (!_groupRegistry.GroupExists(actionColumn.GroupName))
 		{
 			return null;
 		}
 
-		if (actionColumn.GroupName is null)
-		{
-			return null;
-		}
-
-		if (groupRegistry.GroupExists(actionColumn.GroupName) is false)
-		{
-			return null;
-		}
-
-		return groupRegistry.GetGroup(actionColumn.GroupName).Items;
+		return _groupRegistry.GetGroup(actionColumn.GroupName).Items;
 	}
 
 	public void InvalidateCellStates()
 	{
 		_cellStatesCache = null;
 		this.RaisePropertyChanged(nameof(CellStates));
-	}
-
-	private bool HasGroupForColumn(string columnKey)
-	{
-		var actionColumn = action.Columns.FirstOrDefault(c => c.Key == columnKey);
-
-		return actionColumn?.GroupName is not null && groupRegistry.GroupExists(actionColumn.GroupName);
 	}
 
 	/// <summary>
