@@ -15,4 +15,4 @@ Industrial recipe editor and runtime for PLC-based systems.
     <img src=./logo.png width=400 />
 </div>
 
-Documents may be found [here](./Docs/01-overview.md).
+Documentation may be found [here](./Docs/01-overview.md).
