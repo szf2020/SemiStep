@@ -26,12 +26,12 @@ public sealed class ComboBoxCellFactory(IActionRegistry actionRegistry)
 		_cachedActionItems = null;
 	}
 
-	public DataGridColumn CreateActionColumn(GridColumnDefinition columnDef, int width)
+	public DataGridColumn CreateActionColumn(GridColumnDefinition columnDef, DataGridLength width)
 	{
 		return new DataGridTemplateColumn
 		{
 			Header = columnDef.UiName,
-			Width = new DataGridLength(width),
+			Width = width,
 			IsReadOnly = false,
 			CanUserSort = false,
 			CellTemplate = CreateActionTemplate(isEditing: false, isColumnReadOnly: columnDef.ReadOnly),
@@ -39,12 +39,12 @@ public sealed class ComboBoxCellFactory(IActionRegistry actionRegistry)
 		};
 	}
 
-	public DataGridColumn CreateGroupComboBoxColumn(GridColumnDefinition columnDef, int width)
+	public DataGridColumn CreateGroupComboBoxColumn(GridColumnDefinition columnDef, DataGridLength width)
 	{
 		return new DataGridTemplateColumn
 		{
 			Header = columnDef.UiName,
-			Width = new DataGridLength(width),
+			Width = width,
 			IsReadOnly = false,
 			CanUserSort = false,
 			CellTemplate = CreateGroupTemplate(columnDef.Key, isEditing: false, isColumnReadOnly: columnDef.ReadOnly),
@@ -93,7 +93,7 @@ public sealed class ComboBoxCellFactory(IActionRegistry actionRegistry)
 					{
 						if (comboBox.SelectedItem is ActionComboBoxItemViewModel selected)
 						{
-							row.SetPropertyValue(ActionColumnKey, selected.Id);
+							row.SetPropertyValue(ActionColumnKey, selected.Id.ToString());
 						}
 					};
 				}
@@ -132,7 +132,7 @@ public sealed class ComboBoxCellFactory(IActionRegistry actionRegistry)
 					{
 						if (comboBox.SelectedItem is GroupComboBoxItemViewModel selected)
 						{
-							row.SetPropertyValue(columnKey, selected.Id);
+							row.SetPropertyValue(columnKey, selected.Id.ToString());
 						}
 					};
 				}

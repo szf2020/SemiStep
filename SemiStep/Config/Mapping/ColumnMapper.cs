@@ -32,7 +32,6 @@ public sealed class ColumnMapper
 			Key: dto.Key,
 			ColumnType: dto.ColumnType,
 			UiName: dto.Ui.UiName ?? string.Empty,
-			Width: dto.Ui.Width,
 			PropertyTypeId: dto.BusinessLogic.PropertyTypeId ?? string.Empty,
 			PlcDataType: dto.BusinessLogic.PlcDataType ?? string.Empty,
 			ReadOnly: dto.BusinessLogic.ReadOnly,

@@ -43,7 +43,10 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 				.RegisterHandler(HandleShowMessageAsync)
 				.DisposeWith(disposables);
 
-			_columnBuilder = new ColumnBuilder(ViewModel.ActionRegistry);
+			_columnBuilder = new ColumnBuilder(
+				ViewModel.ActionRegistry,
+				ViewModel.GroupRegistry,
+				ViewModel.Configuration.GridStyle);
 			BuildGrid();
 		});
 	}

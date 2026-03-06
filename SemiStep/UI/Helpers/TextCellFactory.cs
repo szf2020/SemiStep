@@ -16,24 +16,24 @@ namespace UI.Helpers;
 
 public sealed class TextCellFactory
 {
-	public DataGridColumn CreateReadOnlyColumn(GridColumnDefinition columnDef, int width)
+	public DataGridColumn CreateReadOnlyColumn(GridColumnDefinition columnDef, DataGridLength width)
 	{
 		return new DataGridTemplateColumn
 		{
 			Header = columnDef.UiName,
-			Width = new DataGridLength(width),
+			Width = width,
 			IsReadOnly = true,
 			CanUserSort = false,
 			CellTemplate = CreateTemplate(columnDef.Key, isEditing: false, isColumnReadOnly: true)
 		};
 	}
 
-	public DataGridColumn CreateEditableColumn(GridColumnDefinition columnDef, int width)
+	public DataGridColumn CreateEditableColumn(GridColumnDefinition columnDef, DataGridLength width)
 	{
 		return new DataGridTemplateColumn
 		{
 			Header = columnDef.UiName,
-			Width = new DataGridLength(width),
+			Width = width,
 			IsReadOnly = false,
 			CanUserSort = false,
 			CellTemplate = CreateTemplate(columnDef.Key, isEditing: false, isColumnReadOnly: false),

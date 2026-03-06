@@ -7,13 +7,17 @@ using Shared.Registries;
 
 namespace UI.Helpers;
 
-public sealed class ColumnBuilder(IActionRegistry actionRegistry)
+public sealed class ColumnBuilder(
+	IActionRegistry actionRegistry,
+	IGroupRegistry groupRegistry,
+	GridStyleOptions gridStyle)
 {
 	private const string ActionColumnKey = "action";
 	private const string ActionTargetComboBoxType = "action_target_combo_box";
 
 	private readonly TextCellFactory _textCellFactory = new();
 	private readonly ComboBoxCellFactory _comboBoxCellFactory = new(actionRegistry);
+	private readonly ColumnWidthCalculator _widthCalculator = new(actionRegistry, groupRegistry, gridStyle);
 
 	public void BuildColumnsFromConfiguration(DataGrid grid, AppConfiguration config)
 	{
@@ -46,7 +50,7 @@ public sealed class ColumnBuilder(IActionRegistry actionRegistry)
 
 	private DataGridColumn CreateColumn(GridColumnDefinition columnDef)
 	{
-		var width = columnDef.Width > 0 ? columnDef.Width : 100;
+		var width = _widthCalculator.CalculateColumnWidth(columnDef);
 
 		if (columnDef.Key == ActionColumnKey)
 		{
