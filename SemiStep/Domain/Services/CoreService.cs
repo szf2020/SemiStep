@@ -62,7 +62,7 @@ public sealed class CoreService(
 		return recipeSnapshot;
 	}
 
-	public RecipeSnapshot UpdateStepProperty(int stepIndex, string columnKey, object value)
+	public RecipeSnapshot UpdateStepProperty(int stepIndex, string columnKey, string value)
 	{
 		var columnDef = columnRegistry.GetColumn(columnKey);
 		var property = propertyRegistry.GetProperty(columnDef.PropertyTypeId);
@@ -71,31 +71,16 @@ public sealed class CoreService(
 		var action = actionRegistry.GetAction(step.ActionKey);
 
 		var columnId = new ColumnId(columnKey);
-		var propertyValue = CreatePropertyValue(value);
 
-		// TODO: Support formula definitions when formula registry is implemented
 		var result = coreFacade.UpdateProperty(
 			stateManager.Current,
 			stepIndex,
 			columnId,
-			propertyValue,
+			value,
 			property,
 			action,
 			formulaDefinition: null);
 
 		return result;
-	}
-
-	private static PropertyValue CreatePropertyValue(object value)
-	{
-		var type = value switch
-		{
-			int => PropertyType.Int,
-			float or double => PropertyType.Float,
-			string => PropertyType.String,
-			_ => throw new ArgumentException($"Unsupported value type: {value.GetType()}")
-		};
-
-		return new PropertyValue(value, type);
 	}
 }

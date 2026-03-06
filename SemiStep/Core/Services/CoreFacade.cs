@@ -8,7 +8,6 @@ using Shared.Registries;
 namespace Core.Services;
 
 public sealed class CoreFacade(
-	RecipeMutator mutator,
 	RecipeAnalyzer analyzer,
 	FormulaApplicationCoordinator formulaCoordinator)
 {
@@ -23,7 +22,7 @@ public sealed class CoreFacade(
 		IPropertyRegistry propertyRegistry,
 		IGroupRegistry groupRegistry)
 	{
-		var newRecipe = mutator.AddStep(recipe, action, propertyRegistry, groupRegistry);
+		var newRecipe = RecipeMutator.AddStep(recipe, action, propertyRegistry, groupRegistry);
 
 		return analyzer.Analyze(newRecipe);
 	}
@@ -37,7 +36,7 @@ public sealed class CoreFacade(
 	{
 		ValidateIndexOrThrow(recipe, stepIndex);
 
-		var newRecipe = mutator.InsertStep(recipe, stepIndex, action, propertyRegistry, groupRegistry);
+		var newRecipe = RecipeMutator.InsertStep(recipe, stepIndex, action, propertyRegistry, groupRegistry);
 
 		return analyzer.Analyze(newRecipe);
 	}
@@ -46,7 +45,7 @@ public sealed class CoreFacade(
 	{
 		ValidateIndexOrThrow(recipe, stepIndex);
 
-		var newRecipe = mutator.RemoveStep(recipe, stepIndex);
+		var newRecipe = RecipeMutator.RemoveStep(recipe, stepIndex);
 
 		return analyzer.Analyze(newRecipe);
 	}
@@ -60,7 +59,7 @@ public sealed class CoreFacade(
 	{
 		ValidateIndexOrThrow(recipe, stepIndex);
 
-		var newRecipe = mutator.ChangeStepAction(recipe, stepIndex, newAction, propertyRegistry, groupRegistry);
+		var newRecipe = RecipeMutator.ChangeStepAction(recipe, stepIndex, newAction, propertyRegistry, groupRegistry);
 
 		return analyzer.Analyze(newRecipe);
 	}
@@ -69,15 +68,20 @@ public sealed class CoreFacade(
 		Recipe recipe,
 		int stepIndex,
 		ColumnId columnId,
-		PropertyValue value,
+		string rawValue,
 		PropertyDefinition propertyDefinition,
 		ActionDefinition actionDefinition,
 		FormulaDefinition? formulaDefinition = null)
 	{
 		ValidateIndexOrThrow(recipe, stepIndex);
 
-		PropertyValidator.ThrowIfInvalid(propertyDefinition, value.Value);
-		var mutatedRecipe = mutator.UpdateProperty(recipe, stepIndex, columnId, value);
+		var propertyType = PropertyTypeMapping.FromSystemType(propertyDefinition.SystemType);
+		var parsed = PropertyValue.TryParse(rawValue, propertyType)
+			?? throw new ArgumentException(
+				$"Cannot parse '{rawValue}' as {propertyType} for column '{columnId}'");
+
+		PropertyValidator.ThrowIfInvalid(propertyDefinition, parsed.Value);
+		var mutatedRecipe = RecipeMutator.UpdateProperty(recipe, stepIndex, columnId, parsed);
 
 		var recalculatedStep = formulaCoordinator.ApplyIfExists(
 			mutatedRecipe.Steps[stepIndex],

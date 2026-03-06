@@ -30,7 +30,7 @@ public sealed class RecipeConverter(IActionRegistry actions, IPropertyRegistry p
 			{
 				var columnId = new ColumnId(columnDef.Key);
 				var propertyDef = properties.GetProperty(columnDef.PropertyTypeId);
-				var propertyType = ParseSystemType(propertyDef.SystemType);
+				var propertyType = PropertyTypeMapping.FromSystemType(propertyDef.SystemType);
 
 				if (!step.Properties.TryGetValue(columnId, out var propertyValue))
 				{
@@ -94,7 +94,7 @@ public sealed class RecipeConverter(IActionRegistry actions, IPropertyRegistry p
 			{
 				var columnId = new ColumnId(columnDef.Key);
 				var propertyDef = properties.GetProperty(columnDef.PropertyTypeId);
-				var propertyType = ParseSystemType(propertyDef.SystemType);
+				var propertyType = PropertyTypeMapping.FromSystemType(propertyDef.SystemType);
 
 				PropertyValue propertyValue;
 
@@ -106,7 +106,7 @@ public sealed class RecipeConverter(IActionRegistry actions, IPropertyRegistry p
 							throw new InvalidOperationException(
 								$"Insufficient int values at step {stepIndex}, column '{columnDef.Key}'");
 						}
-						propertyValue = new PropertyValue(data.IntValues[intIndex++], PropertyType.Int);
+						propertyValue = PropertyValue.FromInt(data.IntValues[intIndex++]);
 
 						break;
 
@@ -116,7 +116,7 @@ public sealed class RecipeConverter(IActionRegistry actions, IPropertyRegistry p
 							throw new InvalidOperationException(
 								$"Insufficient float values at step {stepIndex}, column '{columnDef.Key}'");
 						}
-						propertyValue = new PropertyValue(data.FloatValues[floatIndex++], PropertyType.Float);
+						propertyValue = PropertyValue.FromFloat(data.FloatValues[floatIndex++]);
 
 						break;
 
@@ -126,7 +126,7 @@ public sealed class RecipeConverter(IActionRegistry actions, IPropertyRegistry p
 							throw new InvalidOperationException(
 								$"Insufficient string values at step {stepIndex}, column '{columnDef.Key}'");
 						}
-						propertyValue = new PropertyValue(data.StringValues[stringIndex++], PropertyType.String);
+						propertyValue = PropertyValue.FromString(data.StringValues[stringIndex++]);
 
 						break;
 
@@ -141,17 +141,6 @@ public sealed class RecipeConverter(IActionRegistry actions, IPropertyRegistry p
 		}
 
 		return new Recipe(steps.ToImmutableList());
-	}
-
-	private static PropertyType ParseSystemType(string systemType)
-	{
-		return systemType.ToLowerInvariant() switch
-		{
-			"int" => PropertyType.Int,
-			"float" => PropertyType.Float,
-			"string" => PropertyType.String,
-			_ => throw new InvalidOperationException($"Unknown system type: {systemType}")
-		};
 	}
 
 	private static void AppendDefaultValue(

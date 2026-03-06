@@ -107,7 +107,7 @@ public sealed class DomainFacade(
 		stateManager.Update(snapshot);
 	}
 
-	public void UpdateStepProperty(int stepIndex, string columnKey, object value)
+	public void UpdateStepProperty(int stepIndex, string columnKey, string value)
 	{
 		var snapshot = coreService.UpdateStepProperty(stepIndex, columnKey, value);
 
