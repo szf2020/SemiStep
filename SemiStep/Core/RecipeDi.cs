@@ -15,11 +15,6 @@ public static class RecipeDi
 	{
 		services.AddSingleton<CoreConfig>();
 
-		// Core services
-		services.AddSingleton<StepFactory>();
-		services.AddSingleton<RecipeMutator>();
-		services.AddSingleton<PropertyValidator>();
-
 		// Analysis
 		services.AddSingleton<TimingCalculator>();
 		services.AddSingleton<RecipeAnalyzer>();

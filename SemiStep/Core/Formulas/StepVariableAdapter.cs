@@ -38,7 +38,13 @@ public sealed class StepVariableAdapter : IStepVariableAdapter
 				continue;
 			}
 
-			var updatedProperty = existingProperty with { Value = ConvertOrThrow(formulaValue, existingProperty.Type) };
+			var updatedProperty = existingProperty.Type switch
+			{
+				PropertyType.Int => PropertyValue.FromInt((int)Math.Round(formulaValue)),
+				PropertyType.Float => PropertyValue.FromFloat((float)formulaValue),
+				_ => throw new TypeMismatchException(
+					$"Cannot convert formula value to target property type '{existingProperty.Type}'.")
+			};
 
 			propertyUpdates.Add(KeyValuePair.Create(columnId, updatedProperty));
 		}
@@ -55,17 +61,6 @@ public sealed class StepVariableAdapter : IStepVariableAdapter
 			int i => i,
 			float f => f,
 			_ => throw new TypeMismatchException($"Could not convert value '{value.Value}' to a numeric value.")
-		};
-	}
-
-	private static object ConvertOrThrow(double formulaValue, PropertyType targetType)
-	{
-		return targetType switch
-		{
-			PropertyType.Int => (int)Math.Round(formulaValue),
-			PropertyType.Float => (float)formulaValue,
-			_ => throw new TypeMismatchException(
-				$"Cannot convert formula value to target property type '{targetType}'.")
 		};
 	}
 }

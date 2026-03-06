@@ -5,9 +5,9 @@ using Shared.Registries;
 
 namespace Core.Services;
 
-public sealed class RecipeMutator
+public static class RecipeMutator
 {
-	public Recipe AddStep(
+	public static Recipe AddStep(
 		Recipe recipe,
 		ActionDefinition action,
 		IPropertyRegistry propertyRegistry,
@@ -18,7 +18,7 @@ public sealed class RecipeMutator
 		return recipe with { Steps = recipe.Steps.Add(step) };
 	}
 
-	public Recipe InsertStep(
+	public static Recipe InsertStep(
 		Recipe recipe,
 		int index,
 		ActionDefinition action,
@@ -30,12 +30,12 @@ public sealed class RecipeMutator
 		return recipe with { Steps = recipe.Steps.Insert(index, step) };
 	}
 
-	public Recipe RemoveStep(Recipe recipe, int index)
+	public static Recipe RemoveStep(Recipe recipe, int index)
 	{
 		return recipe with { Steps = recipe.Steps.RemoveAt(index) };
 	}
 
-	public Recipe UpdateProperty(Recipe recipe, int stepIndex, ColumnId columnId, PropertyValue value)
+	public static Recipe UpdateProperty(Recipe recipe, int stepIndex, ColumnId columnId, PropertyValue value)
 	{
 		var step = recipe.Steps[stepIndex];
 		var newProperties = step.Properties.SetItem(columnId, value);
@@ -44,7 +44,7 @@ public sealed class RecipeMutator
 		return recipe with { Steps = recipe.Steps.SetItem(stepIndex, newStep) };
 	}
 
-	public Recipe ChangeStepAction(
+	public static Recipe ChangeStepAction(
 		Recipe recipe,
 		int stepIndex,
 		ActionDefinition newAction,
