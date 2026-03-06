@@ -3,21 +3,27 @@ using System.Text;
 
 using Core.Entities;
 
+using Csv.Reasons;
+using Csv.Services;
+
+using Domain.Models;
 using Domain.Ports;
 
 using Serilog;
 
-namespace Csv;
+using Shared.Reasons;
 
-public sealed class CsvCsvService(CsvSerializer csvSerializer) : ICsvService
+namespace Csv.Facade;
+
+public sealed class CsvService(CsvSerializer csvSerializer) : ICsvService
 {
 	private static readonly Encoding _fileEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
 
-	public async Task<Recipe> LoadAsync(string filePath, CancellationToken cancellationToken = default)
+	public async Task<CsvLoadResult> LoadAsync(string filePath, CancellationToken cancellationToken = default)
 	{
 		if (!File.Exists(filePath))
 		{
-			throw new FileNotFoundException($"Recipe file not found: {filePath}", filePath);
+			return CsvLoadResult.Failure([new CsvLoadError($"Recipe file not found: {filePath}")]);
 		}
 
 		var fullText = await File.ReadAllTextAsync(filePath, _fileEncoding, cancellationToken);
@@ -25,13 +31,24 @@ public sealed class CsvCsvService(CsvSerializer csvSerializer) : ICsvService
 		var (metadata, linesConsumed) = CsvMetadata.Deserialize(fullText);
 		var bodyText = ExtractBody(fullText, linesConsumed);
 
-		var recipe = csvSerializer.Deserialize(bodyText);
+		var result = csvSerializer.Deserialize(bodyText);
 
-		VerifyRowCount(metadata, recipe.StepCount, filePath);
+		if (!result.IsSuccess)
+		{
+			return result;
+		}
 
-		Log.Information("Loaded recipe from {FilePath}: {StepCount} steps", filePath, recipe.StepCount);
+		var reasons = new List<AbstractReason>(result.Reasons);
 
-		return recipe;
+		if (metadata.Rows > 0 && metadata.Rows != result.Recipe!.StepCount)
+		{
+			reasons.Add(new CsvLoadWarning(
+				$"Row count mismatch in '{filePath}': metadata says {metadata.Rows}, actual is {result.Recipe.StepCount}"));
+		}
+
+		Log.Information("Loaded recipe from {FilePath}: {StepCount} steps", filePath, result.Recipe!.StepCount);
+
+		return CsvLoadResult.Success(result.Recipe, reasons);
 	}
 
 	public async Task SaveAsync(Recipe recipe, string filePath, CancellationToken cancellationToken = default)
@@ -92,16 +109,6 @@ public sealed class CsvCsvService(CsvSerializer csvSerializer) : ICsvService
 		return reader.ReadToEnd();
 	}
 
-	private static void VerifyRowCount(CsvMetadata metadata, int actualCount, string filePath)
-	{
-		if (metadata.Rows > 0 && metadata.Rows != actualCount)
-		{
-			Log.Warning(
-				"Row count mismatch in {FilePath}: metadata says {Expected}, actual is {Actual}",
-				filePath, metadata.Rows, actualCount);
-		}
-	}
-
 	private static int CountDataRows(string csvBody)
 	{
 		if (string.IsNullOrEmpty(csvBody))
@@ -117,7 +124,6 @@ public sealed class CsvCsvService(CsvSerializer csvSerializer) : ICsvService
 			lineCount++;
 		}
 
-		// Subtract 1 for the header row
 		return Math.Max(0, lineCount - 1);
 	}
 }

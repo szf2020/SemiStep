@@ -3,13 +3,18 @@ using System.Globalization;
 
 using Core.Entities;
 
+using Csv.Reasons;
+
 using CsvHelper;
 using CsvHelper.Configuration;
 
+using Domain.Models;
+
 using Shared.Entities;
+using Shared.Reasons;
 using Shared.Registries;
 
-namespace Csv;
+namespace Csv.Services;
 
 public sealed class CsvSerializer(
 	IColumnRegistry columnRegistry,
@@ -33,16 +38,21 @@ public sealed class CsvSerializer(
 		return stringWriter.ToString();
 	}
 
-	public Recipe Deserialize(string csvBody)
+	public CsvLoadResult Deserialize(string csvBody)
 	{
 		var csvColumns = GetCsvColumns();
+		var reasons = new List<AbstractReason>();
 
 		using var stringReader = new StringReader(csvBody);
 		using var csvReader = CreateReader(stringReader);
 
 		csvReader.Read();
 		csvReader.ReadHeader();
-		ValidateHeader(csvReader, csvColumns);
+
+		if (!ValidateHeader(csvReader, csvColumns, reasons))
+		{
+			return CsvLoadResult.Failure(reasons);
+		}
 
 		var steps = new List<Step>();
 		var rowNumber = 1;
@@ -50,11 +60,20 @@ public sealed class CsvSerializer(
 		while (csvReader.Read())
 		{
 			rowNumber++;
-			var step = ParseStep(csvReader, csvColumns, rowNumber);
-			steps.Add(step);
+			var step = TryParseStep(csvReader, csvColumns, rowNumber, reasons);
+			if (step is not null)
+			{
+				steps.Add(step);
+			}
 		}
 
-		return new Recipe(steps.ToImmutableList());
+		if (reasons.OfType<AbstractError>().Any())
+		{
+			return CsvLoadResult.Failure(reasons);
+		}
+
+		var recipe = new Recipe(steps.ToImmutableList());
+		return CsvLoadResult.Success(recipe, reasons);
 	}
 
 	private IReadOnlyList<GridColumnDefinition> GetCsvColumns()
@@ -140,35 +159,53 @@ public sealed class CsvSerializer(
 		};
 	}
 
-	private static void ValidateHeader(CsvReader csvReader, IReadOnlyList<GridColumnDefinition> expectedColumns)
+	private static bool ValidateHeader(
+		CsvReader csvReader,
+		IReadOnlyList<GridColumnDefinition> expectedColumns,
+		List<AbstractReason> reasons)
 	{
 		var actualHeader = csvReader.HeaderRecord;
 		if (actualHeader is null || actualHeader.Length == 0)
 		{
-			throw new CsvHeaderMismatchException(
-				expectedColumns.Select(c => c.Key).ToArray(),
-				[]);
+			var expectedKeys = expectedColumns.Select(c => c.Key).ToArray();
+			reasons.Add(new CsvLoadError(
+				$"CSV header mismatch. Expected: [{string.Join("; ", expectedKeys)}], Actual: []"));
+			return false;
 		}
 
-		var expectedKeys = expectedColumns.Select(c => c.Key).ToArray();
+		var expected = expectedColumns.Select(c => c.Key).ToArray();
 		var trimmedActual = actualHeader.Select(h => h.Trim()).ToArray();
 
-		if (!expectedKeys.SequenceEqual(trimmedActual))
+		if (!expected.SequenceEqual(trimmedActual))
 		{
-			throw new CsvHeaderMismatchException(expectedKeys, trimmedActual);
+			reasons.Add(new CsvLoadError(
+				$"CSV header mismatch. Expected: [{string.Join("; ", expected)}], " +
+				$"Actual: [{string.Join("; ", trimmedActual)}]"));
+			return false;
 		}
+
+		return true;
 	}
 
-	private Step ParseStep(CsvReader csvReader, IReadOnlyList<GridColumnDefinition> columns, int rowNumber)
+	private Step? TryParseStep(
+		CsvReader csvReader,
+		IReadOnlyList<GridColumnDefinition> columns,
+		int rowNumber,
+		List<AbstractReason> reasons)
 	{
-		var actionKey = ParseActionKey(csvReader, rowNumber);
-
-		if (!actionRegistry.ActionExists(actionKey))
+		var actionKey = TryParseActionKey(csvReader, rowNumber, reasons);
+		if (actionKey is null)
 		{
-			throw new CsvParseException($"Unknown action ID '{actionKey}'", rowNumber);
+			return null;
 		}
 
-		var action = actionRegistry.GetAction(actionKey);
+		if (!actionRegistry.ActionExists(actionKey.Value))
+		{
+			reasons.Add(new CsvLoadError($"Row {rowNumber}: unknown action ID '{actionKey.Value}'"));
+			return null;
+		}
+
+		var action = actionRegistry.GetAction(actionKey.Value);
 		var actionColumnKeys = action.Columns
 			.Select(c => c.Key)
 			.ToHashSet();
@@ -194,64 +231,81 @@ public sealed class CsvSerializer(
 			}
 
 			var propertyDef = propertyRegistry.GetProperty(column.PropertyTypeId);
-			var propertyValue = ParsePropertyValue(rawValue, propertyDef, column.Key, rowNumber);
-			properties.Add(new ColumnId(column.Key), propertyValue);
+			var propertyValue = TryParsePropertyValue(rawValue, propertyDef, column.Key, rowNumber, reasons);
+			if (propertyValue is not null)
+			{
+				properties.Add(new ColumnId(column.Key), propertyValue);
+			}
 		}
 
-		return new Step(actionKey, properties.ToImmutable());
+		return new Step(actionKey.Value, properties.ToImmutable());
 	}
 
-	private static int ParseActionKey(CsvReader csvReader, int rowNumber)
+	private static int? TryParseActionKey(CsvReader csvReader, int rowNumber, List<AbstractReason> reasons)
 	{
 		var rawAction = csvReader.GetField(ActionColumnKey);
 		if (string.IsNullOrWhiteSpace(rawAction))
 		{
-			throw new CsvParseException("Action column is empty", rowNumber);
+			reasons.Add(new CsvLoadError($"Row {rowNumber}: action column is empty"));
+			return null;
 		}
 
 		if (!int.TryParse(rawAction, NumberStyles.Integer, CultureInfo.InvariantCulture, out var actionKey))
 		{
-			throw new CsvParseException($"Cannot parse action value '{rawAction}' as integer", rowNumber);
+			reasons.Add(new CsvLoadError($"Row {rowNumber}: cannot parse action value '{rawAction}' as integer"));
+			return null;
 		}
 
 		return actionKey;
 	}
 
-	private static PropertyValue ParsePropertyValue(
+	private static PropertyValue? TryParsePropertyValue(
 		string rawValue,
 		PropertyDefinition propertyDef,
 		string columnKey,
-		int rowNumber)
+		int rowNumber,
+		List<AbstractReason> reasons)
 	{
 		return propertyDef.SystemType.ToLowerInvariant() switch
 		{
-			"int" => ParseIntProperty(rawValue, columnKey, rowNumber),
-			"float" => ParseFloatProperty(rawValue, columnKey, rowNumber),
-			"string" => new PropertyValue(rawValue, PropertyType.String),
-			_ => throw new CsvParseException(
-				$"Unknown system type '{propertyDef.SystemType}' for column '{columnKey}'", rowNumber)
+			"int" => TryParseIntProperty(rawValue, columnKey, rowNumber, reasons),
+			"float" => TryParseFloatProperty(rawValue, columnKey, rowNumber, reasons),
+			"string" => PropertyValue.FromString(rawValue),
+			_ => HandleUnknownSystemType(propertyDef.SystemType, columnKey, rowNumber, reasons)
 		};
 	}
 
-	private static PropertyValue ParseIntProperty(string rawValue, string columnKey, int rowNumber)
+	private static PropertyValue? TryParseIntProperty(
+		string rawValue, string columnKey, int rowNumber, List<AbstractReason> reasons)
 	{
 		if (!int.TryParse(rawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intValue))
 		{
-			throw new CsvParseException(
-				$"Cannot parse value '{rawValue}' as int for column '{columnKey}'", rowNumber);
+			reasons.Add(new CsvLoadError(
+				$"Row {rowNumber}: cannot parse value '{rawValue}' as int for column '{columnKey}'"));
+			return null;
 		}
 
-		return new PropertyValue(intValue, PropertyType.Int);
+		return PropertyValue.FromInt(intValue);
 	}
 
-	private static PropertyValue ParseFloatProperty(string rawValue, string columnKey, int rowNumber)
+	private static PropertyValue? TryParseFloatProperty(
+		string rawValue, string columnKey, int rowNumber, List<AbstractReason> reasons)
 	{
 		if (!float.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var floatValue))
 		{
-			throw new CsvParseException(
-				$"Cannot parse value '{rawValue}' as float for column '{columnKey}'", rowNumber);
+			reasons.Add(new CsvLoadError(
+				$"Row {rowNumber}: cannot parse value '{rawValue}' as float for column '{columnKey}'"));
+			return null;
 		}
 
-		return new PropertyValue(floatValue, PropertyType.Float);
+		return PropertyValue.FromFloat(floatValue);
+	}
+
+	private static PropertyValue? HandleUnknownSystemType(
+		string systemType, string columnKey, int rowNumber, List<AbstractReason> reasons)
+	{
+		reasons.Add(new CsvLoadError(
+			$"Row {rowNumber}: unknown system type '{systemType}' for column '{columnKey}'"));
+		return null;
 	}
 }

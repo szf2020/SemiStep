@@ -1,6 +1,7 @@
 ﻿using Core.Analysis;
 using Core.Entities;
 
+using Domain.Models;
 using Domain.Ports;
 using Domain.Services;
 using Domain.State;
@@ -143,13 +144,20 @@ public sealed class DomainFacade(
 		return snapshot;
 	}
 
-	public async Task LoadRecipeAsync(string filePath, CancellationToken ct = default)
+	public async Task<CsvLoadResult> LoadRecipeAsync(string filePath, CancellationToken ct = default)
 	{
-		var recipe = await csvService.LoadAsync(filePath, ct);
+		var result = await csvService.LoadAsync(filePath, ct);
+		if (!result.IsSuccess)
+		{
+			return result;
+		}
+
 		historyManager.Clear();
-		var snapshot = coreService.AnalyzeRecipe(recipe);
+		var snapshot = coreService.AnalyzeRecipe(result.Recipe!);
 		stateManager.Update(snapshot);
 		stateManager.MarkSaved();
+
+		return result;
 	}
 
 	public async Task SaveRecipeAsync(string filePath, CancellationToken ct = default)
