@@ -10,8 +10,8 @@ namespace Tests.Config.Integration.Loading;
 
 [Trait("Category", "Integration")]
 [Trait("Component", "Config")]
-[Trait("Feature", "Loading")]
-public class ConfigLoadingTests
+[Trait("Area", "Loading")]
+public sealed class ConfigLoadingTests
 {
 	[Fact]
 	public async Task StandardConfig_LoadsSuccessfully()
@@ -140,23 +140,21 @@ public class ConfigLoadingTests
 	public async Task StandardConfig_NoErrors()
 	{
 		using var tempDir = TestDataCopier.PrepareValidCase();
-		var facade = ConfigTestHelper.CreateFacade();
 
 		var context = await ConfigFacade.LoadAsync(tempDir.Path);
 
 		context.HasErrors.Should().BeFalse(
-			$"expected no errors but got: {string.Join(", ", context.Errors.Select(e => e.Message))}");
+			$"expected no errors but got: {string.Join(", ", context.Errors.Select(e => e))}");
 	}
 
 	[Fact]
 	public async Task StandardConfig_NoWarnings()
 	{
 		using var tempDir = TestDataCopier.PrepareValidCase();
-		var facade = ConfigTestHelper.CreateFacade();
 
 		var context = await ConfigFacade.LoadAsync(tempDir.Path);
 
 		context.HasWarnings.Should().BeFalse(
-			$"expected no warnings but got: {string.Join(", ", context.Warnings.Select(w => w.Message))}");
+			$"expected no warnings but got: {string.Join(", ", context.Warnings.Select(w => w))}");
 	}
 }

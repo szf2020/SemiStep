@@ -2,7 +2,7 @@
 
 namespace Config.Dto;
 
-public sealed class GridStyleCellColorsDto
+internal sealed class GridStyleCellColorsDto
 {
 	[YamlMember(Alias = "enabled")] public GridStyleCellStateColorsDto? Enabled { get; set; }
 

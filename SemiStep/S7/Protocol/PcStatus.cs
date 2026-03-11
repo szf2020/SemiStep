@@ -1,6 +1,6 @@
 ﻿namespace S7.Protocol;
 
-public enum PcStatus : ushort
+internal enum PcStatus : ushort
 {
 	Idle = 0,
 	Writing = 1,

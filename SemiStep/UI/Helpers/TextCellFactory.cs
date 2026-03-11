@@ -7,8 +7,9 @@ using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Media;
 
-using Shared.Entities;
-using Shared.Registries;
+using Shared.Config;
+using Shared.Config.Contracts;
+using Shared.Core;
 
 using UI.Controls;
 using UI.Converters;
@@ -49,7 +50,8 @@ public sealed class TextCellFactory(IPropertyRegistry propertyRegistry, IColumnR
 			IsReadOnly = false,
 			CanUserSort = false,
 			CellTemplate = CreateTemplate(columnDef.Key, isEditing: false, isColumnReadOnly: false, formatKind),
-			CellEditingTemplate = CreateTemplate(columnDef.Key, isEditing: true, isColumnReadOnly: false, formatKind)
+			CellEditingTemplate =
+				CreateTemplate(columnDef.Key, isEditing: true, isColumnReadOnly: false, formatKind)
 		};
 	}
 
@@ -76,6 +78,7 @@ public sealed class TextCellFactory(IPropertyRegistry propertyRegistry, IColumnR
 		if (cellState == CellState.Disabled)
 		{
 			presenter.Content = CreateEmptyTextBlock();
+
 			return presenter;
 		}
 
@@ -94,13 +97,10 @@ public sealed class TextCellFactory(IPropertyRegistry propertyRegistry, IColumnR
 			};
 
 			textBlock.Bind(TextBlock.TextProperty,
-				new Binding(bindingPath)
-				{
-					Mode = BindingMode.OneWay,
-					Converter = displayConverter
-				});
+				new Binding(bindingPath) { Mode = BindingMode.OneWay, Converter = displayConverter });
 
 			presenter.Content = textBlock;
+
 			return presenter;
 		}
 
@@ -123,6 +123,7 @@ public sealed class TextCellFactory(IPropertyRegistry propertyRegistry, IColumnR
 			});
 
 		presenter.Content = textBox;
+
 		return presenter;
 	}
 
@@ -137,6 +138,7 @@ public sealed class TextCellFactory(IPropertyRegistry propertyRegistry, IColumnR
 		};
 
 		SubscribeWithLifecycle(presenter, row, columnKey);
+
 		return presenter;
 	}
 
@@ -156,6 +158,7 @@ public sealed class TextCellFactory(IPropertyRegistry propertyRegistry, IColumnR
 
 		presenter.DetachedFromVisualTree += OnDetached;
 		presenter.AttachedToVisualTree += OnAttached;
+
 		return;
 
 		void OnDetached(object? sender, VisualTreeAttachmentEventArgs e)
@@ -192,6 +195,7 @@ public sealed class TextCellFactory(IPropertyRegistry propertyRegistry, IColumnR
 		if (propertyRegistry.PropertyExists(columnDef.PropertyTypeId))
 		{
 			var propDef = propertyRegistry.GetProperty(columnDef.PropertyTypeId);
+
 			return propDef.FormatKind;
 		}
 

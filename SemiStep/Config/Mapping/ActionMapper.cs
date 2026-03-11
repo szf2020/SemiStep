@@ -1,10 +1,10 @@
 ﻿using Config.Dto;
 
-using Shared.Entities;
+using Shared.Core;
 
 namespace Config.Mapping;
 
-public sealed class ActionMapper
+internal static class ActionMapper
 {
 	public static ActionDefinition Map(ActionDto dto)
 	{

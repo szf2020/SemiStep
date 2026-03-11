@@ -1,10 +1,11 @@
 ﻿using Config.Dto;
 
-using Shared.Entities;
+using Shared.Plc;
+using Shared.Plc.Memory;
 
 namespace Config.Mapping;
 
-public sealed class ConnectionMapper
+internal static class ConnectionMapper
 {
 	public static PlcConfiguration Map(ConnectionDto? dto)
 	{

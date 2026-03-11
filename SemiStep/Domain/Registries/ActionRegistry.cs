@@ -1,9 +1,9 @@
-﻿using Shared.Entities;
-using Shared.Registries;
+﻿using Shared.Config.Contracts;
+using Shared.Core;
 
 namespace Domain.Registries;
 
-public sealed class ActionRegistry : IActionRegistry
+internal sealed class ActionRegistry : IActionRegistry
 {
 	private readonly Dictionary<int, ActionDefinition> _byId = new();
 	private readonly Dictionary<string, ActionDefinition> _byName = new(StringComparer.OrdinalIgnoreCase);

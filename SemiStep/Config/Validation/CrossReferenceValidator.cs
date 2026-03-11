@@ -2,7 +2,7 @@
 
 namespace Config.Validation;
 
-public sealed class CrossReferenceValidator
+internal static class CrossReferenceValidator
 {
 	public static ConfigContext Validate(ConfigContext context)
 	{
@@ -103,6 +103,14 @@ public sealed class CrossReferenceValidator
 				{
 					context.AddError(
 						$"Action '{action.UiName}' column '{column.Key}' references unknown group_name: '{column.GroupName}'",
+						actionLocation);
+				}
+
+				if (string.Equals(column.PropertyTypeId, "enum", StringComparison.OrdinalIgnoreCase)
+					&& string.IsNullOrEmpty(column.GroupName))
+				{
+					context.AddError(
+						$"Action '{action.UiName}' column '{column.Key}' has property_type_id 'enum' but no group_name specified",
 						actionLocation);
 				}
 			}

@@ -1,6 +1,6 @@
 ﻿namespace Config.Dto;
 
-public sealed class ColumnUiDto
+internal sealed class ColumnUiDto
 {
 	public string? UiName { get; set; }
 }

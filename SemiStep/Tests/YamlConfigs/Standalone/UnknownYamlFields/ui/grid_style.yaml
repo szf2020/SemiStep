@@ -1,0 +1,9 @@
+﻿# Grid style with extra unknown fields
+fonts:
+  header_size: 12
+  cell_size: 11
+  unknown_font: 99
+
+layout:
+  row_height: 24
+  unknown_layout: "noise"

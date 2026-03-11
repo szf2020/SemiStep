@@ -6,7 +6,7 @@ using Config.Validation;
 using Serilog;
 
 using Shared;
-using Shared.Reasons;
+using Shared.Config;
 
 namespace Config.Facade;
 
@@ -20,8 +20,7 @@ public sealed class ConfigFacade
 		{
 			foreach (var error in context.Errors)
 			{
-				var location = error is ConfigLoadError configError ? configError.Location : null;
-				Log.Error("Configuration error: {Message} at {Location}", error.Message, location ?? "unknown");
+				Log.Error("Configuration error: {Error}", error);
 			}
 
 			throw new InvalidOperationException("Configuration loading failed with errors.");
@@ -30,6 +29,7 @@ public sealed class ConfigFacade
 		if (context.Configuration is null)
 		{
 			Log.Error("Configuration is null after successful loading");
+
 			throw new InvalidOperationException("Configuration is null after successful loading.");
 		}
 
@@ -38,7 +38,7 @@ public sealed class ConfigFacade
 		return context.Configuration;
 	}
 
-	public static async Task<ConfigContext> LoadAsync(string configDirectory)
+	internal static async Task<ConfigContext> LoadAsync(string configDirectory)
 	{
 		var context = new ConfigContext { FilePaths = [configDirectory] };
 
@@ -58,6 +58,13 @@ public sealed class ConfigFacade
 		}
 
 		context = CrossReferenceValidator.Validate(context);
+
+		if (context.HasErrors)
+		{
+			return context;
+		}
+
+		context = DefaultValueValidator.Validate(context);
 
 		if (context.HasErrors)
 		{

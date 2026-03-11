@@ -3,8 +3,9 @@
 using Avalonia.Controls;
 using Avalonia.Media;
 
-using Shared.Entities;
-using Shared.Registries;
+using Shared.Config;
+using Shared.Config.Contracts;
+using Shared.Style;
 
 namespace UI.Helpers;
 
@@ -20,7 +21,7 @@ public sealed class ColumnWidthCalculator(
 	private const string TextField = "text_field";
 
 	private const string RepresentativeTimeValue = "00:00:00";
-	private const double BufferMultiplier = 1.3;
+	private const double BufferMultiplier = 1.4;
 
 	public DataGridLength CalculateColumnWidth(GridColumnDefinition columnDef)
 	{
@@ -38,12 +39,14 @@ public sealed class ColumnWidthCalculator(
 	private DataGridLength CalculateActionColumnWidth(GridColumnDefinition columnDef)
 	{
 		var actionNames = actionRegistry.GetAll().Select(a => a.UiName);
+
 		return CalculateWidth(columnDef.UiName, actionNames);
 	}
 
 	private DataGridLength CalculateGroupColumnWidth(GridColumnDefinition columnDef)
 	{
 		var displayStrings = CollectGroupDisplayStrings(columnDef.Key);
+
 		return CalculateWidth(columnDef.UiName, displayStrings);
 	}
 
@@ -115,6 +118,7 @@ public sealed class ColumnWidthCalculator(
 		const double FluentThemeSortIconMinWidth = 32;
 
 		var textWidth = MeasureText(headerText, gridStyle.HeaderFontSize);
+
 		return textWidth + FluentThemeSortIconMinWidth;
 	}
 

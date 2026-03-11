@@ -1,11 +1,9 @@
-﻿using Core.Entities;
-
-using Shared.Entities;
-using Shared.Registries;
+﻿using Shared.Config.Contracts;
+using Shared.Core;
 
 namespace Core.Services;
 
-public static class RecipeMutator
+internal static class RecipeMutator
 {
 	public static Recipe AddStep(
 		Recipe recipe,

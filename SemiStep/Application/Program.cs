@@ -22,7 +22,7 @@ namespace Application;
 
 public static class Program
 {
-	private const string ConfigDir = @"C:\DISTR\Config\Semistep\ConfigFiles";
+	private const string ConfigDir = @"C:\DISTR\Config\Semistep";
 	private const string LogFilePath = @"C:\DISTR\Logs\semistep.log";
 
 	public static async Task Main()

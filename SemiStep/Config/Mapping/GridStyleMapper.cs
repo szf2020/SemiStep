@@ -1,10 +1,10 @@
 ﻿using Config.Dto;
 
-using Shared.Entities;
+using Shared.Style;
 
 namespace Config.Mapping;
 
-public sealed class GridStyleMapper
+internal static class GridStyleMapper
 {
 	public static GridStyleOptions Map(GridStyleOptionsDto? dto)
 	{

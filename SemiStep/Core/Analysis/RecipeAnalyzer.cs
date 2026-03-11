@@ -1,10 +1,8 @@
-﻿using Core.Entities;
-
-using Shared.Reasons;
+﻿using Shared.Core;
 
 namespace Core.Analysis;
 
-public sealed class RecipeAnalyzer(TimingCalculator timingCalculator, LoopParser loopParser)
+internal sealed class RecipeAnalyzer(TimingCalculator timingCalculator, LoopParser loopParser)
 {
 	private const int MaxLoopDepth = 3;
 
@@ -17,11 +15,13 @@ public sealed class RecipeAnalyzer(TimingCalculator timingCalculator, LoopParser
 				TimeSpan.Zero,
 				new Dictionary<int, TimeSpan>(),
 				[],
-				[new EmptyRecipeWarning("Recipe is empty")]);
+				errors: [],
+				warnings: ["Recipe is empty"]);
 		}
 
 		var loopParse = loopParser.Parse(recipe);
-		var reasons = new List<AbstractReason>(loopParse.Reasons);
+		var errors = new List<string>(loopParse.Errors);
+		var warnings = new List<string>();
 
 		var (stepStartTimes, totalDuration) = timingCalculator.Calculate(recipe, loopParse.Loops);
 
@@ -31,7 +31,7 @@ public sealed class RecipeAnalyzer(TimingCalculator timingCalculator, LoopParser
 
 		if (maxDepth > MaxLoopDepth)
 		{
-			reasons.Add(new LoopNestingDepthError($"Maximum loop nesting depth ({MaxLoopDepth}) exceeded: {maxDepth}"));
+			errors.Add($"Maximum loop nesting depth ({MaxLoopDepth}) exceeded: {maxDepth}");
 		}
 
 		return RecipeSnapshot.Create(
@@ -39,6 +39,7 @@ public sealed class RecipeAnalyzer(TimingCalculator timingCalculator, LoopParser
 			totalDuration,
 			stepStartTimes,
 			loopParse.Loops,
-			reasons);
+			errors,
+			warnings);
 	}
 }

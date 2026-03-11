@@ -2,8 +2,9 @@
 using Avalonia.Data;
 
 using Shared;
-using Shared.Entities;
-using Shared.Registries;
+using Shared.Config;
+using Shared.Config.Contracts;
+using Shared.Style;
 
 namespace UI.Helpers;
 
@@ -16,9 +17,9 @@ public sealed class ColumnBuilder(
 {
 	private const string ActionColumnKey = "action";
 	private const string ActionTargetComboBoxType = "action_target_combo_box";
+	private readonly ComboBoxCellFactory _comboBoxCellFactory = new(actionRegistry);
 
 	private readonly TextCellFactory _textCellFactory = new(propertyRegistry, columnRegistry);
-	private readonly ComboBoxCellFactory _comboBoxCellFactory = new(actionRegistry);
 	private readonly ColumnWidthCalculator _widthCalculator = new(actionRegistry, groupRegistry, gridStyle);
 
 	public void BuildColumnsFromConfiguration(DataGrid grid, AppConfiguration config)

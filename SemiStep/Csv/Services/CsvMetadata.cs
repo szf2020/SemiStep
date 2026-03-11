@@ -2,7 +2,7 @@
 
 namespace Csv.Services;
 
-public sealed record CsvMetadata(
+internal sealed record CsvMetadata(
 	char Separator = ';',
 	int Rows = 0,
 	ImmutableDictionary<string, string>? Extras = null)

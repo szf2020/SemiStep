@@ -1,17 +1,17 @@
-﻿using Core.Entities;
-using Core.Exceptions;
+﻿using Core.Exceptions;
 
-using Shared.Reasons;
+using Shared.Core;
 
 namespace Core.Analysis;
 
-public sealed class LoopParser(CoreConfig config)
+internal sealed class LoopParser(CoreConfig config)
 {
 	private readonly ColumnId _iterationColumnName = config.IterationColumnId;
+
 	public LoopParseResult Parse(Recipe recipe)
 	{
 		var validLoops = new List<LoopInfo>();
-		var reasons = new List<AbstractReason>();
+		var errors = new List<string>();
 		var stack = new Stack<ForFrame>();
 
 		for (var i = 0; i < recipe.Steps.Count; i++)
@@ -32,7 +32,7 @@ public sealed class LoopParser(CoreConfig config)
 				}
 				case (int)ServiceActionId.EndForLoop when stack.Count == 0:
 				{
-					reasons.Add(new LoopIntegrityError($"Unmatched EndFor at step {i}"));
+					errors.Add($"Unmatched EndFor at step {i}");
 
 					break;
 				}
@@ -54,10 +54,10 @@ public sealed class LoopParser(CoreConfig config)
 		while (stack.Count > 0)
 		{
 			var frame = stack.Pop();
-			reasons.Add(new LoopIntegrityError($"Unclosed For loop starting at step {frame.StartIndex}"));
+			errors.Add($"Unclosed For loop starting at step {frame.StartIndex}");
 		}
 
-		return new LoopParseResult(validLoops, reasons);
+		return new LoopParseResult(validLoops, errors);
 	}
 
 	private int ExtractIterationCountOrThrow(Step step)

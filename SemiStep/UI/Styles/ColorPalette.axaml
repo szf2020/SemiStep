@@ -13,7 +13,8 @@
 
     <!-- Cell State: Enabled + Selected -->
     <Color x:Key="CellEnabledSelectedBackgroundColor">#0078D7</Color>
-    <SolidColorBrush x:Key="CellEnabledSelectedBackgroundBrush" Color="{StaticResource CellEnabledSelectedBackgroundColor}" />
+    <SolidColorBrush x:Key="CellEnabledSelectedBackgroundBrush"
+                     Color="{StaticResource CellEnabledSelectedBackgroundColor}" />
 
     <!-- Cell State: Readonly -->
     <Color x:Key="CellReadonlyBackgroundColor">#F5F5F5</Color>
@@ -21,7 +22,8 @@
 
     <!-- Cell State: Readonly + Selected -->
     <Color x:Key="CellReadonlySelectedBackgroundColor">#5A9ED7</Color>
-    <SolidColorBrush x:Key="CellReadonlySelectedBackgroundBrush" Color="{StaticResource CellReadonlySelectedBackgroundColor}" />
+    <SolidColorBrush x:Key="CellReadonlySelectedBackgroundBrush"
+                     Color="{StaticResource CellReadonlySelectedBackgroundColor}" />
 
     <!-- Cell State: Disabled -->
     <Color x:Key="CellDisabledBackgroundColor">#E0E0E0</Color>
@@ -31,7 +33,8 @@
 
     <!-- Cell State: Disabled + Selected -->
     <Color x:Key="CellDisabledSelectedBackgroundColor">#89B4D7</Color>
-    <SolidColorBrush x:Key="CellDisabledSelectedBackgroundBrush" Color="{StaticResource CellDisabledSelectedBackgroundColor}" />
+    <SolidColorBrush x:Key="CellDisabledSelectedBackgroundBrush"
+                     Color="{StaticResource CellDisabledSelectedBackgroundColor}" />
 
     <!-- Selected text foreground (white-on-accent) -->
     <Color x:Key="TextOnAccentColor">#FFFFFF</Color>

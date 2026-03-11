@@ -2,7 +2,7 @@
 
 namespace Config.Dto;
 
-public sealed class GridStyleLayoutDto
+internal sealed class GridStyleLayoutDto
 {
 	[YamlMember(Alias = "cell_padding_left")]
 	public double? CellPaddingLeft { get; set; }

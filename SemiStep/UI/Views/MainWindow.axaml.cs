@@ -144,6 +144,4 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
 		_columnBuilder.BuildColumnsFromConfiguration(RecipeGrid, ViewModel.Configuration);
 	}
-
-
 }

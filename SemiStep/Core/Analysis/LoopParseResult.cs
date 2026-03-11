@@ -1,5 +1,5 @@
-﻿using Shared.Reasons;
+﻿using Shared.Core;
 
 namespace Core.Analysis;
 
-public sealed record LoopParseResult(IReadOnlyList<LoopInfo> Loops, IReadOnlyList<AbstractReason> Reasons);
+internal sealed record LoopParseResult(IReadOnlyList<LoopInfo> Loops, IReadOnlyList<string> Errors);

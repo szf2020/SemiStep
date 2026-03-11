@@ -1,6 +1,6 @@
 ﻿namespace S7.Protocol;
 
-public static class ProtocolConstants
+internal static class ProtocolConstants
 {
 	public const ushort ProtocolVersion = 1;
 

@@ -2,8 +2,8 @@
 
 namespace Core.Formulas;
 
-public sealed class FormulaEngine(
-	IReadOnlyDictionary<int, CompiledFormula> compiledFormulas) : IFormulaEngine
+internal sealed class FormulaEngine(
+	IReadOnlyDictionary<int, CompiledFormula> compiledFormulas)
 {
 	private readonly IReadOnlyDictionary<int, CompiledFormula> _compiledFormulas =
 		compiledFormulas ?? throw new ArgumentNullException(nameof(compiledFormulas));

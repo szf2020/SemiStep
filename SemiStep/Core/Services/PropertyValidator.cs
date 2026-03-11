@@ -1,10 +1,10 @@
 ﻿using Core.Exceptions;
 
-using Shared.Entities;
+using Shared.Core;
 
 namespace Core.Services;
 
-public sealed class PropertyValidator
+internal sealed class PropertyValidator
 {
 	public static void ThrowIfInvalid(PropertyDefinition property, object value)
 	{

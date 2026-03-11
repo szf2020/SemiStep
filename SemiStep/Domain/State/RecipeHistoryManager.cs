@@ -1,8 +1,8 @@
-﻿using Core.Entities;
+﻿using Shared.Core;
 
 namespace Domain.State;
 
-public sealed class RecipeHistoryManager
+internal sealed class RecipeHistoryManager
 {
 	private const int MaxHistoryDepth = 100;
 	private readonly List<Recipe> _redoStack = new(MaxHistoryDepth);

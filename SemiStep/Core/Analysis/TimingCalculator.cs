@@ -1,8 +1,8 @@
-﻿using Core.Entities;
+﻿using Shared.Core;
 
 namespace Core.Analysis;
 
-public sealed class TimingCalculator
+internal sealed class TimingCalculator
 {
 	private static readonly ColumnId _durationColumn = new("step_duration");
 

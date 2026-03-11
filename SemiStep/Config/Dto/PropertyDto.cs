@@ -1,6 +1,6 @@
 ﻿namespace Config.Dto;
 
-public sealed class PropertyDto
+internal sealed class PropertyDto
 {
 	public string? PropertyTypeId { get; set; }
 	public string? SystemType { get; set; }

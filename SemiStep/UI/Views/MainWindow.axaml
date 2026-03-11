@@ -5,11 +5,11 @@
         xmlns:vm="clr-namespace:UI.ViewModels"
         xmlns:controls="clr-namespace:UI.Controls"
         mc:Ignorable="d"
-        d:DesignWidth="1400"
+        d:DesignWidth="1600"
         d:DesignHeight="800"
         x:Class="UI.Views.MainWindow"
         Title="{Binding WindowTitle}"
-        Width="1200"
+        Width="1600"
         Height="800">
 
     <Window.KeyBindings>
@@ -38,7 +38,7 @@
                   BorderThickness="1"
                   BorderBrush="Gray"
                   Background="White"
-                   SelectionMode="Single" />
+                  SelectionMode="Single" />
 
         <controls:NotificationLogPanel Grid.Row="2"
                                        x:Name="LogPanel"

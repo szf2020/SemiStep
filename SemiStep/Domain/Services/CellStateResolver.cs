@@ -1,8 +1,9 @@
-﻿using Shared.Entities;
+﻿using Shared.Config;
+using Shared.Core;
 
 namespace Domain.Services;
 
-public sealed class CellStateResolver
+internal static class CellStateResolver
 {
 	public static CellState GetCellState(GridColumnDefinition column, ActionDefinition action)
 	{

@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System.Collections;
+using System.ComponentModel;
 
 using Avalonia;
 using Avalonia.Controls;
@@ -7,8 +8,9 @@ using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Media;
 
-using Shared.Entities;
-using Shared.Registries;
+using Shared.Config;
+using Shared.Config.Contracts;
+using Shared.Core;
 
 using UI.Controls;
 using UI.ViewModels;
@@ -47,8 +49,10 @@ public sealed class ComboBoxCellFactory(IActionRegistry actionRegistry)
 			Width = width,
 			IsReadOnly = false,
 			CanUserSort = false,
-			CellTemplate = CreateGroupTemplate(columnDef.Key, isEditing: false, isColumnReadOnly: columnDef.ReadOnly),
-			CellEditingTemplate = CreateGroupTemplate(columnDef.Key, isEditing: true, isColumnReadOnly: columnDef.ReadOnly)
+			CellTemplate =
+				CreateGroupTemplate(columnDef.Key, isEditing: false, isColumnReadOnly: columnDef.ReadOnly),
+			CellEditingTemplate =
+				CreateGroupTemplate(columnDef.Key, isEditing: true, isColumnReadOnly: columnDef.ReadOnly)
 		};
 	}
 
@@ -151,7 +155,7 @@ public sealed class ComboBoxCellFactory(IActionRegistry actionRegistry)
 
 		var comboBox = new ComboBox
 		{
-			ItemsSource = items as System.Collections.IEnumerable,
+			ItemsSource = items as IEnumerable,
 			DisplayMemberBinding = new Binding("DisplayText"),
 			HorizontalAlignment = HorizontalAlignment.Stretch,
 			VerticalAlignment = VerticalAlignment.Center,
@@ -174,6 +178,7 @@ public sealed class ComboBoxCellFactory(IActionRegistry actionRegistry)
 		};
 
 		SubscribeWithLifecycle(presenter, row, columnKey, comboBox);
+
 		return presenter;
 	}
 
@@ -224,6 +229,7 @@ public sealed class ComboBoxCellFactory(IActionRegistry actionRegistry)
 
 		presenter.DetachedFromVisualTree += OnDetached;
 		presenter.AttachedToVisualTree += OnAttached;
+
 		return;
 
 		void OnDetached(object? sender, VisualTreeAttachmentEventArgs e)

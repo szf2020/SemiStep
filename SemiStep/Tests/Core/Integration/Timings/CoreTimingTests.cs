@@ -9,53 +9,45 @@ namespace Tests.Core.Integration.Timings;
 [Trait("Category", "Integration")]
 [Trait("Component", "Core")]
 [Trait("Area", "Timings")]
-public sealed class CoreTimingTests
+public sealed class CoreTimingTests(CoreFixture fixture) : IClassFixture<CoreFixture>
 {
 	[Fact]
-	public async Task EmptyRecipe_ZeroDuration()
+	public void EmptyRecipe_ZeroDuration()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 
-		var driver = new RecipeTestDriver(facade);
-
-		// NewRecipe already called by DomainFacade.Initialize
 		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.Zero);
 	}
 
 	[Fact]
-	public async Task SingleWaitStep_TotalDurationMatchesStepDuration()
+	public void SingleWaitStep_TotalDurationMatchesStepDuration()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
+		fixture.Facade.NewRecipe();
 
 		const float Duration = 15f;
 
-		var driver = new RecipeTestDriver(facade);
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(Duration);
 
 		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.FromSeconds(Duration));
 	}
 
 	[Fact]
-	public async Task MultipleWaitSteps_TotalDurationIsCumulative()
+	public void MultipleWaitSteps_TotalDurationIsCumulative()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(20f).AddWait(30f);
 
 		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.FromSeconds(60));
 	}
 
 	[Fact]
-	public async Task StepStartTimes_AccumulateCorrectly()
+	public void StepStartTimes_AccumulateCorrectly()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(20f).AddWait(30f);
 
 		var startTimes = driver.Snapshot.StepStartTimes;
@@ -66,38 +58,31 @@ public sealed class CoreTimingTests
 	}
 
 	[Fact]
-	public async Task ImmediateAction_ZeroDuration()
+	public void ImmediateAction_ZeroDuration()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddPause();
 
 		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.Zero);
 	}
 
 	[Fact]
-	public async Task MixedActions_OnlyLongLastingContributeToTotalDuration()
+	public void MixedActions_OnlyLongLastingContributeToTotalDuration()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 
-		var driver = new RecipeTestDriver(facade);
-
-		// Pause (immediate) + Wait (longlasting) + ForLoop (immediate)
 		driver.AddPause().AddWait(15f).AddFor(3);
 
 		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.FromSeconds(15));
 	}
 
 	[Fact]
-	public async Task UpdateDuration_RecalculatesTotal()
+	public void UpdateDuration_RecalculatesTotal()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(10f);
 
 		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.FromSeconds(20));
@@ -108,12 +93,10 @@ public sealed class CoreTimingTests
 	}
 
 	[Fact]
-	public async Task RemoveStep_RecalculatesTotalDuration()
+	public void RemoveStep_RecalculatesTotalDuration()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(20f).AddWait(30f);
 
 		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.FromSeconds(60));

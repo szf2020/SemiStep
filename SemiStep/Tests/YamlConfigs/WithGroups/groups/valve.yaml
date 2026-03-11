@@ -1,0 +1,4 @@
+﻿# Groups for testing enum resolution
+valve:
+  1: "Open"
+  2: "Close"

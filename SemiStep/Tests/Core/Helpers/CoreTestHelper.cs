@@ -5,9 +5,10 @@ using Core;
 
 using Domain;
 using Domain.Facade;
-using Domain.Ports;
 
 using Microsoft.Extensions.DependencyInjection;
+
+using Shared.ServiceContracts;
 
 using Tests.Helpers;
 

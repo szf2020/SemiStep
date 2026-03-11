@@ -2,7 +2,7 @@
 
 namespace Core.Formulas;
 
-public sealed class CompiledFormula(
+internal sealed class CompiledFormula(
 	IReadOnlyList<string> recalcOrder,
 	IReadOnlyList<string> variables,
 	IReadOnlyDictionary<string, Func<Dictionary<string, double>, double>> solvers)

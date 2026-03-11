@@ -1,10 +1,10 @@
 ﻿using Config.Dto;
 
-using Shared.Entities;
+using Shared.Config;
 
 namespace Config.Mapping;
 
-public sealed class ColumnMapper
+internal static class ColumnMapper
 {
 	public static GridColumnDefinition Map(ColumnDto dto)
 	{

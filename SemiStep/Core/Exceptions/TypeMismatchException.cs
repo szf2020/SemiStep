@@ -1,3 +1,3 @@
 ﻿namespace Core.Exceptions;
 
-public sealed class TypeMismatchException(string message) : Exception(message);
+internal sealed class TypeMismatchException(string message) : Exception(message);

@@ -1,8 +1,8 @@
-﻿using Shared.Entities;
+﻿using Shared.Config;
 
 namespace Config.Mapping;
 
-public sealed class GroupMapper
+internal static class GroupMapper
 {
 	public static IReadOnlyDictionary<string, GroupDefinition> Map(
 		Dictionary<string, Dictionary<int, string>> groupsDto)

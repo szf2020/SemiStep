@@ -2,7 +2,7 @@
 
 namespace Config.Dto;
 
-public sealed class GridStyleOptionsDto
+internal sealed class GridStyleOptionsDto
 {
 	[YamlMember(Alias = "fonts")] public GridStyleFontsDto? Fonts { get; set; }
 

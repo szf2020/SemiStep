@@ -1,10 +1,10 @@
 ﻿using Config.Dto;
 
-using Shared.Entities;
+using Shared.Core;
 
 namespace Config.Mapping;
 
-public sealed class PropertyMapper
+internal static class PropertyMapper
 {
 	public static PropertyDefinition Map(PropertyDto dto)
 	{

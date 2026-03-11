@@ -1,6 +1,6 @@
 ﻿namespace S7.Protocol;
 
-public enum PlcSyncError : ushort
+internal enum PlcSyncError : ushort
 {
 	NoError = 0,
 	ChecksumMismatchInt = 1,

@@ -2,7 +2,7 @@
 
 namespace Config.Dto;
 
-public sealed class GridStyleCellStateColorsDto
+internal sealed class GridStyleCellStateColorsDto
 {
 	[YamlMember(Alias = "normal")] public string? Normal { get; set; }
 

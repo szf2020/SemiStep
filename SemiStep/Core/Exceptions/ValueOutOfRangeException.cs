@@ -1,3 +1,3 @@
 ﻿namespace Core.Exceptions;
 
-public sealed class ValueOutOfRangeException(string message) : Exception(message);
+internal sealed class ValueOutOfRangeException(string message) : Exception(message);

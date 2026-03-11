@@ -5,15 +5,16 @@ using Avalonia.Data.Converters;
 
 namespace UI.Converters;
 
-public sealed partial class PropertyValueConverter(string formatKind, string? units, bool appendUnits = true) : IValueConverter
+public sealed partial class PropertyValueConverter(string formatKind, string? units, bool appendUnits = true)
+	: IValueConverter
 {
 	private const string TimeHmsFormat = "time_hms";
 	private const int SecondsPerHour = 3600;
 	private const int SecondsPerMinute = 60;
+	private readonly bool _appendUnits = appendUnits;
 
 	private readonly string _formatKind = formatKind;
 	private readonly string? _units = units;
-	private readonly bool _appendUnits = appendUnits;
 
 	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
@@ -80,6 +81,7 @@ public sealed partial class PropertyValueConverter(string formatKind, string? un
 				if (h < 24 && m < 60 && s < 60)
 				{
 					var totalSeconds = h * SecondsPerHour + m * SecondsPerMinute + s + ms;
+
 					return totalSeconds.ToString(CultureInfo.InvariantCulture);
 				}
 			}

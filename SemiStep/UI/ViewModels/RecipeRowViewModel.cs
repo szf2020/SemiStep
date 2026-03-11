@@ -1,11 +1,9 @@
-﻿using Core.Entities;
-
-using Domain.Services;
+﻿using Domain.Facade;
 
 using ReactiveUI;
 
-using Shared.Entities;
-using Shared.Registries;
+using Shared.Config.Contracts;
+using Shared.Core;
 
 namespace UI.ViewModels;
 
@@ -26,9 +24,9 @@ public class RecipeRowViewModel(
 	private IReadOnlyDictionary<string, CellState>? _cellStatesCache;
 	private bool _disposed;
 	private bool _isExecuting;
+	private Step _step = step;
 	private int _stepNumber = stepNumber;
 	private string? _stepStartTime;
-	private Step _step = step;
 
 	public int StepNumber
 	{
@@ -64,7 +62,7 @@ public class RecipeRowViewModel(
 			var states = new Dictionary<string, CellState>();
 			foreach (var columnDef in columnRegistry.GetAll())
 			{
-				states[columnDef.Key] = CellStateResolver.GetCellState(columnDef, _action);
+				states[columnDef.Key] = DomainFacade.GetCellState(columnDef, _action);
 			}
 
 			_cellStatesCache = states;
@@ -197,6 +195,7 @@ public class RecipeRowViewModel(
 		}
 
 		var propDef = propertyRegistry.GetProperty(actionColumn.PropertyTypeId);
+
 		return propDef.Units;
 	}
 
@@ -214,6 +213,7 @@ public class RecipeRowViewModel(
 		}
 
 		var propDef = propertyRegistry.GetProperty(actionColumn.PropertyTypeId);
+
 		return propDef.FormatKind;
 	}
 

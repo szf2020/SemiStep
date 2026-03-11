@@ -1,6 +1,6 @@
 ﻿namespace S7.Protocol;
 
-public sealed record ManagingAreaState(
+internal sealed record ManagingAreaState(
 	PcStatus PcStatus,
 	uint PcTransactionId,
 	uint PcChecksumInt,

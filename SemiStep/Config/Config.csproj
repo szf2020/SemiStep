@@ -15,4 +15,8 @@
     <Compile Remove="Validation\Attributes\LinkToAttribute.cs"/>
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tests"/>
+  </ItemGroup>
+
 </Project>

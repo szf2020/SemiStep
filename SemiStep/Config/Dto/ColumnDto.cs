@@ -1,6 +1,6 @@
 ﻿namespace Config.Dto;
 
-public sealed class ColumnDto
+internal sealed class ColumnDto
 {
 	public string? Key { get; set; }
 	public string? ColumnType { get; set; }

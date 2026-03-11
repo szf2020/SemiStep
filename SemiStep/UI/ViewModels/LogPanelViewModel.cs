@@ -4,17 +4,15 @@ using System.Reactive;
 
 using ReactiveUI;
 
-using Shared.Reasons;
-
 using UI.Models;
 
 namespace UI.ViewModels;
 
 public class LogPanelViewModel : ReactiveObject
 {
+	private int _errorCount;
 	private bool _isVisible = true;
 	private bool _suppressNotifications;
-	private int _errorCount;
 	private int _warningCount;
 
 	public LogPanelViewModel()
@@ -87,7 +85,7 @@ public class LogPanelViewModel : ReactiveObject
 
 	public bool ShowPanel => HasEntries && IsVisible;
 
-	public void RefreshReasons(IReadOnlyList<AbstractReason> reasons)
+	public void RefreshReasons(IReadOnlyList<string> errors, IReadOnlyList<string> warnings)
 	{
 		_suppressNotifications = true;
 
@@ -101,10 +99,16 @@ public class LogPanelViewModel : ReactiveObject
 			}
 		}
 
-		foreach (var reason in reasons)
+		foreach (var error in errors)
 		{
-			var severity = reason is AbstractError ? LogSeverity.Error : LogSeverity.Warning;
-			var entry = new LogEntry(severity, reason.Message, LogEntry.StructuralSource, DateTime.Now);
+			var entry = new LogEntry(LogSeverity.Error, error, LogEntry.StructuralSource, DateTime.Now);
+			AdjustCountersForAddition(entry);
+			Entries.Add(entry);
+		}
+
+		foreach (var warning in warnings)
+		{
+			var entry = new LogEntry(LogSeverity.Warning, warning, LogEntry.StructuralSource, DateTime.Now);
 			AdjustCountersForAddition(entry);
 			Entries.Add(entry);
 		}

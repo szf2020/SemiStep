@@ -6,10 +6,11 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace Config.Loaders;
 
-public sealed class ConnectionLoader
+internal static class ConnectionLoader
 {
 	private static readonly IDeserializer _deserializer = new DeserializerBuilder()
 		.WithNamingConvention(UnderscoredNamingConvention.Instance)
+		.IgnoreUnmatchedProperties()
 		.Build();
 
 	public static async Task<ConnectionDto?> LoadAsync(string configDirectory, ConfigContext context)

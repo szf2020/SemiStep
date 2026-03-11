@@ -1,10 +1,8 @@
-﻿using Core.Entities;
-
-using Shared.Entities;
+﻿using Shared.Core;
 
 namespace Core.Formulas;
 
-public sealed class FormulaApplicationCoordinator(IFormulaEngine engine, IStepVariableAdapter adapter)
+internal sealed class FormulaApplicationCoordinator(FormulaEngine engine, StepVariableAdapter adapter)
 {
 	public Step ApplyIfExists(
 		Step step,
@@ -22,11 +20,11 @@ public sealed class FormulaApplicationCoordinator(IFormulaEngine engine, IStepVa
 			return step;
 		}
 
-		var currentStepVariables = adapter.ExtractVariableNames(step, formulaDefinition.RecalcOrder);
+		var currentStepVariables = StepVariableAdapter.ExtractVariableNames(step, formulaDefinition.RecalcOrder);
 
 		var calculationResult = engine.Calculate(action.Id, changedColumn.Value, currentStepVariables);
 
-		var newStep = adapter.ApplyChanges(step, calculationResult);
+		var newStep = StepVariableAdapter.ApplyChanges(step, calculationResult);
 
 		return newStep;
 	}

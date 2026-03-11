@@ -1,21 +1,17 @@
 ﻿using System.Collections.Immutable;
 using System.Text;
 
-using Core.Entities;
-
-using Csv.Reasons;
 using Csv.Services;
-
-using Domain.Models;
-using Domain.Ports;
 
 using Serilog;
 
-using Shared.Reasons;
+using Shared.Core;
+using Shared.Csv;
+using Shared.ServiceContracts;
 
 namespace Csv.Facade;
 
-public sealed class CsvService(CsvSerializer csvSerializer) : ICsvService
+internal sealed class CsvService(CsvSerializer csvSerializer) : ICsvService
 {
 	private static readonly Encoding _fileEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
 
@@ -23,7 +19,7 @@ public sealed class CsvService(CsvSerializer csvSerializer) : ICsvService
 	{
 		if (!File.Exists(filePath))
 		{
-			return CsvLoadResult.Failure([new CsvLoadError($"Recipe file not found: {filePath}")]);
+			return CsvLoadResult.Failure([$"Recipe file not found: {filePath}"]);
 		}
 
 		var fullText = await File.ReadAllTextAsync(filePath, _fileEncoding, cancellationToken);
@@ -38,17 +34,17 @@ public sealed class CsvService(CsvSerializer csvSerializer) : ICsvService
 			return result;
 		}
 
-		var reasons = new List<AbstractReason>(result.Reasons);
+		var warnings = new List<string>(result.Warnings);
 
 		if (metadata.Rows > 0 && metadata.Rows != result.Recipe!.StepCount)
 		{
-			reasons.Add(new CsvLoadWarning(
-				$"Row count mismatch in '{filePath}': metadata says {metadata.Rows}, actual is {result.Recipe.StepCount}"));
+			warnings.Add(
+				$"Row count mismatch in '{filePath}': metadata says {metadata.Rows}, actual is {result.Recipe.StepCount}");
 		}
 
 		Log.Information("Loaded recipe from {FilePath}: {StepCount} steps", filePath, result.Recipe!.StepCount);
 
-		return CsvLoadResult.Success(result.Recipe, reasons);
+		return CsvLoadResult.Success(result.Recipe, warnings);
 	}
 
 	public async Task SaveAsync(Recipe recipe, string filePath, CancellationToken cancellationToken = default)
@@ -66,7 +62,7 @@ public sealed class CsvService(CsvSerializer csvSerializer) : ICsvService
 		try
 		{
 			await using (var stream = new FileStream(
-				tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true))
+							 tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true))
 			await using (var writer = new StreamWriter(stream, _fileEncoding))
 			{
 				CsvMetadata.Serialize(writer, metadata);

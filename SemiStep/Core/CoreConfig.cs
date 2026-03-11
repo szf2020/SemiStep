@@ -1,8 +1,8 @@
-﻿using Core.Entities;
+﻿using Shared.Core;
 
 namespace Core;
 
-public class CoreConfig
+internal class CoreConfig
 {
 	private const string IterationColumnName = "task";
 

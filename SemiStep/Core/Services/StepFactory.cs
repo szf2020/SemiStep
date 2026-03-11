@@ -1,13 +1,11 @@
 ﻿using System.Collections.Immutable;
 
-using Core.Entities;
-
-using Shared.Entities;
-using Shared.Registries;
+using Shared.Config.Contracts;
+using Shared.Core;
 
 namespace Core.Services;
 
-public sealed class StepFactory
+internal sealed class StepFactory
 {
 	public static Step Create(
 		ActionDefinition action,
@@ -33,7 +31,7 @@ public sealed class StepFactory
 		if (!string.IsNullOrEmpty(column.DefaultValue))
 		{
 			return PropertyValue.TryParse(column.DefaultValue, propertyType)
-				?? PropertyValue.FromString(column.DefaultValue);
+				   ?? PropertyValue.FromString(column.DefaultValue);
 		}
 
 		if (column.GroupName is not null && groupRegistry.GroupExists(column.GroupName))
@@ -42,6 +40,7 @@ public sealed class StepFactory
 			if (group.Items.Count > 0)
 			{
 				var firstKey = group.Items.Keys.Min();
+
 				return PropertyValue.FromInt(firstKey);
 			}
 		}

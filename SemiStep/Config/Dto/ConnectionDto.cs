@@ -2,22 +2,19 @@
 
 namespace Config.Dto;
 
-public sealed class ConnectionDto
+internal sealed class ConnectionDto
 {
 	[YamlMember(Alias = "connection_file_version")]
 	public string? ConnectionFileVersion { get; set; }
 
-	[YamlMember(Alias = "ip")]
-	public string? Ip { get; set; }
+	[YamlMember(Alias = "ip")] public string? Ip { get; set; }
 
 	[YamlMember(Alias = "connection_protocol")]
 	public string? ConnectionProtocol { get; set; }
 
-	[YamlMember(Alias = "plc_rack")]
-	public int? PlcRack { get; set; }
+	[YamlMember(Alias = "plc_rack")] public int? PlcRack { get; set; }
 
-	[YamlMember(Alias = "plc_slot")]
-	public int? PlcSlot { get; set; }
+	[YamlMember(Alias = "plc_slot")] public int? PlcSlot { get; set; }
 
 	[YamlMember(Alias = "max_retries_attempts")]
 	public int? MaxRetriesAttempts { get; set; }
@@ -106,8 +103,7 @@ public sealed class ConnectionDto
 	[YamlMember(Alias = "managing_pc_data_size")]
 	public int? ManagingPcDataSize { get; set; }
 
-	[YamlMember(Alias = "int_db_number")]
-	public int? IntDbNumber { get; set; }
+	[YamlMember(Alias = "int_db_number")] public int? IntDbNumber { get; set; }
 
 	[YamlMember(Alias = "int_db_total_capacity_offset")]
 	public int? IntDbTotalCapacityOffset { get; set; }

@@ -1,6 +1,6 @@
 ﻿namespace Core.Analysis;
 
-public enum ServiceActionId
+internal enum ServiceActionId
 {
 	Wait = 10,
 	ForLoop = 20,

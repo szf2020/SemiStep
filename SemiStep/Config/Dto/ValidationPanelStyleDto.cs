@@ -2,7 +2,7 @@
 
 namespace Config.Dto;
 
-public sealed class ValidationPanelStyleDto
+internal sealed class ValidationPanelStyleDto
 {
 	[YamlMember(Alias = "background")] public string? Background { get; set; }
 

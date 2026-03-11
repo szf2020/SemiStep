@@ -1,6 +1,6 @@
 ﻿namespace Config.Dto;
 
-public sealed class ActionColumnDto
+internal sealed class ActionColumnDto
 {
 	public string? Key { get; set; }
 	public string? GroupName { get; set; }

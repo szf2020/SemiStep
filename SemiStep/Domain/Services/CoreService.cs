@@ -1,16 +1,13 @@
-﻿using Core.Analysis;
-using Core.Entities;
-using Core.Services;
+﻿using Domain.State;
 
-using Domain.State;
-
-using Shared.Entities;
-using Shared.Registries;
+using Shared.Config.Contracts;
+using Shared.Core;
+using Shared.ServiceContracts;
 
 namespace Domain.Services;
 
-public sealed class CoreService(
-	CoreFacade coreFacade,
+internal sealed class CoreService(
+	ICoreService coreFacade,
 	RecipeStateManager stateManager,
 	IActionRegistry actionRegistry,
 	IPropertyRegistry propertyRegistry,
@@ -42,7 +39,8 @@ public sealed class CoreService(
 	public RecipeSnapshot InsertStep(int index, int actionId)
 	{
 		var action = actionRegistry.GetAction(actionId);
-		var recipeSnapshot = coreFacade.InsertStep(stateManager.Current, index, action, propertyRegistry, groupRegistry);
+		var recipeSnapshot =
+			coreFacade.InsertStep(stateManager.Current, index, action, propertyRegistry, groupRegistry);
 
 		return recipeSnapshot;
 	}
@@ -50,7 +48,8 @@ public sealed class CoreService(
 	public RecipeSnapshot ChangeStepAction(int stepIndex, int newActionId)
 	{
 		var newAction = actionRegistry.GetAction(newActionId);
-		var recipeSnapshot = coreFacade.ChangeStepAction(stateManager.Current, stepIndex, newAction, propertyRegistry, groupRegistry);
+		var recipeSnapshot = coreFacade.ChangeStepAction(stateManager.Current, stepIndex, newAction, propertyRegistry,
+			groupRegistry);
 
 		return recipeSnapshot;
 	}
@@ -78,8 +77,7 @@ public sealed class CoreService(
 			columnId,
 			value,
 			property,
-			action,
-			formulaDefinition: null);
+			action);
 
 		return result;
 	}

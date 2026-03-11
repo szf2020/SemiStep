@@ -2,7 +2,7 @@
 
 namespace Config.Dto;
 
-public sealed class StatusBarStyleDto
+internal sealed class StatusBarStyleDto
 {
 	[YamlMember(Alias = "background")] public string? Background { get; set; }
 

@@ -1,45 +1,69 @@
-﻿using Core.Analysis;
-using Core.Entities;
-
-using Domain.Models;
-using Domain.Ports;
-using Domain.Services;
+﻿using Domain.Services;
 using Domain.State;
 
 using Serilog;
 
-using Shared;
-using Shared.Entities;
-using Shared.Registries;
+using Shared.Config;
+using Shared.Config.Contracts;
+using Shared.Core;
+using Shared.Csv;
+using Shared.Plc;
+using Shared.ServiceContracts;
 
 namespace Domain.Facade;
 
-public sealed class DomainFacade(
-	AppConfiguration appConfiguration,
-	IActionRegistry actionRegistry,
-	IPropertyRegistry propertyRegistry,
-	IColumnRegistry columnRegistry,
-	IGroupRegistry groupRegistry,
-	CoreService coreService,
-	RecipeStateManager stateManager,
-	RecipeHistoryManager historyManager,
-	ICsvService csvService,
-	IS7ConnectionService connectionService)
-	: IDisposable
+public sealed class DomainFacade : IDisposable
 {
-	private bool _disposed;
+	private readonly IActionRegistry _actionRegistry;
+	private readonly AppConfiguration _appConfiguration;
+	private readonly IColumnRegistry _columnRegistry;
+	private readonly IS7ConnectionService _connectionService;
+	private readonly CoreService _coreService;
+	private readonly ICsvService _csvService;
+	private readonly IGroupRegistry _groupRegistry;
+	private readonly RecipeHistoryManager _historyManager;
+	private readonly IPropertyRegistry _propertyRegistry;
+	private readonly RecipeStateManager _stateManager;
 	private Action<PlcConnectionState>? _connectionStateChangedRelay;
 
-	public Recipe CurrentRecipe => stateManager.Current;
+	private bool _disposed;
+	private Action<Recipe>? _recipeChangedRelay;
 
-	public bool IsDirty => stateManager.IsDirty;
-	public bool IsValid => stateManager.IsValid;
-	public RecipeSnapshot Snapshot => stateManager.LastSnapshot ?? RecipeSnapshot.Empty;
+	internal DomainFacade(
+		AppConfiguration appConfiguration,
+		IActionRegistry actionRegistry,
+		IPropertyRegistry propertyRegistry,
+		IColumnRegistry columnRegistry,
+		IGroupRegistry groupRegistry,
+		CoreService coreService,
+		RecipeStateManager stateManager,
+		RecipeHistoryManager historyManager,
+		ICsvService csvService,
+		IS7ConnectionService connectionService)
+	{
+		_appConfiguration = appConfiguration;
+		_actionRegistry = actionRegistry;
+		_propertyRegistry = propertyRegistry;
+		_columnRegistry = columnRegistry;
+		_groupRegistry = groupRegistry;
+		_coreService = coreService;
+		_stateManager = stateManager;
+		_historyManager = historyManager;
+		_csvService = csvService;
+		_connectionService = connectionService;
+	}
 
-	public bool CanUndo => historyManager.CanUndo;
-	public bool CanRedo => historyManager.CanRedo;
+	public Recipe CurrentRecipe => _stateManager.Current;
+	public Recipe LastValidRecipe => _stateManager.LastValidRecipe;
 
-	public bool IsConnected => connectionService.IsConnected;
+	public bool IsDirty => _stateManager.IsDirty;
+	public bool IsValid => _stateManager.IsValid;
+	public RecipeSnapshot Snapshot => _stateManager.LastSnapshot ?? RecipeSnapshot.Empty;
+
+	public bool CanUndo => _historyManager.CanUndo;
+	public bool CanRedo => _historyManager.CanRedo;
+
+	public bool IsConnected => _connectionService.IsConnected;
 	public string? LastConnectionError { get; private set; }
 
 	public void Dispose()
@@ -51,124 +75,139 @@ public sealed class DomainFacade(
 
 		_disposed = true;
 
+		if (_recipeChangedRelay is not null)
+		{
+			_stateManager.RecipeChanged -= _recipeChangedRelay;
+		}
+
 		if (_connectionStateChangedRelay is not null)
 		{
-			connectionService.StateChanged -= _connectionStateChangedRelay;
+			_connectionService.StateChanged -= _connectionStateChangedRelay;
 		}
+	}
+
+	public event Action<Recipe>? RecipeChanged;
+
+	public static CellState GetCellState(GridColumnDefinition column, ActionDefinition action)
+	{
+		return CellStateResolver.GetCellState(column, action);
 	}
 
 	public event Action? ConnectionStateChanged;
 
 	public void Initialize()
 	{
-		actionRegistry.Initialize(appConfiguration.Actions);
-		propertyRegistry.Initialize(appConfiguration.Properties);
-		columnRegistry.Initialize(appConfiguration.Columns);
-		groupRegistry.Initialize(appConfiguration.Groups);
+		_actionRegistry.Initialize(_appConfiguration.Actions);
+		_propertyRegistry.Initialize(_appConfiguration.Properties);
+		_columnRegistry.Initialize(_appConfiguration.Columns);
+		_groupRegistry.Initialize(_appConfiguration.Groups);
 
-		coreService.NewRecipe();
+		_coreService.NewRecipe();
+
+		_recipeChangedRelay = recipe => RecipeChanged?.Invoke(recipe);
+		_stateManager.RecipeChanged += _recipeChangedRelay;
 
 		_connectionStateChangedRelay = _ => ConnectionStateChanged?.Invoke();
-		connectionService.StateChanged += _connectionStateChangedRelay;
-		StartPlcConnection(appConfiguration.PlcConfiguration);
+		_connectionService.StateChanged += _connectionStateChangedRelay;
+		StartPlcConnection(_appConfiguration.PlcConfiguration);
 	}
 
 	public void NewRecipe()
 	{
-		historyManager.Clear();
-		coreService.NewRecipe();
+		_historyManager.Clear();
+		_coreService.NewRecipe();
 	}
 
 	public void InsertStep(int index, int actionId)
 	{
-		historyManager.Push(stateManager.Current);
-		var snapshot = coreService.InsertStep(index, actionId);
-		stateManager.Update(snapshot);
+		_historyManager.Push(_stateManager.Current);
+		var snapshot = _coreService.InsertStep(index, actionId);
+		_stateManager.Update(snapshot);
 	}
 
 	public void AppendStep(int actionId)
 	{
-		historyManager.Push(stateManager.Current);
-		var snapshot = coreService.AppendStep(actionId);
-		stateManager.Update(snapshot);
+		_historyManager.Push(_stateManager.Current);
+		var snapshot = _coreService.AppendStep(actionId);
+		_stateManager.Update(snapshot);
 	}
 
 	public void ChangeStepAction(int stepIndex, int newActionId)
 	{
-		historyManager.Push(stateManager.Current);
-		var snapshot = coreService.ChangeStepAction(stepIndex, newActionId);
-		stateManager.Update(snapshot);
+		_historyManager.Push(_stateManager.Current);
+		var snapshot = _coreService.ChangeStepAction(stepIndex, newActionId);
+		_stateManager.Update(snapshot);
 	}
 
 	public void RemoveStep(int index)
 	{
-		var snapshot = coreService.RemoveStep(index);
+		var snapshot = _coreService.RemoveStep(index);
 
 		HistoryPushOnlyValidState(snapshot);
-		stateManager.Update(snapshot);
+		_stateManager.Update(snapshot);
 	}
 
 	public void UpdateStepProperty(int stepIndex, string columnKey, string value)
 	{
-		var snapshot = coreService.UpdateStepProperty(stepIndex, columnKey, value);
+		var snapshot = _coreService.UpdateStepProperty(stepIndex, columnKey, value);
 
 		HistoryPushOnlyValidState(snapshot);
-		stateManager.Update(snapshot);
+		_stateManager.Update(snapshot);
 	}
 
 	public RecipeSnapshot? Undo()
 	{
-		var previous = historyManager.Undo(stateManager.Current);
+		var previous = _historyManager.Undo(_stateManager.Current);
 		if (previous is null)
 		{
 			return null;
 		}
 
-		var snapshot = coreService.AnalyzeRecipe(previous);
-		stateManager.Update(snapshot);
+		var snapshot = _coreService.AnalyzeRecipe(previous);
+		_stateManager.Update(snapshot);
 
 		return snapshot;
 	}
 
 	public RecipeSnapshot? Redo()
 	{
-		var next = historyManager.Redo(stateManager.Current);
+		var next = _historyManager.Redo(_stateManager.Current);
 		if (next is null)
 		{
 			return null;
 		}
 
-		var snapshot = coreService.AnalyzeRecipe(next);
-		stateManager.Update(snapshot);
+		var snapshot = _coreService.AnalyzeRecipe(next);
+		_stateManager.Update(snapshot);
 
 		return snapshot;
 	}
 
 	public async Task<CsvLoadResult> LoadRecipeAsync(string filePath, CancellationToken ct = default)
 	{
-		var result = await csvService.LoadAsync(filePath, ct);
+		var result = await _csvService.LoadAsync(filePath, ct);
 		if (!result.IsSuccess)
 		{
 			return result;
 		}
 
-		historyManager.Clear();
-		var snapshot = coreService.AnalyzeRecipe(result.Recipe!);
-		stateManager.Update(snapshot);
-		stateManager.MarkSaved();
+		_historyManager.Clear();
+		var snapshot = _coreService.AnalyzeRecipe(result.Recipe!);
+		_stateManager.Update(snapshot);
+		_stateManager.MarkSaved();
 
 		return result;
 	}
 
 	public async Task SaveRecipeAsync(string filePath, CancellationToken ct = default)
 	{
-		await csvService.SaveAsync(stateManager.Current, filePath, ct);
-		stateManager.MarkSaved();
+		await _csvService.SaveAsync(_stateManager.Current, filePath, ct);
+		_stateManager.MarkSaved();
 	}
 
 	public void MarkSaved()
 	{
-		stateManager.MarkSaved();
+		_stateManager.MarkSaved();
 	}
 
 	public void StartPlcConnection(
@@ -186,7 +225,7 @@ public sealed class DomainFacade(
 			try
 			{
 				LastConnectionError = null;
-				await connectionService.ConnectAsync(plcConfiguration.Connection);
+				await _connectionService.ConnectAsync(plcConfiguration.Connection);
 			}
 			catch (Exception ex)
 			{
@@ -209,8 +248,8 @@ public sealed class DomainFacade(
 		{
 			try
 			{
-				await connectionService.DisconnectAsync();
-				await connectionService.DisposeAsync();
+				await _connectionService.DisconnectAsync();
+				await _connectionService.DisposeAsync();
 			}
 			catch (Exception ex)
 			{
@@ -223,7 +262,7 @@ public sealed class DomainFacade(
 	{
 		if (snapshot.IsValid)
 		{
-			historyManager.Push(stateManager.Current);
+			_historyManager.Push(_stateManager.Current);
 		}
 	}
 }

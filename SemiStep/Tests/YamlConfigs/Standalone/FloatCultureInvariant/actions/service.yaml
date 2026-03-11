@@ -1,0 +1,34 @@
+﻿# Actions with dot-decimal default_value to test InvariantCulture float parsing
+10:
+  ui_name: "Wait"
+  deploy_duration: longlasting
+  columns:
+    - key: step_duration
+      default_value: "10.5"
+      property_type_id: time
+    - key: comment
+      property_type_id: string
+
+20:
+  ui_name: "For"
+  deploy_duration: immediate
+  columns:
+    - key: task
+      default_value: "1.25"
+      property_type_id: float
+    - key: comment
+      property_type_id: string
+
+30:
+  ui_name: "EndFor"
+  deploy_duration: immediate
+  columns:
+    - key: comment
+      property_type_id: string
+
+40:
+  ui_name: "Pause"
+  deploy_duration: immediate
+  columns:
+    - key: comment
+      property_type_id: string

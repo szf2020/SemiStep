@@ -1,4 +1,6 @@
-﻿namespace Tests.Config.Helpers;
+﻿using Tests.Helpers;
+
+namespace Tests.Config.Helpers;
 
 public static class TestDataCopier
 {
@@ -89,22 +91,7 @@ public static class TestDataCopier
 
 	private static string GetTestDataPath(string relativePath)
 	{
-		var baseDir = AppContext.BaseDirectory;
-
-		// Search for YamlConfigs directory in or above the test output directory
-		for (var i = 0; i < 10 && !string.IsNullOrEmpty(baseDir); i++)
-		{
-			var probe = Path.Combine(baseDir, "YamlConfigs", relativePath);
-			if (Directory.Exists(probe))
-			{
-				return probe;
-			}
-
-			baseDir = Directory.GetParent(baseDir)?.FullName ?? string.Empty;
-		}
-
-		// Fallback: return the expected path (will fail with clear message)
-		return Path.Combine(AppContext.BaseDirectory, "YamlConfigs", relativePath);
+		return TestConfigLocator.GetConfigDirectory(relativePath);
 	}
 
 	private static void CopyDirectory(string sourceDir, string destDir)

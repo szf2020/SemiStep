@@ -1,0 +1,6 @@
+﻿# Placeholder group with an extra group entry (groups are raw dictionaries,
+# so "unknown fields" means additional dictionary entries — which are inherently valid)
+placeholder:
+  0: "None"
+unknown_group:
+  0: "noise_value"

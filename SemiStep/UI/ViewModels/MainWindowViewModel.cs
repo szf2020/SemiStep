@@ -10,31 +10,30 @@ using Domain.Facade;
 using ReactiveUI;
 
 using Shared;
-using Shared.Registries;
+using Shared.Config;
+using Shared.Config.Contracts;
+using Shared.Core;
 
-using UI.Models;
 using UI.Services;
 
 namespace UI.ViewModels;
 
 public class MainWindowViewModel : ReactiveObject, IDisposable
 {
-	private readonly IColumnRegistry _columnRegistry;
-	private readonly IPropertyRegistry _propertyRegistry;
-	private readonly DomainFacade _domainFacade;
-	private readonly INotificationService _notificationService;
-	private readonly Action _shutdownApplication;
+	private readonly ObservableAsPropertyHelper<bool> _canDeleteStep;
+	private readonly ObservableAsPropertyHelper<bool> _canRedo;
+	private readonly ObservableAsPropertyHelper<bool> _canUndo;
 	private readonly CompositeDisposable _disposables = new();
-	private readonly Subject<Unit> _stateChanged = new();
-	private string? _currentFilePath;
-	private int _selectedRowIndex = -1;
+	private readonly DomainFacade _domainFacade;
 
 	private readonly ObservableAsPropertyHelper<bool> _isDirty;
-	private readonly ObservableAsPropertyHelper<bool> _canUndo;
-	private readonly ObservableAsPropertyHelper<bool> _canRedo;
-	private readonly ObservableAsPropertyHelper<bool> _canDeleteStep;
+	private readonly INotificationService _notificationService;
+	private readonly IShutdownService _shutdownService;
+	private readonly Subject<Unit> _stateChanged = new();
 	private readonly ObservableAsPropertyHelper<string> _statusText;
 	private readonly ObservableAsPropertyHelper<string> _windowTitle;
+	private string? _currentFilePath;
+	private int _selectedRowIndex = -1;
 
 	public MainWindowViewModel(
 		AppConfiguration configuration,
@@ -44,16 +43,16 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		IColumnRegistry columnRegistry,
 		IPropertyRegistry propertyRegistry,
 		INotificationService notificationService,
-		Action shutdownApplication)
+		IShutdownService shutdownService)
 	{
 		Configuration = configuration;
 		_domainFacade = domainFacade;
 		ActionRegistry = actionRegistry;
 		GroupRegistry = groupRegistry;
-		_columnRegistry = columnRegistry;
-		_propertyRegistry = propertyRegistry;
+		ColumnRegistry = columnRegistry;
+		PropertyRegistry = propertyRegistry;
 		_notificationService = notificationService;
-		_shutdownApplication = shutdownApplication;
+		_shutdownService = shutdownService;
 
 		RecipeRows = new ObservableCollection<RecipeRowViewModel>();
 		LogPanel = new LogPanelViewModel();
@@ -137,9 +136,9 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 
 	public IGroupRegistry GroupRegistry { get; }
 
-	public IPropertyRegistry PropertyRegistry => _propertyRegistry;
+	public IPropertyRegistry PropertyRegistry { get; }
 
-	public IColumnRegistry ColumnRegistry => _columnRegistry;
+	public IColumnRegistry ColumnRegistry { get; }
 
 	public ObservableCollection<RecipeRowViewModel> RecipeRows { get; }
 
@@ -193,14 +192,6 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 
 	public string ConnectionStatus => IsConnectedToPlc ? "Connected" : "Disconnected";
 
-	public void Initialize()
-	{
-		RebuildAllRows(_domainFacade.CurrentRecipe);
-		LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
-		RefreshStepStartTimes();
-		NotifyStateChanged();
-	}
-
 	public void Dispose()
 	{
 		_disposables.Dispose();
@@ -209,6 +200,14 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		{
 			row.Dispose();
 		}
+	}
+
+	public void Initialize()
+	{
+		RebuildAllRows(_domainFacade.CurrentRecipe);
+		LogPanel.RefreshReasons(_domainFacade.Snapshot.Errors, _domainFacade.Snapshot.Warnings);
+		RefreshStepStartTimes();
+		NotifyStateChanged();
 	}
 
 	private void AddStep()
@@ -231,7 +230,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 			AppendRow(appendedStep);
 		}
 
-		LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
+		LogPanel.RefreshReasons(_domainFacade.Snapshot.Errors, _domainFacade.Snapshot.Warnings);
 		RefreshStepStartTimes();
 		NotifyStateChanged();
 		SelectedRowIndex = newRowIndex;
@@ -248,7 +247,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		_domainFacade.RemoveStep(indexToDelete);
 		RemoveRow(indexToDelete);
 
-		LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
+		LogPanel.RefreshReasons(_domainFacade.Snapshot.Errors, _domainFacade.Snapshot.Warnings);
 		RefreshStepStartTimes();
 		NotifyStateChanged();
 
@@ -317,15 +316,15 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 			var result = await _domainFacade.LoadRecipeAsync(filePath);
 			if (!result.IsSuccess)
 			{
-				var errorMessages = string.Join(Environment.NewLine,
-					result.Reasons.OfType<Shared.Reasons.AbstractError>().Select(e => e.Message));
+				var errorMessages = string.Join(Environment.NewLine, result.Errors);
 				_notificationService.ShowError($"Failed to load recipe:{Environment.NewLine}{errorMessages}");
+
 				return;
 			}
 
 			_currentFilePath = filePath;
 			RebuildAllRows(_domainFacade.CurrentRecipe);
-			LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
+			LogPanel.RefreshReasons(_domainFacade.Snapshot.Errors, _domainFacade.Snapshot.Warnings);
 			RefreshStepStartTimes();
 			NotifyStateChanged();
 			_notificationService.ShowSuccess($"Loaded: {Path.GetFileName(filePath)}");
@@ -343,7 +342,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 
 		LogPanel.Clear();
 		RebuildAllRows(_domainFacade.CurrentRecipe);
-		LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
+		LogPanel.RefreshReasons(_domainFacade.Snapshot.Errors, _domainFacade.Snapshot.Warnings);
 		RefreshStepStartTimes();
 		NotifyStateChanged();
 	}
@@ -354,7 +353,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		if (snapshot is not null)
 		{
 			RebuildAllRows(snapshot.Recipe);
-			LogPanel.RefreshReasons(snapshot.Reasons);
+			LogPanel.RefreshReasons(snapshot.Errors, snapshot.Warnings);
 			RefreshStepStartTimes();
 			NotifyStateChanged();
 		}
@@ -366,7 +365,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		if (snapshot is not null)
 		{
 			RebuildAllRows(snapshot.Recipe);
-			LogPanel.RefreshReasons(snapshot.Reasons);
+			LogPanel.RefreshReasons(snapshot.Errors, snapshot.Warnings);
 			RefreshStepStartTimes();
 			NotifyStateChanged();
 		}
@@ -374,7 +373,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 
 	private void ExecuteExit()
 	{
-		_shutdownApplication();
+		_shutdownService.Shutdown();
 	}
 
 	private void OnCellValueChanged(RecipeRowViewModel row, string columnKey, string? value)
@@ -402,7 +401,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 			_notificationService.ShowError($"Step {stepIndex + 1}: {ex.Message}");
 		}
 
-		LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
+		LogPanel.RefreshReasons(_domainFacade.Snapshot.Errors, _domainFacade.Snapshot.Warnings);
 		RefreshStepStartTimes();
 		NotifyStateChanged();
 	}
@@ -429,7 +428,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 				$"Step {stepIndex + 1}: Failed to change action - {ex.Message}");
 		}
 
-		LogPanel.RefreshReasons(_domainFacade.Snapshot.Reasons);
+		LogPanel.RefreshReasons(_domainFacade.Snapshot.Errors, _domainFacade.Snapshot.Warnings);
 		RefreshStepStartTimes();
 		NotifyStateChanged();
 	}
@@ -462,8 +461,8 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 	}
 
 	private RecipeRowViewModel CreateRowViewModel(
-		Core.Entities.Step step,
-		Shared.Entities.ActionDefinition action,
+		Step step,
+		ActionDefinition action,
 		int stepNumber)
 	{
 		return new RecipeRowViewModel(
@@ -471,19 +470,19 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 			step,
 			action,
 			GroupRegistry,
-			_columnRegistry,
-			_propertyRegistry,
+			ColumnRegistry,
+			PropertyRegistry,
 			OnCellValueChanged,
 			OnActionChanged);
 	}
 
-	private void AppendRow(Core.Entities.Step step)
+	private void AppendRow(Step step)
 	{
 		var action = ActionRegistry.GetAction(step.ActionKey);
 		RecipeRows.Add(CreateRowViewModel(step, action, RecipeRows.Count + 1));
 	}
 
-	private void InsertRow(int index, Core.Entities.Step step)
+	private void InsertRow(int index, Step step)
 	{
 		var action = ActionRegistry.GetAction(step.ActionKey);
 		RecipeRows.Insert(index, CreateRowViewModel(step, action, index + 1));
@@ -505,7 +504,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		}
 	}
 
-	private void RebuildAllRows(Core.Entities.Recipe recipe)
+	private void RebuildAllRows(Recipe recipe)
 	{
 		foreach (var row in RecipeRows)
 		{

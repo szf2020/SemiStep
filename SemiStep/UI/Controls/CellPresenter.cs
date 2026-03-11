@@ -2,7 +2,7 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Metadata;
 
-using Shared.Entities;
+using Shared.Core;
 
 namespace UI.Controls;
 

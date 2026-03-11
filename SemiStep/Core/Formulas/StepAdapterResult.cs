@@ -1,5 +1,5 @@
-﻿using Core.Entities;
+﻿using Shared.Core;
 
 namespace Core.Formulas;
 
-public sealed record StepAdapterResult(Step Step, IReadOnlyDictionary<string, double> Variables);
+internal sealed record StepAdapterResult(Step Step, IReadOnlyDictionary<string, double> Variables);

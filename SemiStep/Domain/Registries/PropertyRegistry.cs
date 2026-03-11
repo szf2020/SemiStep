@@ -1,9 +1,9 @@
-﻿using Shared.Entities;
-using Shared.Registries;
+﻿using Shared.Config.Contracts;
+using Shared.Core;
 
 namespace Domain.Registries;
 
-public sealed class PropertyRegistry : IPropertyRegistry
+internal sealed class PropertyRegistry : IPropertyRegistry
 {
 	private readonly Dictionary<string, PropertyDefinition> _properties = new(StringComparer.OrdinalIgnoreCase);
 	private IReadOnlyList<PropertyDefinition>? _cachedAll;

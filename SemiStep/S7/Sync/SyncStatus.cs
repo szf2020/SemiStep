@@ -1,6 +1,6 @@
 ﻿namespace S7.Sync;
 
-public enum SyncStatus
+internal enum SyncStatus
 {
 	Idle,
 	Syncing,

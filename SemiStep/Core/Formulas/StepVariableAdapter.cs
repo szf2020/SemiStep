@@ -1,11 +1,12 @@
-﻿using Core.Entities;
-using Core.Exceptions;
+﻿using Core.Exceptions;
+
+using Shared.Core;
 
 namespace Core.Formulas;
 
-public sealed class StepVariableAdapter : IStepVariableAdapter
+internal sealed class StepVariableAdapter
 {
-	public IReadOnlyDictionary<string, double> ExtractVariableNames(Step step, IReadOnlyList<string> variableNames)
+	public static IReadOnlyDictionary<string, double> ExtractVariableNames(Step step, IReadOnlyList<string> variableNames)
 	{
 		var values = new Dictionary<string, double>(variableNames.Count, StringComparer.OrdinalIgnoreCase);
 
@@ -25,7 +26,7 @@ public sealed class StepVariableAdapter : IStepVariableAdapter
 		return values;
 	}
 
-	public Step ApplyChanges(Step originalStep, IReadOnlyDictionary<string, double> variableUpdates)
+	public static Step ApplyChanges(Step originalStep, IReadOnlyDictionary<string, double> variableUpdates)
 	{
 		var propertyUpdates = new List<KeyValuePair<ColumnId, PropertyValue>>();
 

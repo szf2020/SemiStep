@@ -1,9 +1,8 @@
 ﻿using System.Globalization;
 
-using Core.Analysis;
-using Core.Entities;
-
 using Domain.Facade;
+
+using Shared.Core;
 
 namespace Tests.Core.Helpers;
 

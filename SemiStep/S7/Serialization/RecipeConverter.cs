@@ -1,13 +1,12 @@
 ﻿using System.Collections.Immutable;
 
-using Core.Entities;
-
-using Shared.Entities;
-using Shared.Registries;
+using Shared.Config.Contracts;
+using Shared.Core;
+using Shared.Plc;
 
 namespace S7.Serialization;
 
-public sealed class RecipeConverter(IActionRegistry actions, IPropertyRegistry properties)
+internal sealed class RecipeConverter(IActionRegistry actions, IPropertyRegistry properties)
 {
 	public PlcRecipeData FromRecipe(Recipe recipe)
 	{

@@ -1,6 +1,6 @@
 ﻿namespace S7.Protocol;
 
-public sealed record PlcExecutionState(
+internal sealed record PlcExecutionState(
 	bool RecipeActive,
 	int ActualLine,
 	float StepCurrentTime,

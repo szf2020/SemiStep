@@ -1,6 +1,6 @@
 ﻿namespace Config.Dto;
 
-public sealed class ActionDto
+internal sealed class ActionDto
 {
 	public short Id { get; set; }
 	public string? UiName { get; set; }

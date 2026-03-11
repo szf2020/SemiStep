@@ -1,6 +1,6 @@
 ﻿namespace Config.Dto;
 
-public sealed class ColumnBusinessLogicDto
+internal sealed class ColumnBusinessLogicDto
 {
 	public string? PropertyTypeId { get; set; }
 	public string? PlcDataType { get; set; }

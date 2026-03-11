@@ -8,87 +8,25 @@ namespace Tests.Config.Integration.Validation;
 
 [Trait("Category", "Integration")]
 [Trait("Component", "Config")]
-[Trait("Feature", "CrossReferenceValidation")]
-public class CrossReferenceTests
+[Trait("Area", "CrossReferenceValidation")]
+public sealed class CrossReferenceTests
 {
-	[Fact]
-	public async Task MissingPropertyReference_InColumn_HasError()
+	[Theory]
+	[InlineData("MissingPropertyReference", "unknown property_type_id", "nonexistent_property")]
+	[InlineData("MissingColumnReference", "unknown column", "nonexistent_column")]
+	[InlineData("MissingGroupReference", "unknown group_name", "nonexistent_group")]
+	[InlineData("MissingActionPropertyReference", "unknown property_type_id", "nonexistent_property")]
+	public async Task InvalidReference_HasErrorIdentifyingUnknownId(
+		string caseName, string expectedErrorSubstring, string expectedUnknownId)
 	{
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("MissingPropertyReference");
+		var context = await ConfigTestHelper.LoadInvalidCaseAsync(caseName);
 
 		context.HasErrors.Should().BeTrue();
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("unknown property_type_id", StringComparison.OrdinalIgnoreCase));
-	}
-
-	[Fact]
-	public async Task MissingPropertyReference_IdentifiesUnknownId()
-	{
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("MissingPropertyReference");
-
+			e.Contains(expectedErrorSubstring, StringComparison.OrdinalIgnoreCase));
 		context.Errors.Should().Contain(e =>
-				e.Message.Contains("nonexistent_property", StringComparison.OrdinalIgnoreCase),
-			"error should identify 'nonexistent_property' as the unknown property_type_id");
-	}
-
-	[Fact]
-	public async Task MissingColumnReference_InAction_HasError()
-	{
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("MissingColumnReference");
-
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Message.Contains("unknown column", StringComparison.OrdinalIgnoreCase));
-	}
-
-	[Fact]
-	public async Task MissingColumnReference_IdentifiesUnknownColumn()
-	{
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("MissingColumnReference");
-
-		context.Errors.Should().Contain(e =>
-				e.Message.Contains("nonexistent_column", StringComparison.OrdinalIgnoreCase),
-			"error should identify 'nonexistent_column' as the unknown column");
-	}
-
-	[Fact]
-	public async Task MissingGroupReference_InActionColumn_HasError()
-	{
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("MissingGroupReference");
-
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Message.Contains("unknown group_name", StringComparison.OrdinalIgnoreCase));
-	}
-
-	[Fact]
-	public async Task MissingGroupReference_IdentifiesUnknownGroup()
-	{
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("MissingGroupReference");
-
-		context.Errors.Should().Contain(e =>
-				e.Message.Contains("nonexistent_group", StringComparison.OrdinalIgnoreCase),
-			"error should identify 'nonexistent_group' as the unknown group_name");
-	}
-
-	[Fact]
-	public async Task MissingActionPropertyReference_HasError()
-	{
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("MissingActionPropertyReference");
-
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Message.Contains("unknown property_type_id", StringComparison.OrdinalIgnoreCase));
-	}
-
-	[Fact]
-	public async Task MissingActionPropertyReference_IdentifiesUnknownId()
-	{
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("MissingActionPropertyReference");
-
-		context.Errors.Should().Contain(e =>
-				e.Message.Contains("nonexistent_property", StringComparison.OrdinalIgnoreCase),
-			"error should identify 'nonexistent_property' as the unknown property_type_id");
+			e.Contains(expectedUnknownId, StringComparison.OrdinalIgnoreCase),
+			$"error should identify '{expectedUnknownId}' as the unknown reference");
 	}
 
 	[Fact]
@@ -108,7 +46,7 @@ public class CrossReferenceTests
 		var context = await ConfigTestHelper.LoadInvalidCaseAsync("MissingPropertyReference");
 
 		context.Errors.Should().Contain(e =>
-				e.Message.Contains("step_duration"),
+				e.Contains("step_duration"),
 			"error should reference the column 'step_duration' that has the broken reference");
 	}
 
@@ -118,7 +56,7 @@ public class CrossReferenceTests
 		var context = await ConfigTestHelper.LoadInvalidCaseAsync("MissingColumnReference");
 
 		context.Errors.Should().Contain(e =>
-				e.Message.Contains("Wait") || e.Message.Contains("10"),
+				e.Contains("Wait") || e.Contains("10"),
 			"error should reference the action 'Wait' (Id=10) that has the broken reference");
 	}
 }

@@ -1,12 +1,15 @@
 ﻿using Config.Dto;
 
 using Shared;
-using Shared.Reasons;
+using Shared.Config;
 
 namespace Config.Models;
 
-public sealed class ConfigContext
+internal sealed class ConfigContext
 {
+	private readonly List<string> _errors = [];
+	private readonly List<string> _warnings = [];
+
 	public List<string> FilePaths { get; init; } = [];
 
 	public List<ActionDto>? Actions { get; set; }
@@ -23,36 +26,28 @@ public sealed class ConfigContext
 
 	public AppConfiguration? Configuration { get; set; }
 
-	public List<AbstractReason> Reasons { get; } = [];
-
 	public Dictionary<string, object> Metadata { get; } = [];
 
-	public bool HasErrors => Reasons.Any(r => r is AbstractError);
+	public bool HasErrors => _errors.Count > 0;
 
-	public bool HasWarnings => Reasons.Any(r => r is AbstractWarning);
+	public bool HasWarnings => _warnings.Count > 0;
 
-	public IEnumerable<AbstractError> Errors => Reasons.OfType<AbstractError>();
+	public IReadOnlyList<string> Errors => _errors;
 
-	public IEnumerable<AbstractWarning> Warnings => Reasons.OfType<AbstractWarning>();
+	public IReadOnlyList<string> Warnings => _warnings;
 
 	public void AddError(string message, string? location = null)
 	{
-		Reasons.Add(ConfigLoadError.General(message, location));
+		_errors.Add(location is not null ? $"[{location}] {message}" : message);
 	}
 
 	public void AddWarning(string message, string? location = null)
 	{
-		Reasons.Add(ConfigWarning.General(message, location));
+		_warnings.Add(location is not null ? $"[{location}] {message}" : message);
 	}
 
 	public void AddInfo(string message, string? location = null)
 	{
-		// Info messages are treated as warnings (informational, non-blocking)
-		Reasons.Add(ConfigWarning.General(message, location));
-	}
-
-	public void Add(AbstractReason reason)
-	{
-		Reasons.Add(reason);
+		_warnings.Add(location is not null ? $"[{location}] {message}" : message);
 	}
 }

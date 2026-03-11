@@ -1,25 +1,25 @@
-﻿using S7.Connection;
-using S7.Protocol;
+﻿using S7.Protocol;
 using S7.Serialization;
 
 using Serilog;
 
-using Shared.Entities;
+using Shared.Core;
+using Shared.Plc;
 
 namespace S7.Sync;
 
-public sealed class PlcTransactionExecutor
+internal sealed class PlcTransactionExecutor
 {
 	private readonly ArrayCodec _arrayCodec;
+	private readonly RecipeConverter _converter;
 	private readonly ExecutionStateCodec _executionCodec;
 	private readonly PlcProtocolLayout _layout;
 	private readonly ManagingAreaCodec _managingCodec;
 	private readonly PlcProtocolSettings _protocolSettings;
-	private readonly RecipeConverter _converter;
-	private readonly PlcTransport _transport;
+	private readonly S7Driver _transport;
 
 	public PlcTransactionExecutor(
-		PlcTransport transport,
+		S7Driver transport,
 		RecipeConverter converter,
 		PlcConfiguration plcConfiguration)
 	{
@@ -102,7 +102,7 @@ public sealed class PlcTransactionExecutor
 		return new PlcRecipeData(intValues, floatValues, stringValues, stepCount);
 	}
 
-	public async Task WriteRecipeWithRetryAsync(Core.Entities.Recipe recipe, CancellationToken ct = default)
+	public async Task WriteRecipeWithRetryAsync(Recipe recipe, CancellationToken ct = default)
 	{
 		var recipeData = _converter.FromRecipe(recipe);
 
@@ -117,7 +117,8 @@ public sealed class PlcTransactionExecutor
 
 				return;
 			}
-			catch (PlcSyncException ex) when (attempt < _protocolSettings.MaxRetryAttempts && IsRetryableError(ex.ErrorCode))
+			catch (PlcSyncException ex) when (attempt < _protocolSettings.MaxRetryAttempts &&
+											  IsRetryableError(ex.ErrorCode))
 			{
 				Log.Warning(
 					"Sync attempt {Attempt} failed with {Error}, retrying...",

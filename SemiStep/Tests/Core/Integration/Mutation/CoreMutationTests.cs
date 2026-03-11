@@ -9,17 +9,15 @@ namespace Tests.Core.Integration.Mutation;
 [Trait("Category", "Integration")]
 [Trait("Component", "Core")]
 [Trait("Area", "Mutation")]
-public sealed class CoreMutationTests
+public sealed class CoreMutationTests(CoreFixture fixture) : IClassFixture<CoreFixture>
 {
 	private const float DefaultWaitDurationSeconds = 10f;
 
 	[Fact]
-	public async Task AppendStep_CreatesStepWithDefaults()
+	public void AppendStep_CreatesStepWithDefaults()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait();
 
 		driver.StepCount.Should().Be(1);
@@ -27,12 +25,10 @@ public sealed class CoreMutationTests
 	}
 
 	[Fact]
-	public async Task AppendStep_MultipleSteps_IncreasesCount()
+	public void AppendStep_MultipleSteps_IncreasesCount()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait().AddWait().AddWait();
 
 		driver.StepCount.Should().Be(3);
@@ -40,15 +36,12 @@ public sealed class CoreMutationTests
 	}
 
 	[Fact]
-	public async Task InsertStep_AtBeginning_ShiftsExistingSteps()
+	public void InsertStep_AtBeginning_ShiftsExistingSteps()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(5f).AddWait(10f);
 
-		// Insert at beginning
 		driver.InsertWait(0, 15f);
 
 		driver.StepCount.Should().Be(3);
@@ -58,18 +51,15 @@ public sealed class CoreMutationTests
 	}
 
 	[Fact]
-	public async Task InsertStep_InMiddle_ShiftsStartTimes()
+	public void InsertStep_InMiddle_ShiftsStartTimes()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(10f);
 
 		var beforeSecond = driver.Snapshot.StepStartTimes[1];
 		beforeSecond.Should().Be(TimeSpan.FromSeconds(10));
 
-		// Insert in the middle
 		driver.InsertWait(1, 5f);
 
 		driver.StepCount.Should().Be(3);
@@ -77,12 +67,10 @@ public sealed class CoreMutationTests
 	}
 
 	[Fact]
-	public async Task RemoveStep_RecalculatesStartTimes()
+	public void RemoveStep_RecalculatesStartTimes()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(10f).AddWait(10f);
 
 		driver.Snapshot.StepStartTimes[2].Should().Be(TimeSpan.FromSeconds(20));
@@ -94,12 +82,10 @@ public sealed class CoreMutationTests
 	}
 
 	[Fact]
-	public async Task RemoveStep_LastStep_LeavesEmptyRecipe()
+	public void RemoveStep_LastStep_LeavesEmptyRecipe()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait();
 
 		driver.StepCount.Should().Be(1);
@@ -110,20 +96,18 @@ public sealed class CoreMutationTests
 	}
 
 	[Fact]
-	public async Task ReplaceAction_LongLastingToImmediate_RemovesDurationEffect()
+	public void ReplaceAction_LongLastingToImmediate_RemovesDurationEffect()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
+		fixture.Facade.NewRecipe();
 
 		const float CustomDuration = 12f;
 
-		var driver = new RecipeTestDriver(facade);
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(CustomDuration);
 
 		var before = driver.Snapshot.TotalDuration;
 		before.Should().Be(TimeSpan.FromSeconds(CustomDuration));
 
-		// Replace Wait (longlasting) with ForLoop (immediate)
 		driver.ReplaceAction(0, RecipeTestDriver.ForLoopActionId);
 
 		var after = driver.Snapshot.TotalDuration;
@@ -131,17 +115,14 @@ public sealed class CoreMutationTests
 	}
 
 	[Fact]
-	public async Task ReplaceAction_ImmediateToLongLasting_AddsDuration()
+	public void ReplaceAction_ImmediateToLongLasting_AddsDuration()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddPause();
 
 		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.Zero);
 
-		// Replace Pause (immediate) with Wait (longlasting)
 		driver.ReplaceAction(0, RecipeTestDriver.WaitActionId);
 		driver.SetDuration(0, 15f);
 
@@ -149,12 +130,10 @@ public sealed class CoreMutationTests
 	}
 
 	[Fact]
-	public async Task UpdateProperty_ChangesDuration()
+	public void UpdateProperty_ChangesDuration()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f);
 
 		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.FromSeconds(10));
@@ -165,25 +144,21 @@ public sealed class CoreMutationTests
 	}
 
 	[Fact]
-	public async Task UpdateProperty_InvalidIndex_Throws()
+	public void UpdateProperty_InvalidIndex_Throws()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 
 		var act = () => driver.SetDuration(5, 10f);
 
-		act.Should().Throw<Exception>();
+		act.Should().Throw<ArgumentOutOfRangeException>();
 	}
 
 	[Fact]
-	public async Task NewRecipe_ResetsToEmpty()
+	public void NewRecipe_ResetsToEmpty()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait().AddWait().AddWait();
 
 		driver.StepCount.Should().Be(3);

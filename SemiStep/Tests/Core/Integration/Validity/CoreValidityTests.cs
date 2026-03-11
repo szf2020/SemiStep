@@ -1,7 +1,5 @@
 ﻿using FluentAssertions;
 
-using Shared.Reasons;
-
 using Tests.Core.Helpers;
 
 using Xunit;
@@ -11,29 +9,24 @@ namespace Tests.Core.Integration.Validity;
 [Trait("Category", "Integration")]
 [Trait("Component", "Core")]
 [Trait("Area", "Validity")]
-public sealed class CoreValidityTests
+public sealed class CoreValidityTests(CoreFixture fixture) : IClassFixture<CoreFixture>
 {
 	[Fact]
-	public async Task EmptyRecipe_IsValid_ButHasWarning()
+	public void EmptyRecipe_IsValid_ButHasWarning()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 
-		var driver = new RecipeTestDriver(facade);
-
-		// Empty recipe is valid but should have a warning
 		driver.IsValid.Should().BeTrue();
 		driver.Snapshot.Warnings.Should().NotBeEmpty();
-		driver.Snapshot.Warnings.Should().ContainSingle(w => w is EmptyRecipeWarning);
+		driver.Snapshot.Warnings.Should().ContainSingle(w => w.Contains("empty", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
-	public async Task ValidRecipe_NoErrors()
+	public void ValidRecipe_NoErrors()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(20f);
 
 		driver.IsValid.Should().BeTrue();
@@ -41,12 +34,10 @@ public sealed class CoreValidityTests
 	}
 
 	[Fact]
-	public async Task RecipeWithClosedLoop_IsValid()
+	public void RecipeWithClosedLoop_IsValid()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddFor(3).AddWait(10f).AddEndFor();
 
 		driver.IsValid.Should().BeTrue();
@@ -54,78 +45,62 @@ public sealed class CoreValidityTests
 	}
 
 	[Fact]
-	public async Task BrokenLoop_HasLoopIntegrityError()
+	public void BrokenLoop_HasLoopIntegrityError()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
-		driver.AddFor(3).AddWait(10f); // No EndFor
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
+		driver.AddFor(3).AddWait(10f);
 
 		driver.IsValid.Should().BeFalse();
-		driver.Snapshot.Errors.Should().ContainSingle(e => e is LoopIntegrityError);
+		driver.Snapshot.Errors.Should().ContainSingle(e => e.Contains("Unclosed For loop", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
-	public async Task MaxDepthExceeded_HasLoopNestingDepthError()
+	public void MaxDepth3Exceeded_HasLoopNestingDepthError()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 
-		var driver = new RecipeTestDriver(facade);
-
-		// Create 4 nested loops (exceeds max depth of 3)
 		driver.AddFor(1).AddFor(1).AddFor(1).AddFor(1);
 		driver.AddWait(1f);
 		driver.AddEndFor().AddEndFor().AddEndFor().AddEndFor();
 
 		driver.IsValid.Should().BeFalse();
-		driver.Snapshot.Errors.Should().ContainSingle(e => e is LoopNestingDepthError);
+		driver.Snapshot.Errors.Should().ContainSingle(e => e.Contains("nesting depth", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
-	public async Task IsValid_DerivedFromReasons()
+	public void IsValid_DerivedFromReasons()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f);
 
-		// Valid recipe should have no errors
 		driver.Snapshot.Errors.Should().BeEmpty();
-		driver.Snapshot.IsValid.Should().BeTrue();
+		driver.Snapshot.IsValid.Should().BeTrue("IsValid should be true when Errors is empty");
 
-		// Break the recipe
 		driver.AddFor(2);
 
-		// Invalid recipe should have errors
 		driver.Snapshot.Errors.Should().NotBeEmpty();
-		driver.Snapshot.IsValid.Should().BeFalse();
+		driver.Snapshot.IsValid.Should().BeFalse("IsValid should be false when Errors is non-empty");
 	}
 
 	[Fact]
-	public async Task WarningsDoNotAffectValidity()
+	public void WarningsDoNotAffectValidity()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 
-		var driver = new RecipeTestDriver(facade);
-
-		// Empty recipe has warnings but is still valid
 		driver.Snapshot.Warnings.Should().NotBeEmpty();
-		driver.IsValid.Should().BeTrue();
+		driver.IsValid.Should().BeTrue("warnings alone should not invalidate the recipe");
 	}
 
 	[Fact]
-	public async Task MultipleErrors_AllCaptured()
+	public void MultipleErrors_AllCaptured()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 
-		var driver = new RecipeTestDriver(facade);
-
-		// Create multiple unclosed loops
 		driver.AddFor(1).AddFor(1).AddWait(5f);
 
 		driver.IsValid.Should().BeFalse();

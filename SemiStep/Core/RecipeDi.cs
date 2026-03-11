@@ -1,11 +1,11 @@
 ﻿using Core.Analysis;
-using Core.Entities;
+using Core.Facade;
 using Core.Formulas;
 using Core.Services;
 
 using Microsoft.Extensions.DependencyInjection;
 
-using Serilog;
+using Shared.ServiceContracts;
 
 namespace Core;
 
@@ -15,19 +15,19 @@ public static class RecipeDi
 	{
 		services.AddSingleton<CoreConfig>();
 
-		// Analysis
 		services.AddSingleton<TimingCalculator>();
 		services.AddSingleton<RecipeAnalyzer>();
 		services.AddSingleton<LoopParser>();
 
-		// Formulas (placeholder - empty formulas dictionary for now)
 		services.AddSingleton<IReadOnlyDictionary<int, CompiledFormula>>(_ => new Dictionary<int, CompiledFormula>());
-		services.AddSingleton<IFormulaEngine, FormulaEngine>();
-		services.AddSingleton<IStepVariableAdapter, StepVariableAdapter>();
+		services.AddSingleton<FormulaEngine>();
+		services.AddSingleton<StepVariableAdapter>();
 		services.AddSingleton<FormulaApplicationCoordinator>();
 
-		// Facade
-		services.AddSingleton<CoreFacade>();
+		services.AddSingleton<ICoreService, CoreFacade>();
+
+		services.AddSingleton<StepFactory>();
+		services.AddSingleton<PropertyValidator>();
 
 		return services;
 	}

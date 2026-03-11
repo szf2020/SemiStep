@@ -2,7 +2,7 @@
 
 namespace Config.Dto;
 
-public sealed class GridStyleColorsDto
+internal sealed class GridStyleColorsDto
 {
 	[YamlMember(Alias = "selection")] public GridStyleSelectionColorsDto? Selection { get; set; }
 

@@ -4,8 +4,6 @@
 ![.NET](https://img.shields.io/badge/.NET-10%2B-512BD4)
 ![Platform](https://img.shields.io/badge/platform-Windows-informational)
 ![Protocol](https://img.shields.io/badge/Protocol-S7-orange)
-![License](https://img.shields.io/badge/license-BUSL%201.1-red)
-![Status](https://img.shields.io/badge/status-Prototype-blueviolet)
 
 SemiStep — a standalone SCADA-independent tool for industrial recipe control.
 

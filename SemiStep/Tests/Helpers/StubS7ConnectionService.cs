@@ -1,6 +1,5 @@
-﻿using Domain.Ports;
-
-using Shared.Entities;
+﻿using Shared.Plc;
+using Shared.ServiceContracts;
 
 namespace Tests.Helpers;
 

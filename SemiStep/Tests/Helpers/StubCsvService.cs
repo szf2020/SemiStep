@@ -1,7 +1,6 @@
-﻿using Core.Entities;
-
-using Domain.Models;
-using Domain.Ports;
+﻿using Shared.Core;
+using Shared.Csv;
+using Shared.ServiceContracts;
 
 namespace Tests.Helpers;
 

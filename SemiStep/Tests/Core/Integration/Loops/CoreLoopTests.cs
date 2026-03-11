@@ -9,19 +9,17 @@ namespace Tests.Core.Integration.Loops;
 [Trait("Category", "Integration")]
 [Trait("Component", "Core")]
 [Trait("Area", "Loops")]
-public sealed class CoreLoopTests
+public sealed class CoreLoopTests(CoreFixture fixture) : IClassFixture<CoreFixture>
 {
 	private const int SingleIterationDuration = 4;
 	private const int DefaultIterationCount = 3;
 	private const int MaxAllowedNestingDepth = 3;
 
 	[Fact]
-	public async Task ClosedLoop_IsValid()
+	public void ClosedLoop_IsValid()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddFor(DefaultIterationCount).AddWait(SingleIterationDuration).AddEndFor();
 
 		driver.IsValid.Should().BeTrue();
@@ -29,12 +27,10 @@ public sealed class CoreLoopTests
 	}
 
 	[Fact]
-	public async Task ClosedLoop_ComputesIterationTiming()
+	public void ClosedLoop_ComputesIterationTiming()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddFor(DefaultIterationCount).AddWait(SingleIterationDuration).AddEndFor();
 
 		driver.Snapshot.TotalDuration.Should()
@@ -45,12 +41,10 @@ public sealed class CoreLoopTests
 	}
 
 	[Fact]
-	public async Task UnclosedLoop_InvalidatesRecipe()
+	public void UnclosedLoop_InvalidatesRecipe()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddFor(2).AddWait(5f);
 
 		driver.IsValid.Should().BeFalse();
@@ -58,12 +52,10 @@ public sealed class CoreLoopTests
 	}
 
 	[Fact]
-	public async Task UnmatchedEndFor_InvalidatesRecipe()
+	public void UnmatchedEndFor_InvalidatesRecipe()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(5f).AddEndFor();
 
 		driver.IsValid.Should().BeFalse();
@@ -71,12 +63,10 @@ public sealed class CoreLoopTests
 	}
 
 	[Fact]
-	public async Task NestedLoops_ComputeCorrectDepth()
+	public void NestedLoops_ComputeCorrectDepth()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 
 		// Outer loop (depth 1)
 		driver.AddFor(2);
@@ -98,16 +88,15 @@ public sealed class CoreLoopTests
 	}
 
 	[Fact]
-	public async Task NestedLoops_ComputeCorrectTiming()
+	public void NestedLoops_ComputeCorrectTiming()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
+		fixture.Facade.NewRecipe();
 
 		const int OuterIterations = 2;
 		const int InnerIterations = 3;
 		const int StepDuration = 5;
 
-		var driver = new RecipeTestDriver(facade);
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddFor(OuterIterations);
 		driver.AddFor(InnerIterations);
 		driver.AddWait(StepDuration);
@@ -119,12 +108,10 @@ public sealed class CoreLoopTests
 	}
 
 	[Fact]
-	public async Task MaxDepthExceeded_HasError()
+	public void MaxDepthExceeded_HasError()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 
 		// Create MaxAllowedNestingDepth + 1 nested loops
 		for (var i = 0; i <= MaxAllowedNestingDepth; i++)
@@ -144,12 +131,10 @@ public sealed class CoreLoopTests
 	}
 
 	[Fact]
-	public async Task LoopByStart_LoopByEnd_CorrectMapping()
+	public void LoopByStart_LoopByEnd_CorrectMapping()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddFor(2).AddWait(5f).AddEndFor();
 
 		driver.Snapshot.LoopByStart.Should().ContainKey(0);
@@ -162,12 +147,10 @@ public sealed class CoreLoopTests
 	}
 
 	[Fact]
-	public async Task EnclosingLoopsMap_CorrectlyBuilt()
+	public void EnclosingLoopsMap_CorrectlyBuilt()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 
 		// Step 0: For (outer)
 		// Step 1: For (inner)
@@ -182,12 +165,10 @@ public sealed class CoreLoopTests
 	}
 
 	[Fact]
-	public async Task EmptyLoop_ValidButZeroDuration()
+	public void EmptyLoop_ValidButZeroDuration()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddFor(5).AddEndFor();
 
 		driver.IsValid.Should().BeTrue();
@@ -195,12 +176,10 @@ public sealed class CoreLoopTests
 	}
 
 	[Fact]
-	public async Task MultipleSequentialLoops_Valid()
+	public void MultipleSequentialLoops_Valid()
 	{
-		var (services, facade) = await CoreTestHelper.BuildAsync();
-		using var _ = services as IDisposable;
-
-		var driver = new RecipeTestDriver(facade);
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
 
 		// First loop
 		driver.AddFor(2).AddWait(5f).AddEndFor();

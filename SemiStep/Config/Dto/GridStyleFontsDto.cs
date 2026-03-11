@@ -2,7 +2,7 @@
 
 namespace Config.Dto;
 
-public sealed class GridStyleFontsDto
+internal sealed class GridStyleFontsDto
 {
 	[YamlMember(Alias = "header_size")] public int? HeaderSize { get; set; }
 

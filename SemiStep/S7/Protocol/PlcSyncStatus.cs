@@ -1,6 +1,6 @@
 ﻿namespace S7.Protocol;
 
-public enum PlcSyncStatus : ushort
+internal enum PlcSyncStatus : ushort
 {
 	Idle = 0,
 	Busy = 1,

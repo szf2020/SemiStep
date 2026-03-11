@@ -8,8 +8,8 @@ namespace Tests.Config.Integration.Errors;
 
 [Trait("Category", "Integration")]
 [Trait("Component", "Config")]
-[Trait("Feature", "PropertyValidation")]
-public class PropertyErrorTests
+[Trait("Area", "PropertyValidation")]
+public sealed class PropertyErrorTests
 {
 	[Fact]
 	public async Task DuplicatePropertyId_HasError()
@@ -18,7 +18,7 @@ public class PropertyErrorTests
 
 		context.HasErrors.Should().BeTrue();
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("Duplicate PropertyTypeId", StringComparison.OrdinalIgnoreCase));
+			e.Contains("Duplicate PropertyTypeId", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
@@ -27,7 +27,7 @@ public class PropertyErrorTests
 		var context = await ConfigTestHelper.LoadInvalidCaseAsync("DuplicatePropertyId");
 
 		context.Errors.Should().Contain(e =>
-				e.Message.Contains("int", StringComparison.OrdinalIgnoreCase),
+				e.Contains("int", StringComparison.OrdinalIgnoreCase),
 			"error should identify 'int' as the duplicate PropertyTypeId");
 	}
 
@@ -38,7 +38,7 @@ public class PropertyErrorTests
 
 		context.HasErrors.Should().BeTrue();
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("SystemType must be one of", StringComparison.OrdinalIgnoreCase));
+			e.Contains("SystemType must be one of", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
@@ -47,7 +47,7 @@ public class PropertyErrorTests
 		var context = await ConfigTestHelper.LoadInvalidCaseAsync("InvalidSystemType");
 
 		context.Errors.Should().Contain(e =>
-				e.Message.Contains("boolean", StringComparison.OrdinalIgnoreCase),
+				e.Contains("boolean", StringComparison.OrdinalIgnoreCase),
 			"error should show 'boolean' as the invalid value");
 	}
 
@@ -58,8 +58,8 @@ public class PropertyErrorTests
 
 		context.HasErrors.Should().BeTrue();
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("Min", StringComparison.OrdinalIgnoreCase) &&
-			e.Message.Contains("Max", StringComparison.OrdinalIgnoreCase));
+			e.Contains("Min", StringComparison.OrdinalIgnoreCase) &&
+			e.Contains("Max", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
@@ -68,7 +68,7 @@ public class PropertyErrorTests
 		var context = await ConfigTestHelper.LoadInvalidCaseAsync("MinGreaterThanMax");
 
 		context.Errors.Should().Contain(e =>
-				e.Message.Contains("100") && e.Message.Contains("10"),
+				e.Contains("100") && e.Contains("10"),
 			"error should show the actual Min (100) and Max (10) values");
 	}
 
@@ -79,7 +79,7 @@ public class PropertyErrorTests
 
 		context.HasErrors.Should().BeTrue();
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("SystemType is required", StringComparison.OrdinalIgnoreCase));
+			e.Contains("SystemType is required", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
@@ -89,6 +89,6 @@ public class PropertyErrorTests
 
 		context.HasErrors.Should().BeTrue();
 		context.Errors.Should().Contain(e =>
-			e.Message.Contains("FormatKind is required", StringComparison.OrdinalIgnoreCase));
+			e.Contains("FormatKind is required", StringComparison.OrdinalIgnoreCase));
 	}
 }

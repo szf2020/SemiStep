@@ -1,9 +1,9 @@
-﻿using Shared.Entities;
-using Shared.Registries;
+﻿using Shared.Config;
+using Shared.Config.Contracts;
 
 namespace Domain.Registries;
 
-public sealed class ColumnRegistry : IColumnRegistry
+internal sealed class ColumnRegistry : IColumnRegistry
 {
 	private readonly Dictionary<string, GridColumnDefinition> _columns = new(StringComparer.OrdinalIgnoreCase);
 	private IReadOnlyList<GridColumnDefinition>? _cachedAll;

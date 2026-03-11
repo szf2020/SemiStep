@@ -1,20 +1,20 @@
-﻿using Core.Entities;
-
-using Domain.Ports;
-using Domain.State;
+﻿using Domain.Facade;
 
 using S7.Protocol;
 
 using Serilog;
 
+using Shared.Core;
+using Shared.ServiceContracts;
+
 namespace S7.Sync;
 
-public sealed class PlcSyncCoordinator : IDisposable
+internal sealed class PlcSyncCoordinator : IDisposable
 {
 	private const int DebounceDelayMs = 1000;
 	private readonly IS7ConnectionService _connectionService;
+	private readonly DomainFacade _domainFacade;
 	private readonly Lock _lock = new();
-	private readonly RecipeStateManager _stateManager;
 	private readonly PlcTransactionExecutor _transactionExecutor;
 
 	private CancellationTokenSource? _debounceCts;
@@ -27,13 +27,13 @@ public sealed class PlcSyncCoordinator : IDisposable
 	public PlcSyncCoordinator(
 		PlcTransactionExecutor transactionExecutor,
 		IS7ConnectionService connectionService,
-		RecipeStateManager stateManager)
+		DomainFacade domainFacade)
 	{
 		_transactionExecutor = transactionExecutor;
 		_connectionService = connectionService;
-		_stateManager = stateManager;
+		_domainFacade = domainFacade;
 
-		_stateManager.RecipeChanged += OnRecipeChanged;
+		_domainFacade.RecipeChanged += OnRecipeChanged;
 	}
 
 	public SyncStatus Status
@@ -86,7 +86,7 @@ public sealed class PlcSyncCoordinator : IDisposable
 		}
 
 		_disposed = true;
-		_stateManager.RecipeChanged -= OnRecipeChanged;
+		_domainFacade.RecipeChanged -= OnRecipeChanged;
 		_debounceCts?.Cancel();
 		_debounceCts?.Dispose();
 	}

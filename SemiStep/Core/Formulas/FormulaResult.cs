@@ -1,10 +1,8 @@
-﻿using Shared.Reasons;
+﻿namespace Core.Formulas;
 
-namespace Core.Formulas;
-
-public sealed record FormulaResult(
+internal sealed record FormulaResult(
 	IReadOnlyDictionary<string, double>? ComputedValues,
-	AbstractError? Error)
+	string? Error)
 {
 	public bool IsSuccess => Error is null;
 
@@ -13,7 +11,7 @@ public sealed record FormulaResult(
 		return new(values, null);
 	}
 
-	public static FormulaResult Failure(AbstractError error)
+	public static FormulaResult Failure(string error)
 	{
 		return new(null, error);
 	}

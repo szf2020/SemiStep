@@ -1,9 +1,9 @@
-﻿using Shared.Entities;
-using Shared.Registries;
+﻿using Shared.Config;
+using Shared.Config.Contracts;
 
 namespace Domain.Registries;
 
-public sealed class GroupRegistry : IGroupRegistry
+internal sealed class GroupRegistry : IGroupRegistry
 {
 	private readonly Dictionary<string, GroupDefinition> _groups = new(StringComparer.OrdinalIgnoreCase);
 	private IReadOnlyList<GroupDefinition>? _cachedAll;

@@ -2,7 +2,7 @@
 
 namespace Config.Dto;
 
-public sealed class GridStyleRowColorsDto
+internal sealed class GridStyleRowColorsDto
 {
 	[YamlMember(Alias = "alternating_background")]
 	public string? AlternatingBackground { get; set; }

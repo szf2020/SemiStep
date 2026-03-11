@@ -6,7 +6,7 @@ namespace S7.Protocol;
 /// CRC-32/ISO-HDLC checksum calculator using standard .NET implementation.
 /// Reference: https://learn.microsoft.com/en-us/dotnet/api/system.io.hashing.crc32
 /// </summary>
-public static class ChecksumCalculator
+internal static class ChecksumCalculator
 {
 	public static uint ComputeCrc32(byte[] data)
 	{
