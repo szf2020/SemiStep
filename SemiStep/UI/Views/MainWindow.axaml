@@ -18,7 +18,6 @@
         <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
         <KeyBinding Gesture="Ctrl+N" Command="{Binding AddStepCommand}" />
-        <KeyBinding Gesture="Delete" Command="{Binding DeleteStepCommand}" />
     </Window.KeyBindings>
 
     <Grid RowDefinitions="Auto,*,Auto,Auto">
@@ -38,7 +37,24 @@
                   BorderThickness="1"
                   BorderBrush="Gray"
                   Background="White"
-                  SelectionMode="Single" />
+                  SelectionMode="Extended"
+                  ClipboardCopyMode="None">
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Add Step"
+                              Command="{Binding AddStepCommand}" />
+                    <MenuItem Header="Delete Step"
+                              Command="{Binding DeleteStepCommand}" />
+                    <Separator />
+                    <MenuItem Header="Copy Steps"
+                              Command="{Binding CopyStepCommand}" />
+                    <MenuItem Header="Cut Steps"
+                              Command="{Binding CutStepCommand}" />
+                    <MenuItem Header="Paste Steps"
+                              Command="{Binding PasteStepCommand}" />
+                </ContextMenu>
+            </DataGrid.ContextMenu>
+        </DataGrid>
 
         <controls:NotificationLogPanel Grid.Row="2"
                                        x:Name="LogPanel"

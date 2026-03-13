@@ -22,6 +22,10 @@ public interface ICoreService
 
 	RecipeSnapshot RemoveStep(Recipe recipe, int stepIndex);
 
+	RecipeSnapshot InsertSteps(Recipe recipe, int startIndex, IReadOnlyList<Step> steps);
+
+	RecipeSnapshot RemoveSteps(Recipe recipe, IReadOnlyList<int> indices);
+
 	RecipeSnapshot ChangeStepAction(
 		Recipe recipe,
 		int stepIndex,

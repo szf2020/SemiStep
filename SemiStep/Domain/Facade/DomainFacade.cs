@@ -1,13 +1,15 @@
 ﻿using Domain.Services;
 using Domain.State;
 
+using FluentResults;
+
 using Serilog;
 
 using Shared.Config;
 using Shared.Config.Contracts;
 using Shared.Core;
-using Shared.Csv;
 using Shared.Plc;
+using Shared.Results;
 using Shared.ServiceContracts;
 
 namespace Domain.Facade;
@@ -147,6 +149,21 @@ public sealed class DomainFacade : IDisposable
 		_stateManager.Update(snapshot);
 	}
 
+	public void InsertSteps(int startIndex, IReadOnlyList<Step> steps)
+	{
+		_historyManager.Push(_stateManager.Current);
+		var snapshot = _coreService.InsertSteps(startIndex, steps);
+		_stateManager.Update(snapshot);
+	}
+
+	public void RemoveSteps(IReadOnlyList<int> indices)
+	{
+		var snapshot = _coreService.RemoveSteps(indices);
+
+		HistoryPushOnlyValidState(snapshot);
+		_stateManager.Update(snapshot);
+	}
+
 	public void UpdateStepProperty(int stepIndex, string columnKey, string value)
 	{
 		var snapshot = _coreService.UpdateStepProperty(stepIndex, columnKey, value);
@@ -183,16 +200,16 @@ public sealed class DomainFacade : IDisposable
 		return snapshot;
 	}
 
-	public async Task<CsvLoadResult> LoadRecipeAsync(string filePath, CancellationToken ct = default)
+	public async Task<Result<Recipe>> LoadRecipeAsync(string filePath, CancellationToken ct = default)
 	{
 		var result = await _csvService.LoadAsync(filePath, ct);
-		if (!result.IsSuccess)
+		if (result.IsFailed)
 		{
 			return result;
 		}
 
 		_historyManager.Clear();
-		var snapshot = _coreService.AnalyzeRecipe(result.Recipe!);
+		var snapshot = _coreService.AnalyzeRecipe(result.Value);
 		_stateManager.Update(snapshot);
 		_stateManager.MarkSaved();
 

@@ -52,6 +52,32 @@ internal sealed class CoreFacade(
 		return analyzer.Analyze(newRecipe);
 	}
 
+	public RecipeSnapshot InsertSteps(Recipe recipe, int startIndex, IReadOnlyList<Step> steps)
+	{
+		if (startIndex < 0 || startIndex > recipe.Steps.Count)
+		{
+			throw new IndexOutOfRangeException(
+				$"Index {startIndex} is out of range for recipe with {recipe.Steps.Count} steps.");
+		}
+
+		var newRecipe = RecipeMutator.InsertSteps(recipe, startIndex, steps);
+
+		return analyzer.Analyze(newRecipe);
+	}
+
+	public RecipeSnapshot RemoveSteps(Recipe recipe, IReadOnlyList<int> indices)
+	{
+		var sorted = indices.OrderByDescending(i => i).ToList();
+		foreach (var i in sorted)
+		{
+			ValidateIndexOrThrow(recipe, i);
+		}
+
+		var newRecipe = RecipeMutator.RemoveSteps(recipe, sorted);
+
+		return analyzer.Analyze(newRecipe);
+	}
+
 	public RecipeSnapshot ChangeStepAction(
 		Recipe recipe,
 		int stepIndex,

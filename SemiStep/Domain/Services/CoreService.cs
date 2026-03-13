@@ -61,6 +61,20 @@ internal sealed class CoreService(
 		return recipeSnapshot;
 	}
 
+	public RecipeSnapshot InsertSteps(int startIndex, IReadOnlyList<Step> steps)
+	{
+		var recipeSnapshot = coreFacade.InsertSteps(stateManager.Current, startIndex, steps);
+
+		return recipeSnapshot;
+	}
+
+	public RecipeSnapshot RemoveSteps(IReadOnlyList<int> indices)
+	{
+		var recipeSnapshot = coreFacade.RemoveSteps(stateManager.Current, indices);
+
+		return recipeSnapshot;
+	}
+
 	public RecipeSnapshot UpdateStepProperty(int stepIndex, string columnKey, string value)
 	{
 		var columnDef = columnRegistry.GetColumn(columnKey);

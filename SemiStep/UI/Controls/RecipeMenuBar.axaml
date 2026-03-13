@@ -32,6 +32,16 @@
                       Command="{Binding DeleteStepCommand}"
                       InputGesture="Delete" />
             <Separator />
+            <MenuItem Header="Cop_y Steps"
+                      Command="{Binding CopyStepCommand}"
+                      InputGesture="Ctrl+C" />
+            <MenuItem Header="Cu_t Steps"
+                      Command="{Binding CutStepCommand}"
+                      InputGesture="Ctrl+X" />
+            <MenuItem Header="_Paste Steps"
+                      Command="{Binding PasteStepCommand}"
+                      InputGesture="Ctrl+V" />
+            <Separator />
             <MenuItem Header="_Undo"
                       Command="{Binding UndoCommand}"
                       InputGesture="Ctrl+Z" />

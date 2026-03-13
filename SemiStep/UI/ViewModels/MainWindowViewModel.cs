@@ -5,7 +5,11 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 
+using Avalonia.Input.Platform;
+
 using Domain.Facade;
+
+using FluentResults;
 
 using ReactiveUI;
 
@@ -13,6 +17,7 @@ using Shared;
 using Shared.Config;
 using Shared.Config.Contracts;
 using Shared.Core;
+using Shared.ServiceContracts;
 
 using UI.Services;
 
@@ -23,6 +28,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 	private readonly ObservableAsPropertyHelper<bool> _canDeleteStep;
 	private readonly ObservableAsPropertyHelper<bool> _canRedo;
 	private readonly ObservableAsPropertyHelper<bool> _canUndo;
+	private readonly ICsvClipboardService _csvClipboardService;
 	private readonly CompositeDisposable _disposables = new();
 	private readonly DomainFacade _domainFacade;
 
@@ -33,7 +39,9 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 	private readonly ObservableAsPropertyHelper<string> _statusText;
 	private readonly ObservableAsPropertyHelper<string> _windowTitle;
 	private string? _currentFilePath;
+	private IClipboard? _clipboard;
 	private int _selectedRowIndex = -1;
+	private IReadOnlyList<int> _selectedRowIndices = [];
 
 	public MainWindowViewModel(
 		AppConfiguration configuration,
@@ -42,6 +50,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		IGroupRegistry groupRegistry,
 		IColumnRegistry columnRegistry,
 		IPropertyRegistry propertyRegistry,
+		ICsvClipboardService csvClipboardService,
 		INotificationService notificationService,
 		IShutdownService shutdownService)
 	{
@@ -51,6 +60,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		GroupRegistry = groupRegistry;
 		ColumnRegistry = columnRegistry;
 		PropertyRegistry = propertyRegistry;
+		_csvClipboardService = csvClipboardService;
 		_notificationService = notificationService;
 		_shutdownService = shutdownService;
 
@@ -62,8 +72,8 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		ShowMessageInteraction = new Interaction<(string Title, string Message), Unit>();
 
 		_canDeleteStep = this
-			.WhenAnyValue(x => x.SelectedRowIndex)
-			.Select(index => index >= 0)
+			.WhenAnyValue(x => x.SelectedRowIndices)
+			.Select(indices => indices.Count > 0)
 			.ToProperty(this, x => x.CanDeleteStep)
 			.DisposeWith(_disposables);
 
@@ -109,6 +119,41 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		UndoCommand = ReactiveCommand.Create(Undo, canUndo);
 		RedoCommand = ReactiveCommand.Create(Redo, canRedo);
 		ExitCommand = ReactiveCommand.Create(ExecuteExit);
+
+		var canCopyOrCut = this.WhenAnyValue(x => x.CanDeleteStep);
+		CopyStepCommand = ReactiveCommand.CreateFromTask(CopyStepsAsync, canCopyOrCut);
+		CutStepCommand = ReactiveCommand.CreateFromTask(CutStepsAsync, canCopyOrCut);
+		PasteStepCommand = ReactiveCommand.CreateFromTask(PasteStepsAsync);
+
+		SaveRecipeCommand.ThrownExceptions
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(ex => _notificationService.ShowError($"Save failed: {ex.Message}"))
+			.DisposeWith(_disposables);
+
+		SaveAsRecipeCommand.ThrownExceptions
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(ex => _notificationService.ShowError($"Save As failed: {ex.Message}"))
+			.DisposeWith(_disposables);
+
+		LoadRecipeCommand.ThrownExceptions
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(ex => _notificationService.ShowError($"Load failed: {ex.Message}"))
+			.DisposeWith(_disposables);
+
+		CopyStepCommand.ThrownExceptions
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(ex => _notificationService.ShowError($"Copy failed: {ex.Message}"))
+			.DisposeWith(_disposables);
+
+		CutStepCommand.ThrownExceptions
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(ex => _notificationService.ShowError($"Cut failed: {ex.Message}"))
+			.DisposeWith(_disposables);
+
+		PasteStepCommand.ThrownExceptions
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(ex => _notificationService.ShowError($"Paste failed: {ex.Message}"))
+			.DisposeWith(_disposables);
 
 		_currentFilePath = null;
 
@@ -170,6 +215,12 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 
 	public ReactiveCommand<Unit, Unit> ExitCommand { get; }
 
+	public ReactiveCommand<Unit, Unit> CopyStepCommand { get; }
+
+	public ReactiveCommand<Unit, Unit> CutStepCommand { get; }
+
+	public ReactiveCommand<Unit, Unit> PasteStepCommand { get; }
+
 	public string WindowTitle => _windowTitle.Value;
 
 	public bool IsDirty => _isDirty.Value;
@@ -182,6 +233,17 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 	{
 		get => _selectedRowIndex;
 		set => this.RaiseAndSetIfChanged(ref _selectedRowIndex, value);
+	}
+
+	public IReadOnlyList<int> SelectedRowIndices
+	{
+		get => _selectedRowIndices;
+		set => this.RaiseAndSetIfChanged(ref _selectedRowIndices, value);
+	}
+
+	public void SetClipboard(IClipboard? clipboard)
+	{
+		_clipboard = clipboard;
 	}
 
 	public bool CanDeleteStep => _canDeleteStep.Value;
@@ -238,27 +300,123 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 
 	private void DeleteStep()
 	{
-		if (SelectedRowIndex < 0)
+		var indices = _selectedRowIndices;
+		if (indices.Count == 0)
 		{
 			return;
 		}
 
-		var indexToDelete = SelectedRowIndex;
-		_domainFacade.RemoveStep(indexToDelete);
-		RemoveRow(indexToDelete);
+		var sortedDesc = indices.OrderByDescending(i => i).ToList();
+
+		if (indices.Count == 1)
+		{
+			var indexToDelete = indices[0];
+			_domainFacade.RemoveStep(indexToDelete);
+			RemoveRow(indexToDelete);
+		}
+		else
+		{
+			_domainFacade.RemoveSteps(indices);
+			foreach (var i in sortedDesc)
+			{
+				RecipeRows[i].Dispose();
+				RecipeRows.RemoveAt(i);
+			}
+
+			RenumberRowsFrom(0);
+		}
 
 		LogPanel.RefreshReasons(_domainFacade.Snapshot.Errors, _domainFacade.Snapshot.Warnings);
 		RefreshStepStartTimes();
 		NotifyStateChanged();
 
+		var firstDeleted = sortedDesc[^1];
 		if (RecipeRows.Count > 0)
 		{
-			SelectedRowIndex = Math.Min(indexToDelete, RecipeRows.Count - 1);
+			SelectedRowIndex = Math.Min(firstDeleted, RecipeRows.Count - 1);
 		}
 		else
 		{
 			SelectedRowIndex = -1;
 		}
+	}
+
+	private async Task CopyStepsAsync()
+	{
+		if (_clipboard is null || _selectedRowIndices.Count == 0)
+		{
+			return;
+		}
+
+		var steps = CollectSelectedSteps();
+		var csvText = _csvClipboardService.SerializeSteps(steps);
+		await _clipboard.SetTextAsync(csvText);
+	}
+
+	private async Task CutStepsAsync()
+	{
+		if (_clipboard is null || _selectedRowIndices.Count == 0)
+		{
+			return;
+		}
+
+		var steps = CollectSelectedSteps();
+		var csvText = _csvClipboardService.SerializeSteps(steps);
+		await _clipboard.SetTextAsync(csvText);
+
+		DeleteStep();
+	}
+
+	private async Task PasteStepsAsync()
+	{
+		if (_clipboard is null)
+		{
+			return;
+		}
+
+		var csvText = await _clipboard.GetTextAsync();
+		if (string.IsNullOrWhiteSpace(csvText))
+		{
+			return;
+		}
+
+		var stepsResult = _csvClipboardService.DeserializeSteps(csvText);
+		if (stepsResult.IsFailed)
+		{
+			return;
+		}
+
+		var steps = stepsResult.Value;
+		var insertIndex = _selectedRowIndices.Count > 0
+			? _selectedRowIndices.Max() + 1
+			: RecipeRows.Count;
+
+		_domainFacade.InsertSteps(insertIndex, steps);
+
+		for (var i = 0; i < steps.Count; i++)
+		{
+			var step = _domainFacade.CurrentRecipe.Steps[insertIndex + i];
+			var action = ActionRegistry.GetAction(step.ActionKey);
+			var rowVm = CreateRowViewModel(step, action, insertIndex + i + 1);
+			RecipeRows.Insert(insertIndex + i, rowVm);
+		}
+
+		RenumberRowsFrom(insertIndex + steps.Count);
+		LogPanel.RefreshReasons(_domainFacade.Snapshot.Errors, _domainFacade.Snapshot.Warnings);
+		RefreshStepStartTimes();
+		NotifyStateChanged();
+
+		SelectedRowIndex = insertIndex;
+	}
+
+	private List<Step> CollectSelectedSteps()
+	{
+		var recipe = _domainFacade.CurrentRecipe;
+
+		return _selectedRowIndices
+			.OrderBy(i => i)
+			.Select(i => recipe.Steps[i])
+			.ToList();
 	}
 
 	private async Task SaveRecipeAsync()
@@ -314,9 +472,9 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		try
 		{
 			var result = await _domainFacade.LoadRecipeAsync(filePath);
-			if (!result.IsSuccess)
+			if (result.IsFailed)
 			{
-				var errorMessages = string.Join(Environment.NewLine, result.Errors);
+				var errorMessages = string.Join(Environment.NewLine, result.Errors.Select(e => e.Message));
 				_notificationService.ShowError($"Failed to load recipe:{Environment.NewLine}{errorMessages}");
 
 				return;

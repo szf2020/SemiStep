@@ -1,4 +1,8 @@
-﻿using FluentAssertions;
+﻿using System.Collections.Immutable;
+
+using FluentAssertions;
+
+using Shared.Core;
 
 using Tests.Core.Helpers;
 
@@ -164,6 +168,79 @@ public sealed class CoreMutationTests(CoreFixture fixture) : IClassFixture<CoreF
 		driver.StepCount.Should().Be(3);
 
 		driver.NewRecipe();
+
+		driver.StepCount.Should().Be(0);
+	}
+
+	[Fact]
+	public void InsertSteps_InsertsMultipleStepsAtPosition()
+	{
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
+		driver.AddWait(5f).AddWait(10f);
+
+		var stepsToInsert = new List<Step>
+		{
+			new(RecipeTestDriver.WaitActionId, ImmutableDictionary<ColumnId, PropertyValue>.Empty
+				.Add(new ColumnId(RecipeTestDriver.StepDurationColumn), PropertyValue.FromFloat(20f))),
+			new(RecipeTestDriver.WaitActionId, ImmutableDictionary<ColumnId, PropertyValue>.Empty
+				.Add(new ColumnId(RecipeTestDriver.StepDurationColumn), PropertyValue.FromFloat(30f)))
+		};
+
+		driver.InsertSteps(1, stepsToInsert);
+
+		driver.StepCount.Should().Be(4);
+		driver.Snapshot.StepStartTimes[0].Should().Be(TimeSpan.Zero);
+		driver.Snapshot.StepStartTimes[1].Should().Be(TimeSpan.FromSeconds(5));
+		driver.Snapshot.StepStartTimes[2].Should().Be(TimeSpan.FromSeconds(25));
+		driver.Snapshot.StepStartTimes[3].Should().Be(TimeSpan.FromSeconds(55));
+	}
+
+	[Fact]
+	public void InsertSteps_AtEnd_AppendsSteps()
+	{
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
+		driver.AddWait(5f);
+
+		var stepsToInsert = new List<Step>
+		{
+			new(RecipeTestDriver.WaitActionId, ImmutableDictionary<ColumnId, PropertyValue>.Empty
+				.Add(new ColumnId(RecipeTestDriver.StepDurationColumn), PropertyValue.FromFloat(15f)))
+		};
+
+		driver.InsertSteps(1, stepsToInsert);
+
+		driver.StepCount.Should().Be(2);
+		driver.Snapshot.StepStartTimes[1].Should().Be(TimeSpan.FromSeconds(5));
+		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.FromSeconds(20));
+	}
+
+	[Fact]
+	public void RemoveSteps_NonContiguousIndices_RemovesCorrectSteps()
+	{
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
+		driver.AddWait(5f).AddWait(10f).AddWait(15f).AddWait(20f);
+
+		driver.StepCount.Should().Be(4);
+
+		driver.RemoveSteps([0, 2]);
+
+		driver.StepCount.Should().Be(2);
+		driver.Snapshot.StepStartTimes[0].Should().Be(TimeSpan.Zero);
+		driver.Snapshot.StepStartTimes[1].Should().Be(TimeSpan.FromSeconds(10));
+		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.FromSeconds(30));
+	}
+
+	[Fact]
+	public void RemoveSteps_AllSteps_LeavesEmptyRecipe()
+	{
+		fixture.Facade.NewRecipe();
+		var driver = new RecipeTestDriver(fixture.Facade);
+		driver.AddWait().AddWait().AddWait();
+
+		driver.RemoveSteps([0, 1, 2]);
 
 		driver.StepCount.Should().Be(0);
 	}

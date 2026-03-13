@@ -2,6 +2,7 @@
 using System.Reactive.Disposables;
 
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using Avalonia.ReactiveUI;
 
@@ -17,6 +18,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 {
 	private ColumnBuilder? _columnBuilder;
 	private bool _forceClose;
+	private bool _isEditing;
 
 	public MainWindow()
 	{
@@ -30,6 +32,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 			{
 				return;
 			}
+
+			ViewModel.SetClipboard(Clipboard);
 
 			ViewModel.OpenFileInteraction
 				.RegisterHandler(HandleOpenFileDialogAsync)
@@ -50,7 +54,94 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 				ViewModel.PropertyRegistry,
 				ViewModel.ColumnRegistry);
 			BuildGrid();
+
+			RecipeGrid.BeginningEdit += OnBeginningEdit;
+			RecipeGrid.CellEditEnded += OnCellEditEnded;
+			RecipeGrid.SelectionChanged += OnSelectionChanged;
+
+			Disposable.Create(() =>
+			{
+				RecipeGrid.BeginningEdit -= OnBeginningEdit;
+				RecipeGrid.CellEditEnded -= OnCellEditEnded;
+				RecipeGrid.SelectionChanged -= OnSelectionChanged;
+			}).DisposeWith(disposables);
 		});
+	}
+
+	protected override void OnKeyDown(KeyEventArgs e)
+	{
+		if (ViewModel is null)
+		{
+			base.OnKeyDown(e);
+
+			return;
+		}
+
+		if (!_isEditing)
+		{
+			switch (e.Key)
+			{
+				case Key.Delete:
+					ViewModel.DeleteStepCommand.Execute().Subscribe();
+					e.Handled = true;
+
+					return;
+
+				case Key.C when e.KeyModifiers == KeyModifiers.Control:
+					ViewModel.CopyStepCommand.Execute().Subscribe();
+					e.Handled = true;
+
+					return;
+
+				case Key.X when e.KeyModifiers == KeyModifiers.Control:
+					ViewModel.CutStepCommand.Execute().Subscribe();
+					e.Handled = true;
+
+					return;
+
+				case Key.V when e.KeyModifiers == KeyModifiers.Control:
+					ViewModel.PasteStepCommand.Execute().Subscribe();
+					e.Handled = true;
+
+					return;
+			}
+		}
+
+		base.OnKeyDown(e);
+	}
+
+	private void OnBeginningEdit(object? sender, DataGridBeginningEditEventArgs e)
+	{
+		_isEditing = true;
+	}
+
+	private void OnCellEditEnded(object? sender, DataGridCellEditEndedEventArgs e)
+	{
+		_isEditing = false;
+	}
+
+	private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+	{
+		if (ViewModel is null)
+		{
+			return;
+		}
+
+		var indices = new List<int>();
+		foreach (var item in RecipeGrid.SelectedItems)
+		{
+			if (item is RecipeRowViewModel row)
+			{
+				var index = ViewModel.RecipeRows.IndexOf(row);
+				if (index >= 0)
+				{
+					indices.Add(index);
+				}
+			}
+		}
+
+		indices.Sort();
+		ViewModel.SelectedRowIndices = indices;
 	}
 
 	private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)

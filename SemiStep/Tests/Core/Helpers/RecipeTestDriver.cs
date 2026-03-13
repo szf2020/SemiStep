@@ -144,5 +144,19 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 		return this;
 	}
 
+	public RecipeTestDriver InsertSteps(int startIndex, IReadOnlyList<Step> steps)
+	{
+		domainFacade.InsertSteps(startIndex, steps);
+
+		return this;
+	}
+
+	public RecipeTestDriver RemoveSteps(IReadOnlyList<int> indices)
+	{
+		domainFacade.RemoveSteps(indices);
+
+		return this;
+	}
+
 	#endregion
 }

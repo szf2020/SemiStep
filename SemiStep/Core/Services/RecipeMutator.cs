@@ -33,6 +33,22 @@ internal static class RecipeMutator
 		return recipe with { Steps = recipe.Steps.RemoveAt(index) };
 	}
 
+	public static Recipe InsertSteps(Recipe recipe, int index, IReadOnlyList<Step> steps)
+	{
+		return recipe with { Steps = recipe.Steps.InsertRange(index, steps) };
+	}
+
+	public static Recipe RemoveSteps(Recipe recipe, IReadOnlyList<int> sortedDescendingIndices)
+	{
+		var steps = recipe.Steps;
+		foreach (var i in sortedDescendingIndices)
+		{
+			steps = steps.RemoveAt(i);
+		}
+
+		return recipe with { Steps = steps };
+	}
+
 	public static Recipe UpdateProperty(Recipe recipe, int stepIndex, ColumnId columnId, PropertyValue value)
 	{
 		var step = recipe.Steps[stepIndex];
