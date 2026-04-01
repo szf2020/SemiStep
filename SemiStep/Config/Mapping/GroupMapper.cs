@@ -1,4 +1,4 @@
-﻿using Shared.Config;
+﻿using TypesShared.Config;
 
 namespace Config.Mapping;
 

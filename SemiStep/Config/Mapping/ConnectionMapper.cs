@@ -1,7 +1,7 @@
 ﻿using Config.Dto;
 
-using Shared.Plc;
-using Shared.Plc.Memory;
+using TypesShared.Plc;
+using TypesShared.Plc.Memory;
 
 namespace Config.Mapping;
 

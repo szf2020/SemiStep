@@ -14,49 +14,41 @@ public sealed class ActionErrorTests
 	[Fact]
 	public async Task DuplicateActionId_HasError()
 	{
-		// Act
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("DuplicateActionId");
+		var result = await ConfigTestHelper.LoadInvalidCaseAsync("DuplicateActionId");
 
-		// Assert
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Contains("Duplicate action Id", StringComparison.OrdinalIgnoreCase));
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().Contain(e =>
+			e.Message.Contains("Duplicate action Id", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
 	public async Task DuplicateActionId_IdentifiesDuplicateId()
 	{
-		// Act
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("DuplicateActionId");
+		var result = await ConfigTestHelper.LoadInvalidCaseAsync("DuplicateActionId");
 
-		// Assert
-		context.Errors.Should().Contain(e =>
-				e.Contains("10"),
+		result.Errors.Should().Contain(e =>
+				e.Message.Contains("10"),
 			"error should identify '10' as the duplicate action Id");
 	}
 
 	[Fact]
 	public async Task InvalidDeployDuration_HasError()
 	{
-		// Act
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("InvalidDeployDuration");
+		var result = await ConfigTestHelper.LoadInvalidCaseAsync("InvalidDeployDuration");
 
-		// Assert
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Contains("DeployDuration must be", StringComparison.OrdinalIgnoreCase) ||
-			e.Contains("immediate", StringComparison.OrdinalIgnoreCase));
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().Contain(e =>
+			e.Message.Contains("DeployDuration must be", StringComparison.OrdinalIgnoreCase) ||
+			e.Message.Contains("immediate", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
 	public async Task InvalidDeployDuration_ShowsInvalidValue()
 	{
-		// Act
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("InvalidDeployDuration");
+		var result = await ConfigTestHelper.LoadInvalidCaseAsync("InvalidDeployDuration");
 
-		// Assert
-		context.Errors.Should().Contain(e =>
-				e.Contains("invalid", StringComparison.OrdinalIgnoreCase),
+		result.Errors.Should().Contain(e =>
+				e.Message.Contains("invalid", StringComparison.OrdinalIgnoreCase),
 			"error should show 'invalid' as the invalid value");
 	}
 
@@ -69,10 +61,10 @@ public sealed class ActionErrorTests
 	[InlineData("ActionWithNegativeId", "Id must be positive")]
 	public async Task StandaloneCase_HasExpectedError(string caseName, string expectedSubstring)
 	{
-		var context = await ConfigTestHelper.LoadStandaloneCaseAsync(caseName);
+		var result = await ConfigTestHelper.LoadStandaloneCaseAsync(caseName);
 
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Contains(expectedSubstring, StringComparison.OrdinalIgnoreCase));
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().Contain(e =>
+			e.Message.Contains(expectedSubstring, StringComparison.OrdinalIgnoreCase));
 	}
 }

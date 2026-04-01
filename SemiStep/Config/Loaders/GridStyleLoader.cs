@@ -1,5 +1,8 @@
 ﻿using Config.Dto;
-using Config.Models;
+
+using FluentResults;
+
+using TypesShared.Results;
 
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -13,45 +16,34 @@ internal static class GridStyleLoader
 		.IgnoreUnmatchedProperties()
 		.Build();
 
-	public static async Task<GridStyleOptionsDto?> LoadAsync(string configDirectory, ConfigContext context)
+	public static async Task<Result<GridStyleOptionsDto?>> LoadAsync(string configDirectory)
 	{
 		var uiDir = Path.Combine(configDirectory, "ui");
 
 		if (!Directory.Exists(uiDir))
 		{
-			context.AddInfo($"UI directory not found, using default grid styles: {uiDir}");
-
-			return null;
+			return Result.Ok<GridStyleOptionsDto?>(null)
+				.WithWarning($"UI directory not found, using default grid styles: {uiDir}");
 		}
 
 		var filePath = Path.Combine(uiDir, "grid_style.yaml");
 
 		if (!File.Exists(filePath))
 		{
-			context.AddInfo($"Grid style file not found, using defaults: {filePath}");
-
-			return null;
+			return Result.Ok<GridStyleOptionsDto?>(null)
+				.WithWarning($"Grid style file not found, using defaults: {filePath}");
 		}
 
 		try
 		{
 			var content = await File.ReadAllTextAsync(filePath);
-			var dto = _deserializer.Deserialize<GridStyleOptionsDto>(content);
 
-			if (dto == null)
-			{
-				context.AddWarning("Grid style file is empty, using defaults", filePath);
-
-				return null;
-			}
-
-			return dto;
+			return Result.Ok(_deserializer.Deserialize<GridStyleOptionsDto?>(content));
 		}
 		catch (Exception ex)
 		{
-			context.AddWarning($"Failed to parse grid style file, using defaults: {ex.Message}", filePath);
-
-			return null;
+			return Result.Ok<GridStyleOptionsDto?>(null)
+				.WithWarning($"Failed to parse grid style file, using defaults: {ex.Message}");
 		}
 	}
 }

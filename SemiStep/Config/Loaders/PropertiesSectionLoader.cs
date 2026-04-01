@@ -1,5 +1,8 @@
 ﻿using Config.Dto;
-using Config.Models;
+
+using FluentResults;
+
+using TypesShared.Results;
 
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -13,15 +16,13 @@ internal static class PropertiesSectionLoader
 		.IgnoreUnmatchedProperties()
 		.Build();
 
-	public static async Task<List<PropertyDto>> LoadAsync(string configDirectory, ConfigContext context)
+	public static async Task<Result<List<PropertyDto>>> LoadAsync(string configDirectory)
 	{
 		var propertiesDir = Path.Combine(configDirectory, "properties");
 
 		if (!Directory.Exists(propertiesDir))
 		{
-			context.AddError($"Properties directory not found: {propertiesDir}");
-
-			return [];
+			return Result.Fail($"Properties directory not found: {propertiesDir}");
 		}
 
 		var yamlFiles = Directory.GetFiles(propertiesDir, "*.yaml")
@@ -30,58 +31,97 @@ internal static class PropertiesSectionLoader
 
 		if (yamlFiles.Count == 0)
 		{
-			context.AddError($"No YAML files found in properties directory: {propertiesDir}");
-
-			return [];
+			return Result.Fail($"No YAML files found in properties directory: {propertiesDir}");
 		}
 
-		var allProperties = new List<PropertyDto>();
 		var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		var fileResults = new List<Result<List<PropertyDto>>>();
 
 		foreach (var file in yamlFiles)
 		{
-			try
+			fileResults.Add(await LoadFilePropertiesAsync(file, seenIds));
+		}
+
+		var merged = Result.Merge(fileResults.ToArray());
+		if (merged.IsFailed)
+		{
+			return merged.ToResult<List<PropertyDto>>();
+		}
+
+		var allProperties = fileResults
+			.Where(r => r.IsSuccess)
+			.SelectMany(r => r.Value)
+			.ToList();
+
+		return Result.Ok(allProperties).WithReasons(merged.Reasons);
+	}
+
+	private static async Task<Result<List<PropertyDto>>> LoadFilePropertiesAsync(
+		string filePath,
+		HashSet<string> seenIds)
+	{
+		try
+		{
+			var content = await File.ReadAllTextAsync(filePath);
+			var propertiesDict = _deserializer.Deserialize<Dictionary<string, PropertyDto>>(content);
+
+			if (propertiesDict is null || propertiesDict.Count == 0)
 			{
-				var content = await File.ReadAllTextAsync(file);
-				var propertiesDict = _deserializer.Deserialize<Dictionary<string, PropertyDto>>(content);
-
-				if (propertiesDict == null || propertiesDict.Count == 0)
-				{
-					context.AddWarning($"Empty or invalid YAML file: {Path.GetFileName(file)}", file);
-
-					continue;
-				}
-
-				foreach (var (propertyTypeId, propertyContent) in propertiesDict)
-				{
-					var property = new PropertyDto
-					{
-						PropertyTypeId = propertyTypeId,
-						SystemType = propertyContent.SystemType,
-						FormatKind = propertyContent.FormatKind,
-						Units = propertyContent.Units,
-						Min = propertyContent.Min,
-						Max = propertyContent.Max,
-						MaxLength = propertyContent.MaxLength
-					};
-
-					ValidateProperty(property, file, context, seenIds);
-					allProperties.Add(property);
-				}
+				return Result.Ok(new List<PropertyDto>())
+					.WithWarning($"Empty or invalid YAML file: {Path.GetFileName(filePath)}");
 			}
-			catch (Exception ex)
+
+			return ValidatePropertiesFromFile(propertiesDict, filePath, seenIds);
+		}
+		catch (Exception ex)
+		{
+			return Result.Fail<List<PropertyDto>>(
+				$"Failed to parse {Path.GetFileName(filePath)}: {ex.Message}");
+		}
+	}
+
+	private static Result<List<PropertyDto>> ValidatePropertiesFromFile(
+		Dictionary<string, PropertyDto> propertiesDict,
+		string filePath,
+		HashSet<string> seenIds)
+	{
+		var properties = new List<PropertyDto>();
+		var validationResults = new List<Result>();
+
+		foreach (var (propertyTypeId, propertyContent) in propertiesDict)
+		{
+			var property = new PropertyDto
 			{
-				context.AddError($"Failed to parse {Path.GetFileName(file)}: {ex.Message}", file);
+				PropertyTypeId = propertyTypeId,
+				SystemType = propertyContent.SystemType,
+				FormatKind = propertyContent.FormatKind,
+				Units = propertyContent.Units,
+				Min = propertyContent.Min,
+				Max = propertyContent.Max,
+				MaxLength = propertyContent.MaxLength
+			};
+
+			var validationResult = ValidateProperty(property, filePath, seenIds);
+			validationResults.Add(validationResult);
+
+			if (validationResult.IsSuccess)
+			{
+				properties.Add(property);
 			}
 		}
 
-		return allProperties;
+		var merged = Result.Merge(validationResults.ToArray());
+		if (merged.IsFailed)
+		{
+			return merged.ToResult<List<PropertyDto>>();
+		}
+
+		return Result.Ok(properties).WithReasons(merged.Reasons);
 	}
 
-	private static void ValidateProperty(
+	private static Result ValidateProperty(
 		PropertyDto property,
 		string file,
-		ConfigContext context,
 		HashSet<string> seenIds)
 	{
 		var fileName = Path.GetFileName(file);
@@ -89,39 +129,49 @@ internal static class PropertiesSectionLoader
 
 		if (string.IsNullOrWhiteSpace(property.PropertyTypeId))
 		{
-			context.AddError("Property PropertyTypeId is required", fileName);
-
-			return;
+			return Result.Fail($"[{fileName}] Property PropertyTypeId is required");
 		}
+
+		var validationResults = new List<Result>();
 
 		if (!seenIds.Add(property.PropertyTypeId))
 		{
-			context.AddError($"Duplicate PropertyTypeId: '{property.PropertyTypeId}'", location);
+			validationResults.Add(
+				Result.Fail($"[{location}] Duplicate PropertyTypeId: '{property.PropertyTypeId}'"));
 		}
 
 		if (string.IsNullOrWhiteSpace(property.SystemType))
 		{
-			context.AddError("Property SystemType is required", location);
+			validationResults.Add(
+				Result.Fail($"[{location}] Property SystemType is required"));
 		}
 		else
 		{
 			var validSystemTypes = new[] { "int", "float", "string" };
 			if (!validSystemTypes.Contains(property.SystemType, StringComparer.OrdinalIgnoreCase))
 			{
-				context.AddError(
-					$"Property SystemType must be one of: {string.Join(", ", validSystemTypes)}, got: '{property.SystemType}'",
-					location);
+				validationResults.Add(Result.Fail(
+					$"[{location}] Property SystemType must be one of: {string.Join(", ", validSystemTypes)}, got: '{property.SystemType}'"));
 			}
 		}
 
 		if (string.IsNullOrWhiteSpace(property.FormatKind))
 		{
-			context.AddError("Property FormatKind is required", location);
+			validationResults.Add(
+				Result.Fail($"[{location}] Property FormatKind is required"));
 		}
 
 		if (property.Min.HasValue && property.Max.HasValue && property.Min > property.Max)
 		{
-			context.AddError($"Property Min ({property.Min}) cannot be greater than Max ({property.Max})", location);
+			validationResults.Add(Result.Fail(
+				$"[{location}] Property Min ({property.Min}) cannot be greater than Max ({property.Max})"));
 		}
+
+		if (validationResults.Count == 0)
+		{
+			return Result.Ok();
+		}
+
+		return Result.Merge(validationResults.ToArray());
 	}
 }

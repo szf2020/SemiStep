@@ -1,6 +1,6 @@
 ﻿using Config.Dto;
 
-using Shared.Core;
+using TypesShared.Core;
 
 namespace Config.Mapping;
 
@@ -31,7 +31,7 @@ internal static class ActionMapper
 			Id: dto.Id,
 			UiName: dto.UiName,
 			DeployDuration: dto.DeployDuration,
-			Columns: columns);
+			Properties: columns);
 	}
 
 	public static IReadOnlyList<ActionDefinition> MapMany(IEnumerable<ActionDto> dtos)
@@ -39,7 +39,7 @@ internal static class ActionMapper
 		return dtos.Select(Map).ToList();
 	}
 
-	private static ActionColumnDefinition MapColumn(ActionColumnDto dto)
+	private static ActionPropertyDefinition MapColumn(ActionColumnDto dto)
 	{
 		if (string.IsNullOrWhiteSpace(dto.Key))
 		{
@@ -51,7 +51,7 @@ internal static class ActionMapper
 			throw new InvalidOperationException($"PropertyTypeId is required for action column '{dto.Key}'");
 		}
 
-		return new ActionColumnDefinition(
+		return new ActionPropertyDefinition(
 			Key: dto.Key,
 			GroupName: dto.GroupName,
 			PropertyTypeId: dto.PropertyTypeId,

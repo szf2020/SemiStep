@@ -1,5 +1,8 @@
 ﻿using Config.Dto;
-using Config.Models;
+
+using FluentResults;
+
+using TypesShared.Results;
 
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -13,45 +16,34 @@ internal static class ConnectionLoader
 		.IgnoreUnmatchedProperties()
 		.Build();
 
-	public static async Task<ConnectionDto?> LoadAsync(string configDirectory, ConfigContext context)
+	public static async Task<Result<ConnectionDto?>> LoadAsync(string configDirectory)
 	{
 		var connectionDir = Path.Combine(configDirectory, "connection");
 
 		if (!Directory.Exists(connectionDir))
 		{
-			context.AddInfo($"Connection directory not found, using default PLC settings: {connectionDir}");
-
-			return null;
+			return Result.Ok()
+				.WithWarning($"Connection directory not found, using default PLC settings: {connectionDir}");
 		}
 
 		var filePath = Path.Combine(connectionDir, "connection.yaml");
 
 		if (!File.Exists(filePath))
 		{
-			context.AddInfo($"Connection file not found, using defaults: {filePath}");
-
-			return null;
+			return Result.Ok()
+				.WithWarning($"Connection file not found, using defaults: {filePath}");
 		}
 
 		try
 		{
 			var content = await File.ReadAllTextAsync(filePath);
-			var dto = _deserializer.Deserialize<ConnectionDto>(content);
 
-			if (dto == null)
-			{
-				context.AddWarning("Connection file is empty, using defaults", filePath);
-
-				return null;
-			}
-
-			return dto;
+			return Result.Ok(_deserializer.Deserialize<ConnectionDto?>(content));
 		}
 		catch (Exception ex)
 		{
-			context.AddWarning($"Failed to parse connection file, using defaults: {ex.Message}", filePath);
-
-			return null;
+			return Result.Ok()
+				.WithWarning($"Failed to parse connection file, using defaults: {ex.Message}");
 		}
 	}
 }

@@ -1,47 +1,48 @@
-﻿using Config.Models;
+﻿using Config.Dto;
+
+using FluentResults;
 
 namespace Config.Validation;
 
 internal static class CrossReferenceValidator
 {
-	public static ConfigContext Validate(ConfigContext context)
+	public static Result Validate(
+		List<PropertyDto> properties,
+		List<ColumnDto> columns,
+		Dictionary<string, Dictionary<int, string>> groups,
+		List<ActionDto> actions)
 	{
-		if (context.HasErrors)
-		{
-			return context;
-		}
-
-		if (context.Properties == null
-			|| context.Columns == null
-			|| context.Groups == null
-			|| context.Actions == null)
-		{
-			context.AddError("Cannot perform cross-reference validation: some sections are not loaded");
-
-			return context;
-		}
-
-		var propertyIds = context.Properties
+		var propertyIds = properties
 			.Where(p => !string.IsNullOrEmpty(p.PropertyTypeId))
 			.Select(p => p.PropertyTypeId!)
 			.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-		var columnKeys = context.Columns
+		var columnKeys = columns
 			.Where(c => !string.IsNullOrEmpty(c.Key))
 			.Select(c => c.Key!)
 			.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-		var groupIds = context.Groups.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+		var groupIds = groups.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-		ValidateColumnReferences(context, propertyIds);
-		ValidateActionReferences(context, propertyIds, columnKeys, groupIds);
+		var validationResults = new List<Result>();
 
-		return context;
+		ValidateColumnReferences(columns, propertyIds, validationResults);
+		ValidateActionReferences(actions, propertyIds, columnKeys, groupIds, validationResults);
+
+		if (validationResults.Count == 0)
+		{
+			return Result.Ok();
+		}
+
+		return Result.Merge(validationResults.ToArray());
 	}
 
-	private static void ValidateColumnReferences(ConfigContext context, HashSet<string> propertyIds)
+	private static void ValidateColumnReferences(
+		List<ColumnDto> columns,
+		HashSet<string> propertyIds,
+		List<Result> validationResults)
 	{
-		foreach (var column in context.Columns!)
+		foreach (var column in columns)
 		{
 			if (column.BusinessLogic == null)
 			{
@@ -56,20 +57,20 @@ internal static class CrossReferenceValidator
 
 			if (!propertyIds.Contains(propertyTypeId))
 			{
-				context.AddError(
-					$"Column '{column.Key}' references unknown property_type_id: '{propertyTypeId}'",
-					$"columns, Key='{column.Key}'");
+				validationResults.Add(Result.Fail(
+					$"[columns, Key='{column.Key}'] Column '{column.Key}' references unknown property_type_id: '{propertyTypeId}'"));
 			}
 		}
 	}
 
 	private static void ValidateActionReferences(
-		ConfigContext context,
+		List<ActionDto> actions,
 		HashSet<string> propertyIds,
 		HashSet<string> columnKeys,
-		HashSet<string> groupIds)
+		HashSet<string> groupIds,
+		List<Result> validationResults)
 	{
-		foreach (var action in context.Actions!)
+		foreach (var action in actions)
 		{
 			if (action.Columns == null)
 			{
@@ -87,31 +88,27 @@ internal static class CrossReferenceValidator
 
 				if (!columnKeys.Contains(column.Key))
 				{
-					context.AddError(
-						$"Action '{action.UiName}' references unknown column: '{column.Key}'",
-						actionLocation);
+					validationResults.Add(Result.Fail(
+						$"[{actionLocation}] Action '{action.UiName}' references unknown column: '{column.Key}'"));
 				}
 
 				if (!string.IsNullOrEmpty(column.PropertyTypeId) && !propertyIds.Contains(column.PropertyTypeId))
 				{
-					context.AddError(
-						$"Action '{action.UiName}' column '{column.Key}' references unknown property_type_id: '{column.PropertyTypeId}'",
-						actionLocation);
+					validationResults.Add(Result.Fail(
+						$"[{actionLocation}] Action '{action.UiName}' column '{column.Key}' references unknown property_type_id: '{column.PropertyTypeId}'"));
 				}
 
 				if (!string.IsNullOrEmpty(column.GroupName) && !groupIds.Contains(column.GroupName))
 				{
-					context.AddError(
-						$"Action '{action.UiName}' column '{column.Key}' references unknown group_name: '{column.GroupName}'",
-						actionLocation);
+					validationResults.Add(Result.Fail(
+						$"[{actionLocation}] Action '{action.UiName}' column '{column.Key}' references unknown group_name: '{column.GroupName}'"));
 				}
 
 				if (string.Equals(column.PropertyTypeId, "enum", StringComparison.OrdinalIgnoreCase)
 					&& string.IsNullOrEmpty(column.GroupName))
 				{
-					context.AddError(
-						$"Action '{action.UiName}' column '{column.Key}' has property_type_id 'enum' but no group_name specified",
-						actionLocation);
+					validationResults.Add(Result.Fail(
+						$"[{actionLocation}] Action '{action.UiName}' column '{column.Key}' has property_type_id 'enum' but no group_name specified"));
 				}
 			}
 		}

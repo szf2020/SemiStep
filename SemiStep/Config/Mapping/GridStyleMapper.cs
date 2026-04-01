@@ -1,6 +1,6 @@
 ﻿using Config.Dto;
 
-using Shared.Style;
+using TypesShared.Style;
 
 namespace Config.Mapping;
 

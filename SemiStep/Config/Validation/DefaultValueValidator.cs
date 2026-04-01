@@ -1,28 +1,25 @@
 ﻿using System.Globalization;
 
 using Config.Dto;
-using Config.Models;
+
+using FluentResults;
+
+using TypesShared.Results;
 
 namespace Config.Validation;
 
 internal static class DefaultValueValidator
 {
-	public static ConfigContext Validate(ConfigContext context)
+	public static Result Validate(
+		List<PropertyDto> properties,
+		List<ColumnDto> columns,
+		List<ActionDto> actions)
 	{
-		if (context.HasErrors)
-		{
-			return context;
-		}
+		var propertyByTypeId = BuildPropertyLookup(properties);
+		var columnByKey = BuildColumnLookup(columns);
+		var validationResults = new List<Result>();
 
-		if (context.Properties is null || context.Columns is null || context.Actions is null)
-		{
-			return context;
-		}
-
-		var propertyByTypeId = BuildPropertyLookup(context.Properties);
-		var columnByKey = BuildColumnLookup(context.Columns);
-
-		foreach (var action in context.Actions)
+		foreach (var action in actions)
 		{
 			if (action.Columns is null)
 			{
@@ -31,19 +28,24 @@ internal static class DefaultValueValidator
 
 			foreach (var actionColumn in action.Columns)
 			{
-				ValidateActionColumn(context, action, actionColumn, propertyByTypeId, columnByKey);
+				ValidateActionColumn(action, actionColumn, propertyByTypeId, columnByKey, validationResults);
 			}
 		}
 
-		return context;
+		if (validationResults.Count == 0)
+		{
+			return Result.Ok();
+		}
+
+		return Result.Merge(validationResults.ToArray());
 	}
 
 	private static void ValidateActionColumn(
-		ConfigContext context,
 		ActionDto action,
 		ActionColumnDto actionColumn,
 		Dictionary<string, PropertyDto> propertyByTypeId,
-		Dictionary<string, ColumnDto> columnByKey)
+		Dictionary<string, ColumnDto> columnByKey,
+		List<Result> validationResults)
 	{
 		if (string.IsNullOrEmpty(actionColumn.DefaultValue))
 		{
@@ -52,15 +54,15 @@ internal static class DefaultValueValidator
 
 		var location = $"actions, Id={action.Id}, column '{actionColumn.Key}'";
 
-		ValidateReadOnlyConflict(context, actionColumn, columnByKey, location);
-		ValidateValueAgainstProperty(context, actionColumn, propertyByTypeId, location);
+		ValidateReadOnlyConflict(actionColumn, columnByKey, location, validationResults);
+		ValidateValueAgainstProperty(actionColumn, propertyByTypeId, location, validationResults);
 	}
 
 	private static void ValidateReadOnlyConflict(
-		ConfigContext context,
 		ActionColumnDto actionColumn,
 		Dictionary<string, ColumnDto> columnByKey,
-		string location)
+		string location,
+		List<Result> validationResults)
 	{
 		if (string.IsNullOrEmpty(actionColumn.Key))
 		{
@@ -74,17 +76,16 @@ internal static class DefaultValueValidator
 
 		if (columnDto.BusinessLogic?.ReadOnly == true)
 		{
-			context.AddWarning(
-				$"Column '{actionColumn.Key}' is read_only but has a default_value defined; the default value will have no effect",
-				location);
+			validationResults.Add(Result.Ok().WithWarning(
+				$"[{location}] Column '{actionColumn.Key}' is read_only but has a default_value defined; the default value will have no effect"));
 		}
 	}
 
 	private static void ValidateValueAgainstProperty(
-		ConfigContext context,
 		ActionColumnDto actionColumn,
 		Dictionary<string, PropertyDto> propertyByTypeId,
-		string location)
+		string location,
+		List<Result> validationResults)
 	{
 		if (string.IsNullOrEmpty(actionColumn.PropertyTypeId))
 		{
@@ -102,97 +103,83 @@ internal static class DefaultValueValidator
 		switch (systemType)
 		{
 			case "string":
-				ValidateStringDefault(context, defaultValue, propertyDto, location);
-
+				ValidateStringDefault(defaultValue, propertyDto, location, validationResults);
 				break;
 			case "int":
-				ValidateIntDefault(context, defaultValue, propertyDto, location);
-
+				ValidateIntDefault(defaultValue, propertyDto, location, validationResults);
 				break;
 			case "float":
-				ValidateFloatDefault(context, defaultValue, propertyDto, location);
-
+				ValidateFloatDefault(defaultValue, propertyDto, location, validationResults);
 				break;
 		}
 	}
 
 	private static void ValidateStringDefault(
-		ConfigContext context,
 		string defaultValue,
 		PropertyDto propertyDto,
-		string location)
+		string location,
+		List<Result> validationResults)
 	{
 		if (propertyDto.MaxLength.HasValue && defaultValue.Length > propertyDto.MaxLength.Value)
 		{
-			context.AddError(
-				$"Default value exceeds max_length ({propertyDto.MaxLength.Value}): " +
-				$"value has {defaultValue.Length} characters",
-				location);
+			validationResults.Add(Result.Fail(
+				$"[{location}] Default value exceeds max_length ({propertyDto.MaxLength.Value}): " +
+				$"value has {defaultValue.Length} characters"));
 		}
 	}
 
 	private static void ValidateIntDefault(
-		ConfigContext context,
 		string defaultValue,
 		PropertyDto propertyDto,
-		string location)
+		string location,
+		List<Result> validationResults)
 	{
 		if (!int.TryParse(defaultValue, CultureInfo.InvariantCulture, out var parsed))
 		{
-			context.AddError(
-				$"Cannot parse default value '{defaultValue}' as int",
-				location);
-
+			validationResults.Add(
+				Result.Fail($"[{location}] Cannot parse default value '{defaultValue}' as int"));
 			return;
 		}
 
-		ValidateNumericRange(context, parsed, propertyDto, location);
+		ValidateNumericRange(parsed, propertyDto, location, validationResults);
 	}
 
 	private static void ValidateFloatDefault(
-		ConfigContext context,
 		string defaultValue,
 		PropertyDto propertyDto,
-		string location)
+		string location,
+		List<Result> validationResults)
 	{
 		if (!float.TryParse(defaultValue, CultureInfo.InvariantCulture, out var parsed))
 		{
-			context.AddError(
-				$"Cannot parse default value '{defaultValue}' as float",
-				location);
-
+			validationResults.Add(
+				Result.Fail($"[{location}] Cannot parse default value '{defaultValue}' as float"));
 			return;
 		}
 
-		ValidateNumericRange(context, parsed, propertyDto, location);
+		ValidateNumericRange(parsed, propertyDto, location, validationResults);
 	}
 
 	private static void ValidateNumericRange(
-		ConfigContext context,
 		double value,
 		PropertyDto propertyDto,
-		string location)
+		string location,
+		List<Result> validationResults)
 	{
 		if (propertyDto.Min.HasValue && value < propertyDto.Min.Value)
 		{
-			context.AddError(
-				string.Format(
-					CultureInfo.InvariantCulture,
-					"Default value {0} is out of range: minimum is {1}",
-					value,
-					propertyDto.Min.Value),
-				location);
+			validationResults.Add(Result.Fail(string.Format(
+				CultureInfo.InvariantCulture,
+				"[{0}] Default value {1} is out of range: minimum is {2}",
+				location, value, propertyDto.Min.Value)));
 		}
 
 		if (propertyDto.Max.HasValue && value > propertyDto.Max.Value)
 		{
-			context.AddError(
-				string.Format(
-					CultureInfo.InvariantCulture,
-					"Default value {0} is out of range: maximum is {1}",
-					value,
-					propertyDto.Max.Value),
-				location);
+			validationResults.Add(Result.Fail(string.Format(
+				CultureInfo.InvariantCulture,
+				"[{0}] Default value {1} is out of range: maximum is {2}",
+				location, value, propertyDto.Max.Value)));
 		}
 	}
 

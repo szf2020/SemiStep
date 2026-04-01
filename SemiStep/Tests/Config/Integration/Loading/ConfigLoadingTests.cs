@@ -4,6 +4,8 @@ using FluentAssertions;
 
 using Tests.Config.Helpers;
 
+using TypesShared.Results;
+
 using Xunit;
 
 namespace Tests.Config.Integration.Loading;
@@ -58,7 +60,7 @@ public sealed class ConfigLoadingTests
 		foreach (var expectedId in expectedPropertyTypeIds)
 		{
 			config.Properties.Values.Should()
-				.Contain(p => p.PropertyTypeId == expectedId,
+				.Contain(p => p.Id == expectedId,
 					$"expected property type '{expectedId}' should exist");
 		}
 	}
@@ -81,7 +83,6 @@ public sealed class ConfigLoadingTests
 	[Fact]
 	public async Task StandardConfig_HasExpectedActions()
 	{
-		// action Ids: Wait=10, For=20, EndFor=30, Pause=40
 		var expectedActionIds = new[] { 10, 20, 30, 40 };
 
 		var config = await ConfigTestHelper.LoadValidCaseAsync();
@@ -97,14 +98,12 @@ public sealed class ConfigLoadingTests
 	[Fact]
 	public async Task StandardConfig_ActionHasCorrectColumns()
 	{
-		// Wait action (Id=10) should have step_duration and comment columns
-
 		var config = await ConfigTestHelper.LoadValidCaseAsync();
 
 		var waitAction = config.Actions.Values.FirstOrDefault(a => a.Id == 10);
 		waitAction.Should().NotBeNull();
-		waitAction.Columns.Should().Contain(c => c.Key == "step_duration");
-		waitAction.Columns.Should().Contain(c => c.Key == "comment");
+		waitAction.Properties.Should().Contain(c => c.Key == "step_duration");
+		waitAction.Properties.Should().Contain(c => c.Key == "comment");
 	}
 
 	[Fact]
@@ -112,15 +111,15 @@ public sealed class ConfigLoadingTests
 	{
 		var config = await ConfigTestHelper.LoadValidCaseAsync();
 
-		var intProperty = config.Properties.Values.FirstOrDefault(p => p.PropertyTypeId == "int");
+		var intProperty = config.Properties.Values.FirstOrDefault(p => p.Id == "int");
 		intProperty.Should().NotBeNull();
 		intProperty.SystemType.Should().Be("int");
 
-		var floatProperty = config.Properties.Values.FirstOrDefault(p => p.PropertyTypeId == "float");
+		var floatProperty = config.Properties.Values.FirstOrDefault(p => p.Id == "float");
 		floatProperty.Should().NotBeNull();
 		floatProperty.SystemType.Should().Be("float");
 
-		var stringProperty = config.Properties.Values.FirstOrDefault(p => p.PropertyTypeId == "string");
+		var stringProperty = config.Properties.Values.FirstOrDefault(p => p.Id == "string");
 		stringProperty.Should().NotBeNull();
 		stringProperty.SystemType.Should().Be("string");
 	}
@@ -130,7 +129,7 @@ public sealed class ConfigLoadingTests
 	{
 		var config = await ConfigTestHelper.LoadValidCaseAsync();
 
-		var timeProperty = config.Properties.Values.FirstOrDefault(p => p.PropertyTypeId == "time");
+		var timeProperty = config.Properties.Values.FirstOrDefault(p => p.Id == "time");
 		timeProperty.Should().NotBeNull();
 		timeProperty.Min.Should().Be(0);
 		timeProperty.Max.Should().Be(86400);
@@ -141,10 +140,10 @@ public sealed class ConfigLoadingTests
 	{
 		using var tempDir = TestDataCopier.PrepareValidCase();
 
-		var context = await ConfigFacade.LoadAsync(tempDir.Path);
+		var result = await ConfigFacade.LoadAndValidateAsync(tempDir.Path);
 
-		context.HasErrors.Should().BeFalse(
-			$"expected no errors but got: {string.Join(", ", context.Errors.Select(e => e))}");
+		result.IsSuccess.Should().BeTrue(
+			$"expected no errors but got: {string.Join(", ", result.Errors.Select(e => e.Message))}");
 	}
 
 	[Fact]
@@ -152,9 +151,10 @@ public sealed class ConfigLoadingTests
 	{
 		using var tempDir = TestDataCopier.PrepareValidCase();
 
-		var context = await ConfigFacade.LoadAsync(tempDir.Path);
+		var result = await ConfigFacade.LoadAndValidateAsync(tempDir.Path);
 
-		context.HasWarnings.Should().BeFalse(
-			$"expected no warnings but got: {string.Join(", ", context.Warnings.Select(w => w))}");
+		var warnings = result.Reasons.OfType<Warning>().Select(w => w.Message).ToList();
+		warnings.Should().BeEmpty(
+			$"expected no warnings but got: {string.Join(", ", warnings)}");
 	}
 }

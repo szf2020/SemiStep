@@ -1,6 +1,6 @@
 ﻿using Config.Dto;
 
-using Shared.Config;
+using TypesShared.Config;
 
 namespace Config.Mapping;
 

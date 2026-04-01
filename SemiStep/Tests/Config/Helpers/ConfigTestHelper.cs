@@ -1,8 +1,8 @@
 ﻿using Config.Facade;
-using Config.Models;
 
-using Shared;
-using Shared.Config;
+using FluentResults;
+
+using TypesShared.Config;
 
 namespace Tests.Config.Helpers;
 
@@ -11,27 +11,29 @@ internal static class ConfigTestHelper
 	public static async Task<AppConfiguration> LoadValidCaseAsync(string caseName = "Standard")
 	{
 		using var tempDir = TestDataCopier.PrepareValidCase(caseName);
-		var context = await ConfigFacade.LoadAsync(tempDir.Path);
+		var result = await ConfigFacade.LoadAndValidateAsync(tempDir.Path);
 
-		if (context.HasErrors || context.Configuration is null)
+		if (result.IsFailed)
 		{
-			var errors = string.Join("; ", context.Errors);
+			var errors = string.Join("; ", result.Errors.Select(e => e.Message));
 
 			throw new InvalidOperationException($"Expected valid config but got errors: {errors}");
 		}
 
-		return context.Configuration;
+		return result.Value;
 	}
 
-	public static async Task<ConfigContext> LoadInvalidCaseAsync(string invalidCaseName)
+	public static async Task<Result<AppConfiguration>> LoadInvalidCaseAsync(string invalidCaseName)
 	{
 		using var tempDir = TestDataCopier.PrepareInvalidCase(invalidCaseName);
-		return await ConfigFacade.LoadAsync(tempDir.Path);
+
+		return await ConfigFacade.LoadAndValidateAsync(tempDir.Path);
 	}
 
-	public static async Task<ConfigContext> LoadStandaloneCaseAsync(string caseName)
+	public static async Task<Result<AppConfiguration>> LoadStandaloneCaseAsync(string caseName)
 	{
 		using var tempDir = TestDataCopier.PrepareStandaloneCase(caseName);
-		return await ConfigFacade.LoadAsync(tempDir.Path);
+
+		return await ConfigFacade.LoadAndValidateAsync(tempDir.Path);
 	}
 }

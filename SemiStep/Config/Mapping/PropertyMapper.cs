@@ -1,12 +1,12 @@
 ﻿using Config.Dto;
 
-using Shared.Core;
+using TypesShared.Core;
 
 namespace Config.Mapping;
 
 internal static class PropertyMapper
 {
-	public static PropertyDefinition Map(PropertyDto dto)
+	public static PropertyTypeDefinition Map(PropertyDto dto)
 	{
 		if (string.IsNullOrWhiteSpace(dto.PropertyTypeId))
 		{
@@ -23,8 +23,8 @@ internal static class PropertyMapper
 			throw new InvalidOperationException($"FormatKind is required for property '{dto.PropertyTypeId}'");
 		}
 
-		return new PropertyDefinition(
-			PropertyTypeId: dto.PropertyTypeId,
+		return new PropertyTypeDefinition(
+			Id: dto.PropertyTypeId,
 			SystemType: dto.SystemType,
 			FormatKind: dto.FormatKind,
 			Units: dto.Units,
@@ -33,7 +33,7 @@ internal static class PropertyMapper
 			MaxLength: dto.MaxLength);
 	}
 
-	public static IReadOnlyList<PropertyDefinition> MapMany(IEnumerable<PropertyDto> dtos)
+	public static IReadOnlyList<PropertyTypeDefinition> MapMany(IEnumerable<PropertyDto> dtos)
 	{
 		return dtos.Select(Map).ToList();
 	}

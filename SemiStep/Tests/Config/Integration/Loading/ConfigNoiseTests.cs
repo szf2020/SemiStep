@@ -14,12 +14,11 @@ public sealed class ConfigNoiseTests
 	[Fact]
 	public async Task LoadConfig_WithUnknownYamlFields_Succeeds()
 	{
-		var context = await ConfigTestHelper.LoadStandaloneCaseAsync("UnknownYamlFields");
+		var result = await ConfigTestHelper.LoadStandaloneCaseAsync("UnknownYamlFields");
 
-		context.HasErrors.Should().BeFalse(
+		result.IsSuccess.Should().BeTrue(
 			"unknown YAML fields should be silently ignored, not cause errors");
-		context.Configuration.Should().NotBeNull();
-		context.Configuration!.Actions.Should().NotBeEmpty();
-		context.Configuration.Properties.Should().NotBeEmpty();
+		result.Value.Actions.Should().NotBeEmpty();
+		result.Value.Properties.Should().NotBeEmpty();
 	}
 }

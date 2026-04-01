@@ -4,6 +4,8 @@ using FluentAssertions;
 
 using Tests.Config.Helpers;
 
+using TypesShared.Results;
+
 using Xunit;
 
 namespace Tests.Config.Integration.Errors;
@@ -18,12 +20,12 @@ public sealed class FileSystemErrorTests
 	{
 		var nonExistentPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
 
-		var context = await ConfigFacade.LoadAsync(nonExistentPath);
+		var result = await ConfigFacade.LoadAndValidateAsync(nonExistentPath);
 
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
-			e.Contains("does not exist", StringComparison.OrdinalIgnoreCase));
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().Contain(e =>
+			e.Message.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+			e.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Theory]
@@ -32,77 +34,76 @@ public sealed class FileSystemErrorTests
 	[InlineData("MissingActionsDir", "actions")]
 	public async Task MissingRequiredDirectory_HasError(string caseName, string directoryKeyword)
 	{
-		var context = await ConfigTestHelper.LoadStandaloneCaseAsync(caseName);
+		var result = await ConfigTestHelper.LoadStandaloneCaseAsync(caseName);
 
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Contains(directoryKeyword, StringComparison.OrdinalIgnoreCase) &&
-			e.Contains("not found", StringComparison.OrdinalIgnoreCase));
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().Contain(e =>
+			e.Message.Contains(directoryKeyword, StringComparison.OrdinalIgnoreCase) &&
+			e.Message.Contains("not found", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
 	public async Task EmptyPropertiesDirectory_HasError()
 	{
-		var context = await ConfigTestHelper.LoadStandaloneCaseAsync("EmptyPropertiesDir");
+		var result = await ConfigTestHelper.LoadStandaloneCaseAsync("EmptyPropertiesDir");
 
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Contains("No YAML files found", StringComparison.OrdinalIgnoreCase) ||
-			e.Contains("properties", StringComparison.OrdinalIgnoreCase));
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().Contain(e =>
+			e.Message.Contains("No YAML files found", StringComparison.OrdinalIgnoreCase) ||
+			e.Message.Contains("properties", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
 	public async Task EmptyActionsDirectory_HasError()
 	{
-		var context = await ConfigTestHelper.LoadStandaloneCaseAsync("EmptyActionsDir");
+		var result = await ConfigTestHelper.LoadStandaloneCaseAsync("EmptyActionsDir");
 
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Contains("No YAML files found", StringComparison.OrdinalIgnoreCase) ||
-			e.Contains("actions", StringComparison.OrdinalIgnoreCase));
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().Contain(e =>
+			e.Message.Contains("No YAML files found", StringComparison.OrdinalIgnoreCase) ||
+			e.Message.Contains("actions", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
 	public async Task MalformedYaml_HasError()
 	{
-		var context = await ConfigTestHelper.LoadStandaloneCaseAsync("MalformedYaml");
+		var result = await ConfigTestHelper.LoadStandaloneCaseAsync("MalformedYaml");
 
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Contains("Failed to parse", StringComparison.OrdinalIgnoreCase) ||
-			e.Contains("parse", StringComparison.OrdinalIgnoreCase));
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().Contain(e =>
+			e.Message.Contains("Failed to parse", StringComparison.OrdinalIgnoreCase) ||
+			e.Message.Contains("parse", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
 	public async Task EmptyYamlFile_HasWarning()
 	{
-		var context = await ConfigTestHelper.LoadStandaloneCaseAsync("EmptyYamlFile");
+		var result = await ConfigTestHelper.LoadStandaloneCaseAsync("EmptyYamlFile");
 
-		context.HasWarnings.Should().BeTrue();
-		context.Warnings.Should().Contain(w =>
+		var warnings = result.Reasons.OfType<Warning>().Select(w => w.Message).ToList();
+		warnings.Should().Contain(w =>
 			w.Contains("Empty", StringComparison.OrdinalIgnoreCase) ||
 			w.Contains("invalid", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
-	public async Task ConfigurationIsNullOnError()
+	public async Task ConfigurationNotProducedOnError()
 	{
 		var nonExistentPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
 
-		var context = await ConfigFacade.LoadAsync(nonExistentPath);
+		var result = await ConfigFacade.LoadAndValidateAsync(nonExistentPath);
 
-		context.HasErrors.Should().BeTrue();
-		context.Configuration.Should().BeNull(
-			"Configuration should be null when errors occur during loading");
+		result.IsFailed.Should().BeTrue(
+			"Configuration should not be produced when errors occur during loading");
 	}
 
 	[Fact]
 	public async Task MultipleErrors_AllReported()
 	{
-		var context = await ConfigTestHelper.LoadStandaloneCaseAsync("MultipleErrors");
+		var result = await ConfigTestHelper.LoadStandaloneCaseAsync("MultipleErrors");
 
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().HaveCountGreaterThanOrEqualTo(2,
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().HaveCountGreaterThanOrEqualTo(2,
 			"both invalid system_type and min > max errors should be reported");
 	}
 }

@@ -1,13 +1,13 @@
 ﻿using Config.Loaders;
 using Config.Mapping;
-using Config.Models;
 using Config.Validation;
 
 using FluentResults;
 
 using Serilog;
 
-using Shared.Config;
+using TypesShared.Config;
+using TypesShared.Results;
 
 namespace Config.Facade;
 
@@ -15,106 +15,137 @@ public static class ConfigFacade
 {
 	public static async Task<Result<AppConfiguration>> LoadAndValidateAsync(string configDirectory)
 	{
-		var context = await LoadAsync(configDirectory);
-
-		if (context.HasErrors)
-		{
-			foreach (var error in context.Errors)
-			{
-				Log.Error("Configuration error: {Error}", error);
-			}
-
-			return Result.Fail<AppConfiguration>(context.Errors.Select(e => new Error(e)));
-		}
-
-		if (context.Configuration is null)
-		{
-			const string NullConfigurationError = "Configuration is null after successful loading.";
-			Log.Error(NullConfigurationError);
-
-			return Result.Fail<AppConfiguration>(NullConfigurationError);
-		}
-
-		Log.Information("Configuration loaded successfully");
-
-		return Result.Ok(context.Configuration);
-	}
-
-	internal static async Task<ConfigContext> LoadAsync(string configDirectory)
-	{
-		var context = new ConfigContext { FilePaths = [configDirectory] };
-
 		if (!Directory.Exists(configDirectory))
 		{
-			context.AddError($"Configuration directory not found", configDirectory);
 			Log.Error("Configuration directory not found: {ConfigDirectory}", configDirectory);
 
-			return context;
+			return Result.Fail($"Configuration directory not found: {configDirectory}");
 		}
 
-		context = await LoadAllSectionsAsync(configDirectory, context);
-
-		if (context.HasErrors)
+		var loadResult = await LoadAllSectionsAsync(configDirectory);
+		if (loadResult.IsFailed)
 		{
-			return context;
+			foreach (var error in loadResult.Errors)
+			{
+				Log.Error("Configuration error: {Error}", error.Message);
+			}
+
+			return loadResult.ToResult<AppConfiguration>();
 		}
 
-		context = CrossReferenceValidator.Validate(context);
+		var (properties, columns, groups, actions, gridStyle, connection) = loadResult.Value;
 
-		if (context.HasErrors)
+		var xrefResult = CrossReferenceValidator.Validate(properties, columns, groups, actions);
+		if (xrefResult.IsFailed)
 		{
-			return context;
+			foreach (var error in xrefResult.Errors)
+			{
+				Log.Error("Configuration error: {Error}", error.Message);
+			}
+
+			return Result.Fail<AppConfiguration>(xrefResult.Errors)
+				.WithReasons(loadResult.Reasons)
+				.WithReasons(xrefResult.Successes.OfType<Warning>());
 		}
 
-		context = DefaultValueValidator.Validate(context);
-
-		if (context.HasErrors)
+		var defaultsResult = DefaultValueValidator.Validate(properties, columns, actions);
+		if (defaultsResult.IsFailed)
 		{
-			return context;
+			foreach (var error in defaultsResult.Errors)
+			{
+				Log.Error("Configuration error: {Error}", error.Message);
+			}
+
+			return Result.Fail<AppConfiguration>(defaultsResult.Errors)
+				.WithReasons(loadResult.Reasons)
+				.WithReasons(xrefResult.Reasons)
+				.WithReasons(defaultsResult.Successes.OfType<Warning>());
 		}
 
 		try
 		{
-			context.Configuration = MapToDomain(context);
+			var config = MapToDomain(properties, columns, groups, actions, gridStyle, connection);
+			Log.Information("Configuration loaded successfully");
+
+			return Result.Ok(config)
+				.WithReasons(loadResult.Reasons)
+				.WithReasons(xrefResult.Reasons)
+				.WithReasons(defaultsResult.Reasons);
 		}
 		catch (Exception ex)
 		{
 			Log.Error("Failed to map configuration to domain: {message}", ex.Message);
-			context.AddError($"Failed to map configuration to domain: {ex.Message}");
+
+			return Result.Fail<AppConfiguration>($"Failed to map configuration to domain: {ex.Message}");
+		}
+	}
+
+	private static async Task<Result<LoadedSections>> LoadAllSectionsAsync(string configDirectory)
+	{
+		var propertiesResult = await PropertiesSectionLoader.LoadAsync(configDirectory);
+		var columnsResult = await ColumnsSectionLoader.LoadAsync(configDirectory);
+		var groupsResult = await GroupsSectionLoader.LoadAsync(configDirectory);
+		var actionsResult = await ActionsSectionLoader.LoadAsync(configDirectory);
+		var gridStyleResult = await GridStyleLoader.LoadAsync(configDirectory);
+		var connectionResult = await ConnectionLoader.LoadAsync(configDirectory);
+
+		var merged = Result.Merge(
+			propertiesResult.ToResult(),
+			columnsResult.ToResult(),
+			groupsResult.ToResult(),
+			actionsResult.ToResult(),
+			gridStyleResult.ToResult(),
+			connectionResult.ToResult());
+
+		if (merged.IsFailed)
+		{
+			return merged.ToResult<LoadedSections>();
 		}
 
-		return context;
+		var sections = new LoadedSections(
+			propertiesResult.Value,
+			columnsResult.Value,
+			groupsResult.Value,
+			actionsResult.Value,
+			gridStyleResult.Value,
+			connectionResult.Value);
+
+		return Result.Ok(sections).WithReasons(merged.Reasons);
 	}
 
-	private static async Task<ConfigContext> LoadAllSectionsAsync(string configDirectory, ConfigContext context)
+	private static AppConfiguration MapToDomain(
+		List<Dto.PropertyDto> properties,
+		List<Dto.ColumnDto> columns,
+		Dictionary<string, Dictionary<int, string>> groups,
+		List<Dto.ActionDto> actions,
+		Dto.GridStyleOptionsDto? gridStyle,
+		Dto.ConnectionDto? connection)
 	{
-		context.Properties = await PropertiesSectionLoader.LoadAsync(configDirectory, context);
-		context.Columns = await ColumnsSectionLoader.LoadAsync(configDirectory, context);
-		context.Groups = await GroupsSectionLoader.LoadAsync(configDirectory, context);
-		context.Actions = await ActionsSectionLoader.LoadAsync(configDirectory, context);
-		context.GridStyle = await GridStyleLoader.LoadAsync(configDirectory, context);
-		context.Connection = await ConnectionLoader.LoadAsync(configDirectory, context);
+		var mappedProperties = PropertyMapper.MapMany(properties)
+			.ToDictionary(p => p.Id, StringComparer.OrdinalIgnoreCase);
 
-		return context;
-	}
-
-	private static AppConfiguration MapToDomain(ConfigContext context)
-	{
-		var properties = PropertyMapper.MapMany(context.Properties!)
-			.ToDictionary(p => p.PropertyTypeId, StringComparer.OrdinalIgnoreCase);
-
-		var columns = ColumnMapper.MapMany(context.Columns!)
+		var mappedColumns = ColumnMapper.MapMany(columns)
 			.ToDictionary(c => c.Key, StringComparer.OrdinalIgnoreCase);
 
-		var groups = GroupMapper.Map(context.Groups!);
+		var mappedGroups = GroupMapper.Map(groups);
 
-		var actions = ActionMapper.MapMany(context.Actions!)
+		var mappedActions = ActionMapper.MapMany(actions)
 			.ToDictionary(a => a.Id);
 
-		var gridStyle = GridStyleMapper.Map(context.GridStyle);
+		var mappedGridStyle = GridStyleMapper.Map(gridStyle);
 
-		var plcConfiguration = ConnectionMapper.Map(context.Connection);
+		var plcConfiguration = ConnectionMapper.Map(connection);
 
-		return new AppConfiguration(properties, columns, groups, actions, gridStyle, plcConfiguration);
+		return new AppConfiguration(
+			mappedProperties, mappedColumns, mappedGroups,
+			mappedActions, mappedGridStyle, plcConfiguration);
 	}
+
+	private sealed record LoadedSections(
+		List<Dto.PropertyDto> Properties,
+		List<Dto.ColumnDto> Columns,
+		Dictionary<string, Dictionary<int, string>> Groups,
+		List<Dto.ActionDto> Actions,
+		Dto.GridStyleOptionsDto? GridStyle,
+		Dto.ConnectionDto? Connection);
 }

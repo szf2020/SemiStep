@@ -1,4 +1,6 @@
-﻿using Config.Models;
+﻿using FluentResults;
+
+using TypesShared.Results;
 
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -12,17 +14,14 @@ internal static class GroupsSectionLoader
 		.IgnoreUnmatchedProperties()
 		.Build();
 
-	public static async Task<Dictionary<string, Dictionary<int, string>>> LoadAsync(
-		string configDirectory,
-		ConfigContext context)
+	public static async Task<Result<Dictionary<string, Dictionary<int, string>>>> LoadAsync(
+		string configDirectory)
 	{
 		var groupsDir = Path.Combine(configDirectory, "groups");
 
 		if (!Directory.Exists(groupsDir))
 		{
-			context.AddError($"Groups directory not found: {groupsDir}");
-
-			return new Dictionary<string, Dictionary<int, string>>();
+			return Result.Fail($"Groups directory not found: {groupsDir}");
 		}
 
 		var yamlFiles = Directory.GetFiles(groupsDir, "*.yaml")
@@ -31,49 +30,70 @@ internal static class GroupsSectionLoader
 
 		if (yamlFiles.Count == 0)
 		{
-			context.AddError($"No YAML files found in groups directory: {groupsDir}");
-
-			return new Dictionary<string, Dictionary<int, string>>();
+			return Result.Fail($"No YAML files found in groups directory: {groupsDir}");
 		}
 
 		var allGroups = new Dictionary<string, Dictionary<int, string>>(StringComparer.OrdinalIgnoreCase);
+		var fileResults = new List<Result>();
 
 		foreach (var file in yamlFiles)
 		{
-			try
+			fileResults.Add(await LoadFileGroupsAsync(file, allGroups));
+		}
+
+		var merged = Result.Merge(fileResults.ToArray());
+		if (merged.IsFailed)
+		{
+			return merged.ToResult<Dictionary<string, Dictionary<int, string>>>();
+		}
+
+		return Result.Ok(allGroups).WithReasons(merged.Reasons);
+	}
+
+	private static async Task<Result> LoadFileGroupsAsync(
+		string filePath,
+		Dictionary<string, Dictionary<int, string>> allGroups)
+	{
+		try
+		{
+			var content = await File.ReadAllTextAsync(filePath);
+			var fileGroups = _deserializer.Deserialize<Dictionary<string, Dictionary<int, string>>>(content);
+
+			if (fileGroups is null || fileGroups.Count == 0)
 			{
-				var content = await File.ReadAllTextAsync(file);
-				var fileGroups = _deserializer.Deserialize<Dictionary<string, Dictionary<int, string>>>(content);
+				return Result.Ok()
+					.WithWarning($"Empty or invalid YAML file: {Path.GetFileName(filePath)}");
+			}
 
-				if (fileGroups == null)
+			var validationResults = new List<Result>();
+
+			foreach (var (groupId, items) in fileGroups)
+			{
+				if (allGroups.ContainsKey(groupId))
 				{
-					context.AddWarning($"Empty or invalid YAML file: {Path.GetFileName(file)}", file);
-
+					validationResults.Add(
+						Result.Fail($"[{Path.GetFileName(filePath)}] Duplicate group_id '{groupId}'"));
 					continue;
 				}
 
-				foreach (var (groupId, items) in fileGroups)
-				{
-					if (allGroups.ContainsKey(groupId))
-					{
-						context.AddError($"Duplicate group_id '{groupId}'", file);
+				var validItems = items
+					.Where(kv => !string.IsNullOrEmpty(kv.Value))
+					.ToDictionary(kv => kv.Key, kv => kv.Value);
 
-						continue;
-					}
-
-					var validItems = items
-						.Where(kv => !string.IsNullOrEmpty(kv.Value))
-						.ToDictionary(kv => kv.Key, kv => kv.Value);
-
-					allGroups[groupId] = validItems;
-				}
+				allGroups[groupId] = validItems;
 			}
-			catch (Exception ex)
+
+			if (validationResults.Count == 0)
 			{
-				context.AddError($"Failed to parse {Path.GetFileName(file)}: {ex.Message}", file);
+				return Result.Ok();
 			}
-		}
 
-		return allGroups;
+			return Result.Merge(validationResults.ToArray());
+		}
+		catch (Exception ex)
+		{
+			return Result.Fail(
+				$"Failed to parse {Path.GetFileName(filePath)}: {ex.Message}");
+		}
 	}
 }

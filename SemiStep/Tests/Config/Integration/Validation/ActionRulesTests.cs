@@ -14,10 +14,10 @@ public sealed class ActionRulesTests
 	[Fact]
 	public async Task EnumWithoutGroupName_HasError()
 	{
-		var context = await ConfigTestHelper.LoadInvalidCaseAsync("EnumWithoutGroupName");
+		var result = await ConfigTestHelper.LoadInvalidCaseAsync("EnumWithoutGroupName");
 
-		context.HasErrors.Should().BeTrue();
-		context.Errors.Should().Contain(e =>
-			e.Contains("group_name", StringComparison.OrdinalIgnoreCase));
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().Contain(e =>
+			e.Message.Contains("group_name", StringComparison.OrdinalIgnoreCase));
 	}
 }

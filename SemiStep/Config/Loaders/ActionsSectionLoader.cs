@@ -1,5 +1,8 @@
 ﻿using Config.Dto;
-using Config.Models;
+
+using FluentResults;
+
+using TypesShared.Results;
 
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -13,121 +16,206 @@ internal static class ActionsSectionLoader
 		.IgnoreUnmatchedProperties()
 		.Build();
 
-	public static async Task<List<ActionDto>> LoadAsync(string configDirectory, ConfigContext context)
+	public static async Task<Result<List<ActionDto>>> LoadAsync(string configDirectory)
 	{
-		var actionsDir = Path.Combine(configDirectory, "actions");
+		var actionsDirectory = Path.Combine(configDirectory, "actions");
 
-		if (!Directory.Exists(actionsDir))
+		if (!Directory.Exists(actionsDirectory))
 		{
-			context.AddError($"Actions directory not found: {actionsDir}");
-
-			return [];
+			return Result.Fail($"Actions directory not found: {actionsDirectory}");
 		}
 
-		var yamlFiles = Directory.GetFiles(actionsDir, "*.yaml")
-			.OrderBy(f => f)
+		var yamlFiles = Directory.GetFiles(actionsDirectory, "*.yaml")
+			.OrderBy(file => file)
 			.ToList();
 
 		if (yamlFiles.Count == 0)
 		{
-			context.AddError($"No YAML files found in actions directory: {actionsDir}");
-
-			return [];
+			return Result.Fail($"No YAML files found in actions directory: {actionsDirectory}");
 		}
 
-		var allActions = new List<ActionDto>();
-		var seenIds = new HashSet<short>();
+		var seenActionIds = new HashSet<short>();
+		var fileResults = new List<Result<List<ActionDto>>>();
 
 		foreach (var file in yamlFiles)
 		{
-			try
-			{
-				var content = await File.ReadAllTextAsync(file);
-				var actionsDict = _deserializer.Deserialize<Dictionary<short, ActionDto>>(content);
-
-				if (actionsDict == null || actionsDict.Count == 0)
-				{
-					context.AddWarning($"Empty or invalid YAML file: {Path.GetFileName(file)}", file);
-
-					continue;
-				}
-
-				foreach (var (id, actionContent) in actionsDict)
-				{
-					var action = new ActionDto
-					{
-						Id = id,
-						UiName = actionContent.UiName,
-						DeployDuration = actionContent.DeployDuration,
-						Columns = actionContent.Columns
-					};
-
-					ValidateAction(action, file, context, seenIds);
-					allActions.Add(action);
-				}
-			}
-			catch (Exception ex)
-			{
-				context.AddError($"Failed to parse {Path.GetFileName(file)}: {ex.Message}", file);
-			}
+			fileResults.Add(await LoadFileActionsAsync(file, seenActionIds));
 		}
 
-		return allActions;
+		var merged = Result.Merge(fileResults.ToArray());
+		if (merged.IsFailed)
+		{
+			return merged.ToResult<List<ActionDto>>();
+		}
+
+		var allActions = fileResults
+			.Where(r => r.IsSuccess)
+			.SelectMany(r => r.Value)
+			.ToList();
+
+		return Result.Ok(allActions).WithReasons(merged.Reasons);
 	}
 
-	private static void ValidateAction(ActionDto action, string file, ConfigContext context, HashSet<short> seenIds)
+	private static async Task<Result<List<ActionDto>>> LoadFileActionsAsync(
+		string filePath,
+		HashSet<short> seenActionIds)
 	{
-		var fileName = Path.GetFileName(file);
-		var location = $"{fileName}, Id={action.Id}";
+		try
+		{
+			var fileContent = await File.ReadAllTextAsync(filePath);
 
-		if (action.Id <= 0)
-		{
-			context.AddError($"Action Id must be positive, got: {action.Id}", location);
+			var actionsDictionary =
+				_deserializer.Deserialize<Dictionary<short, ActionDto>>(fileContent);
+
+			if (actionsDictionary is null || actionsDictionary.Count == 0)
+			{
+				return Result.Ok(new List<ActionDto>())
+					.WithWarning($"Empty or invalid YAML file: {Path.GetFileName(filePath)}");
+			}
+
+			return ValidateActionsFromFile(actionsDictionary, filePath, seenActionIds);
 		}
-		else if (!seenIds.Add(action.Id))
+		catch (Exception exception)
 		{
-			context.AddError($"Duplicate action Id: {action.Id}", location);
+			return Result.Fail<List<ActionDto>>(
+				$"Failed to parse {Path.GetFileName(filePath)}: {exception.Message}");
+		}
+	}
+
+	private static Result<List<ActionDto>> ValidateActionsFromFile(
+		Dictionary<short, ActionDto> actionsDictionary,
+		string filePath,
+		HashSet<short> seenActionIds)
+	{
+		var actions = new List<ActionDto>();
+		var validationResults = new List<Result>();
+
+		foreach (var (id, actionContent) in actionsDictionary)
+		{
+			var action = CreateAction(id, actionContent);
+			var validationResult = ValidateAction(action, filePath, seenActionIds);
+
+			validationResults.Add(validationResult);
+
+			if (validationResult.IsSuccess)
+			{
+				actions.Add(action);
+			}
 		}
 
-		if (string.IsNullOrWhiteSpace(action.UiName))
+		var merged = Result.Merge(validationResults.ToArray());
+		if (merged.IsFailed)
 		{
-			context.AddError("Action UiName is required", location);
+			return merged.ToResult<List<ActionDto>>();
 		}
 
-		if (string.IsNullOrWhiteSpace(action.DeployDuration))
+		return Result.Ok(actions).WithReasons(merged.Reasons);
+	}
+
+	private static ActionDto CreateAction(short id, ActionDto source)
+	{
+		return new ActionDto
 		{
-			context.AddError("Action DeployDuration is required", location);
-		}
-		else if (action.DeployDuration != "immediate" && action.DeployDuration != "longlasting")
+			Id = id,
+			UiName = source.UiName,
+			DeployDuration = source.DeployDuration,
+			Columns = source.Columns
+		};
+	}
+
+	private static Result ValidateAction(
+		ActionDto action,
+		string filePath,
+		HashSet<short> seenActionIds)
+	{
+		var location = $"{Path.GetFileName(filePath)}, Id={action.Id}";
+
+		var idResult = ValidateActionId(action.Id, location, seenActionIds);
+		var nameResult = ValidateUiName(action.UiName, location);
+		var durationResult = ValidateDeployDuration(action.DeployDuration, location);
+		var columnsResult = ValidateColumns(action, location);
+
+		return Result.Merge(idResult, nameResult, durationResult, columnsResult);
+	}
+
+	private static Result ValidateActionId(
+		short actionId,
+		string location,
+		HashSet<short> seenActionIds)
+	{
+		if (actionId <= 0)
 		{
-			context.AddError(
-				$"Action DeployDuration must be 'immediate' or 'longlasting', got: '{action.DeployDuration}'",
-				location);
+			return Result.Fail($"[{location}] Action Id must be positive, got: {actionId}");
 		}
 
+		if (!seenActionIds.Add(actionId))
+		{
+			return Result.Fail($"[{location}] Duplicate action Id: {actionId}");
+		}
+
+		return Result.Ok();
+	}
+
+	private static Result ValidateUiName(string? uiName, string location)
+	{
+		if (string.IsNullOrWhiteSpace(uiName))
+		{
+			return Result.Fail($"[{location}] Action UiName is required");
+		}
+
+		return Result.Ok();
+	}
+
+	private static Result ValidateDeployDuration(string? deployDuration, string location)
+	{
+		if (string.IsNullOrWhiteSpace(deployDuration))
+		{
+			return Result.Fail($"[{location}] Action DeployDuration is required");
+		}
+
+		if (deployDuration is not ("immediate" or "longlasting"))
+		{
+			return Result.Fail($"[{location}] Action DeployDuration must be 'immediate' or 'longlasting', got: '{deployDuration}'");
+		}
+
+		return Result.Ok();
+	}
+
+	private static Result ValidateColumns(ActionDto action, string location)
+	{
 		if (action.Columns == null || action.Columns.Count == 0)
 		{
-			context.AddWarning("Action has no columns defined", location);
+			return Result.Ok().WithWarning($"[{location}] Action has no columns defined");
 		}
-		else
+
+		var columnResults = new List<Result>();
+
+		foreach (var column in action.Columns)
 		{
-			foreach (var column in action.Columns)
-			{
-				ValidateActionColumn(column, location, context);
-			}
+			columnResults.Add(ValidateActionColumnKey(column.Key, location));
+			columnResults.Add(ValidatePropertyTypeId(column.PropertyTypeId, location));
 		}
+
+		return Result.Merge(columnResults.ToArray());
 	}
 
-	private static void ValidateActionColumn(ActionColumnDto column, string actionLocation, ConfigContext context)
+	private static Result ValidatePropertyTypeId(string? propertyTypeId, string location)
 	{
-		if (string.IsNullOrWhiteSpace(column.Key))
+		if (string.IsNullOrWhiteSpace(propertyTypeId))
 		{
-			context.AddError("Action column Key is required", actionLocation);
+			return Result.Fail($"[{location}] Action column PropertyTypeId is required");
 		}
 
-		if (string.IsNullOrWhiteSpace(column.PropertyTypeId))
+		return Result.Ok();
+	}
+
+	private static Result ValidateActionColumnKey(string? actionColumnKey, string location)
+	{
+		if (string.IsNullOrWhiteSpace(actionColumnKey))
 		{
-			context.AddError($"Action column '{column.Key}' PropertyTypeId is required", actionLocation);
+			return Result.Fail($"[{location}] Action column Key is required");
 		}
+
+		return Result.Ok();
 	}
 }
