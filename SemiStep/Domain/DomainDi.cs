@@ -1,13 +1,12 @@
 ﻿using Domain.Facade;
-using Domain.Registries;
-using Domain.Services;
+using Domain.Helpers;
 using Domain.State;
 
 using Microsoft.Extensions.DependencyInjection;
 
-using Shared.Config;
-using Shared.Config.Contracts;
-using Shared.ServiceContracts;
+using TypesShared.Config;
+using TypesShared.Core;
+using TypesShared.Domain;
 
 namespace Domain;
 
@@ -15,27 +14,21 @@ public static class DomainDi
 {
 	public static IServiceCollection AddDomain(this IServiceCollection services)
 	{
-		services.AddSingleton<IActionRegistry, ActionRegistry>();
-		services.AddSingleton<IPropertyRegistry, PropertyRegistry>();
-		services.AddSingleton<IColumnRegistry, ColumnRegistry>();
-		services.AddSingleton<IGroupRegistry, GroupRegistry>();
+		services.AddSingleton(sp => new ConfigRegistry(sp.GetRequiredService<AppConfiguration>()));
 		services.AddSingleton<RecipeStateManager>();
 		services.AddSingleton<RecipeHistoryManager>();
-		services.AddSingleton<CoreService>();
-		services.AddSingleton<DomainFacade>(
-			sp => new DomainFacade(
-				sp.GetRequiredService<AppConfiguration>(),
-				sp.GetRequiredService<IActionRegistry>(),
-				sp.GetRequiredService<IPropertyRegistry>(),
-				sp.GetRequiredService<IColumnRegistry>(),
-				sp.GetRequiredService<IGroupRegistry>(),
-				sp.GetRequiredService<CoreService>(),
-				sp.GetRequiredService<RecipeStateManager>(),
-				sp.GetRequiredService<RecipeHistoryManager>(),
-				sp.GetRequiredService<ICsvService>(),
-				sp.GetRequiredService<IS7ConnectionService>(),
-				sp.GetRequiredService<ICsvClipboardService>())
-			);
+		services.AddSingleton<ImportedRecipeValidator>();
+		services.AddSingleton(sp => new DomainFacade(
+			sp.GetRequiredService<AppConfiguration>(),
+			sp.GetRequiredService<ConfigRegistry>(),
+			sp.GetRequiredService<ICoreService>(),
+			sp.GetRequiredService<RecipeStateManager>(),
+			sp.GetRequiredService<RecipeHistoryManager>(),
+			sp.GetRequiredService<ICsvService>(),
+			sp.GetRequiredService<IS7Service>(),
+			sp.GetRequiredService<IClipboardService>(),
+			sp.GetRequiredService<ImportedRecipeValidator>(),
+			sp.GetRequiredService<IPropertyParser>()));
 
 		return services;
 	}

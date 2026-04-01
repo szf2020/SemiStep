@@ -5,30 +5,26 @@ using Core.Services;
 
 using Microsoft.Extensions.DependencyInjection;
 
-using Shared.ServiceContracts;
+using TypesShared.Core;
+using TypesShared.Domain;
 
 namespace Core;
 
-public static class RecipeDi
+public static class CoreDi
 {
 	public static IServiceCollection AddRecipe(this IServiceCollection services)
 	{
 		services.AddSingleton<CoreConfig>();
 
-		services.AddSingleton<TimingCalculator>();
 		services.AddSingleton<RecipeAnalyzer>();
 		services.AddSingleton<LoopParser>();
 
 		services.AddSingleton<IReadOnlyDictionary<int, CompiledFormula>>(_ => new Dictionary<int, CompiledFormula>());
 		services.AddSingleton<FormulaEngine>();
-		services.AddSingleton<StepVariableAdapter>();
 		services.AddSingleton<FormulaApplicationCoordinator>();
 
+		services.AddSingleton<IPropertyParser, PropertyParser>();
 		services.AddSingleton<ICoreService, CoreFacade>();
-
-		services.AddSingleton<StepFactory>();
-		services.AddSingleton<PropertyValidator>();
-
 		return services;
 	}
 }

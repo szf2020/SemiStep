@@ -1,45 +1,50 @@
-﻿using Shared.Core;
+﻿using FluentResults;
+
+using TypesShared.Core;
+using TypesShared.Results;
 
 namespace Core.Analysis;
 
-internal sealed class RecipeAnalyzer(TimingCalculator timingCalculator, LoopParser loopParser)
+internal sealed class RecipeAnalyzer(LoopParser loopParser)
 {
 	private const int MaxLoopDepth = 3;
 
-	public RecipeSnapshot Analyze(Recipe recipe)
+	public Result<RecipeSnapshot> Analyze(Recipe recipe)
 	{
+		var reasons = new List<IReason>();
+
 		if (recipe.Steps.Count == 0)
 		{
-			return RecipeSnapshot.Create(
-				recipe,
-				TimeSpan.Zero,
-				new Dictionary<int, TimeSpan>(),
-				[],
-				errors: [],
-				warnings: ["Recipe is empty"]);
+			return Result.Ok(RecipeSnapshot.Empty).WithWarning("Recipe has no steps");
 		}
 
-		var loopParse = loopParser.Parse(recipe);
-		var errors = new List<string>(loopParse.Errors);
-		var warnings = new List<string>();
+		var loopParseResult = loopParser.Parse(recipe);
+		if (loopParseResult.IsFailed)
+		{
+			return Result.Fail<RecipeSnapshot>(loopParseResult.Errors);
+		}
 
-		var (stepStartTimes, totalDuration) = timingCalculator.Calculate(recipe, loopParse.Loops);
+		var parsedLoops = loopParseResult.Value;
 
-		var maxDepth = loopParse.Loops.Count > 0
-			? loopParse.Loops.Max(l => l.Depth)
+		var (stepStartTimes, totalDuration) = TimingCalculator.Calculate(recipe, parsedLoops);
+
+		var maxDepth = parsedLoops.Count > 0
+			? parsedLoops.Max(l => l.Depth)
 			: 0;
 
 		if (maxDepth > MaxLoopDepth)
 		{
-			errors.Add($"Maximum loop nesting depth ({MaxLoopDepth}) exceeded: {maxDepth}");
+			reasons.Add(new ValidationError($"Maximum loop nesting depth ({MaxLoopDepth}) exceeded: {maxDepth}"));
 		}
 
-		return RecipeSnapshot.Create(
+		var snapshot = RecipeSnapshot.Create(
 			recipe,
 			totalDuration,
 			stepStartTimes,
-			loopParse.Loops,
-			errors,
-			warnings);
+			parsedLoops);
+
+		return Result.Ok(snapshot)
+			.WithReasons(reasons)
+			.WithReasons(loopParseResult.Reasons);
 	}
 }

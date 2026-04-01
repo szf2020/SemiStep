@@ -15,50 +15,52 @@ public sealed class CoreMutationEdgeCasesTests(CoreFixture fixture) : IClassFixt
 	private const int InvalidLargeIndex = 100;
 
 	[Fact]
-	public void RemoveStep_NegativeIndex_Throws()
+	public void RemoveStep_NegativeIndex_Fails()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait();
 
-		var act = () => fixture.Facade.RemoveStep(InvalidNegativeIndex);
+		var result = fixture.Facade.RemoveStep(InvalidNegativeIndex);
 
-		act.Should().Throw<IndexOutOfRangeException>();
+		result.IsFailed.Should().BeTrue();
+		driver.StepCount.Should().Be(1, "state should not change on failed mutation");
 	}
 
 	[Fact]
-	public void RemoveStep_IndexBeyondCount_Throws()
+	public void RemoveStep_IndexBeyondCount_Fails()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait();
 
-		var act = () => fixture.Facade.RemoveStep(InvalidLargeIndex);
+		var result = fixture.Facade.RemoveStep(InvalidLargeIndex);
 
-		act.Should().Throw<IndexOutOfRangeException>();
+		result.IsFailed.Should().BeTrue();
+		driver.StepCount.Should().Be(1, "state should not change on failed mutation");
 	}
 
 	[Fact]
-	public void UpdateProperty_NonExistentColumn_Throws()
+	public void UpdateProperty_NonExistentColumn_Fails()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait();
 
-		var act = () => fixture.Facade.UpdateStepProperty(0, "non_existent_column", "123");
+		var result = fixture.Facade.UpdateStepProperty(0, "non_existent_column", "123");
 
-		act.Should().Throw<KeyNotFoundException>("column key is not defined in the action's column list");
+		result.IsFailed.Should().BeTrue("column key is not defined in the action's column list");
 	}
 
 	[Fact]
-	public void UpdateProperty_TypeMismatch_Throws()
+	public void UpdateProperty_TypeMismatch_Fails()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait();
 
-		var act = () => fixture.Facade.UpdateStepProperty(0, RecipeTestDriver.StepDurationColumn, "not_a_valid_number");
+		var result = fixture.Facade.UpdateStepProperty(0, RecipeTestDriver.StepDurationColumn, "not_a_valid_number");
 
-		act.Should().Throw<ArgumentException>("value cannot be parsed as the column's declared property type");
+		result.IsFailed.Should().BeTrue("value cannot be parsed as the column's declared property type");
 	}
 }

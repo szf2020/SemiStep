@@ -1,9 +1,8 @@
-﻿using Core.Exceptions;
-using Core.Services;
+﻿using Core.Services;
 
 using FluentAssertions;
 
-using Shared.Core;
+using TypesShared.Core;
 
 using Xunit;
 
@@ -15,18 +14,28 @@ namespace Tests.Core.Unit.Properties;
 public sealed class CorePropertyParsingTests
 {
 	[Fact]
-	public void NonNumericString_AsInt_ReturnsNull()
+	public void NonNumericString_AsInt_ReturnsFailure()
 	{
-		var result = PropertyValue.TryParse("abc", PropertyType.Int);
+		var parser = new PropertyParser();
+		var definition = new PropertyTypeDefinition(
+			Id: "test_int",
+			SystemType: "int",
+			FormatKind: "numeric",
+			Units: null,
+			Min: null,
+			Max: null,
+			MaxLength: null);
 
-		result.Should().BeNull();
+		var result = parser.Parse("abc", definition);
+
+		result.IsFailed.Should().BeTrue();
 	}
 
 	[Fact]
-	public void String_ExceedingMaxLength_ThrowsStringTooLong()
+	public void String_ExceedingMaxLength_ReturnsFail()
 	{
-		var propertyDefinition = new PropertyDefinition(
-			PropertyTypeId: "test_string",
+		var propertyDefinition = new PropertyTypeDefinition(
+			Id: "test_string",
 			SystemType: "string",
 			FormatKind: "numeric",
 			Units: null,
@@ -36,8 +45,8 @@ public sealed class CorePropertyParsingTests
 
 		var longString = new string('A', 11);
 
-		var act = () => PropertyValidator.ThrowIfInvalid(propertyDefinition, longString);
+		var result = PropertyValidator.Validate(propertyDefinition, longString);
 
-		act.Should().Throw<StringTooLongException>();
+		result.IsFailed.Should().BeTrue();
 	}
 }

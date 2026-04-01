@@ -1,4 +1,4 @@
-﻿using Core.Exceptions;
+﻿using FluentResults;
 
 namespace Core.Formulas;
 
@@ -7,29 +7,33 @@ internal sealed class CompiledFormula(
 	IReadOnlyList<string> variables,
 	IReadOnlyDictionary<string, Func<Dictionary<string, double>, double>> solvers)
 {
-	public Dictionary<string, double> ApplyRecalculation(
+	public Result<Dictionary<string, double>> ApplyRecalculation(
 		string changedVariable,
 		IReadOnlyDictionary<string, double> currentValues)
 	{
 		if (!IsVariableKnown(changedVariable))
 		{
-			throw new FormulaVariableNotFoundException(
-				$"Could not find variable '{changedVariable}' in step properties.");
+			return Result.Fail<Dictionary<string, double>>(
+				$"Variable '{changedVariable}' is not defined in formula");
 		}
 
 		var targetVariable = DetermineTarget(changedVariable);
 		if (targetVariable is null)
 		{
-			throw new FormulaNoTargetVariableException(
-				$"No target variable could be determined for changed variable '{changedVariable}'.");
+			return Result.Fail<Dictionary<string, double>>(
+				$"No target variable for changed variable '{changedVariable}'");
 		}
 
 		var computeResult = ComputeTargetValue(targetVariable, currentValues);
+		if (computeResult.IsFailed)
+		{
+			return computeResult;
+		}
 
 		var result = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
 		{
 			[changedVariable] = currentValues[changedVariable],
-			[targetVariable] = computeResult[targetVariable]
+			[targetVariable] = computeResult.Value[targetVariable]
 		};
 
 		return result;
@@ -42,27 +46,33 @@ internal sealed class CompiledFormula(
 
 	private string? DetermineTarget(string changedVariable)
 	{
-		return recalcOrder.FirstOrDefault(v => string.Equals(v, changedVariable, StringComparison.OrdinalIgnoreCase));
+		return recalcOrder.FirstOrDefault(
+			v => string.Equals(v, changedVariable, StringComparison.OrdinalIgnoreCase));
 	}
 
-	private Dictionary<string, double> ComputeTargetValue(string targetVariable,
+	private Result<Dictionary<string, double>> ComputeTargetValue(
+		string targetVariable,
 		IReadOnlyDictionary<string, double> values)
 	{
 		if (!solvers.TryGetValue(targetVariable, out var solver))
 		{
-			throw new FormulaNoTargetVariableException(
-				$"No target variable could be determined for changed variable '{targetVariable}'.");
+			return Result.Fail<Dictionary<string, double>>(
+				$"No solver found for target variable '{targetVariable}'");
 		}
+
 		var mutableValues = new Dictionary<string, double>(values, StringComparer.OrdinalIgnoreCase);
 		var calculatedValue = solver(mutableValues);
 
 		if (double.IsNaN(calculatedValue) || double.IsInfinity(calculatedValue))
 		{
-			throw new FormulaComputationOverflowException(
-				$"Computation for target variable '{targetVariable}' resulted as NaN or Infinity.");
+			return Result.Fail<Dictionary<string, double>>(
+				$"Computation for '{targetVariable}' resulted in NaN or Infinity");
 		}
 
-		return new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase) { [targetVariable] = calculatedValue };
+		return new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
+		{
+			[targetVariable] = calculatedValue
+		};
 	}
 
 	public override string ToString()

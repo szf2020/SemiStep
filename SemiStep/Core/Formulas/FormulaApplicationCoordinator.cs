@@ -1,13 +1,15 @@
-﻿using Shared.Core;
+﻿using FluentResults;
+
+using TypesShared.Core;
 
 namespace Core.Formulas;
 
-internal sealed class FormulaApplicationCoordinator(FormulaEngine engine, StepVariableAdapter adapter)
+internal sealed class FormulaApplicationCoordinator(FormulaEngine engine)
 {
-	public Step ApplyIfExists(
+	public Result<Step> ApplyIfExists(
 		Step step,
 		ActionDefinition action,
-		ColumnId changedColumn,
+		PropertyId changedProperty,
 		FormulaDefinition? formulaDefinition)
 	{
 		if (formulaDefinition is null)
@@ -15,22 +17,28 @@ internal sealed class FormulaApplicationCoordinator(FormulaEngine engine, StepVa
 			return step;
 		}
 
-		if (IsFormulaNotNeeded(changedColumn, formulaDefinition))
+		if (IsFormulaNotNeeded(changedProperty, formulaDefinition))
 		{
 			return step;
 		}
 
-		var currentStepVariables = StepVariableAdapter.ExtractVariableNames(step, formulaDefinition.RecalcOrder);
+		var extractResult = StepVariableAdapter.ExtractVariables(step, formulaDefinition.RecalcOrder);
+		if (extractResult.IsFailed)
+		{
+			return extractResult.ToResult<Step>();
+		}
 
-		var calculationResult = engine.Calculate(action.Id, changedColumn.Value, currentStepVariables);
+		var calcResult = engine.Calculate(action.Id, changedProperty.Value, extractResult.Value);
+		if (calcResult.IsFailed)
+		{
+			return calcResult.ToResult<Step>();
+		}
 
-		var newStep = StepVariableAdapter.ApplyChanges(step, calculationResult);
-
-		return newStep;
+		return StepVariableAdapter.ApplyChanges(step, calcResult.Value);
 	}
 
-	private static bool IsFormulaNotNeeded(ColumnId changedColumn, FormulaDefinition formula)
+	private static bool IsFormulaNotNeeded(PropertyId changedProperty, FormulaDefinition formula)
 	{
-		return !formula.RecalcOrder.Contains(changedColumn.Value, StringComparer.OrdinalIgnoreCase);
+		return !formula.RecalcOrder.Contains(changedProperty.Value, StringComparer.OrdinalIgnoreCase);
 	}
 }

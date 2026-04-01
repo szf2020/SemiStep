@@ -2,13 +2,14 @@
 
 using Domain.Facade;
 
-using Shared.Core;
+using TypesShared.Core;
+using TypesShared.Results;
 
 namespace Tests.Core.Helpers;
 
 public sealed class RecipeTestDriver(DomainFacade domainFacade)
 {
-	public RecipeSnapshot Snapshot => domainFacade.Snapshot;
+	public RecipeSnapshot Snapshot => domainFacade.Snapshot.Value;
 
 	public Recipe Recipe => domainFacade.CurrentRecipe;
 
@@ -16,11 +17,22 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 
 	public int StepCount => Recipe.StepCount;
 
+	public IReadOnlyList<ValidationError> Errors => domainFacade.Snapshot
+		.Reasons
+		.OfType<ValidationError>()
+		.ToList();
+
+	public IReadOnlyList<string> Warnings => domainFacade.Snapshot
+		.Reasons
+		.OfType<Warning>()
+		.Select(w => w.Message)
+		.ToList();
+
 	#region Recipe Management
 
 	public RecipeTestDriver NewRecipe()
 	{
-		domainFacade.NewRecipe();
+		domainFacade.SetNewRecipe();
 
 		return this;
 	}
@@ -33,6 +45,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	public const int ForLoopActionId = 20;
 	public const int EndForLoopActionId = 30;
 	public const int PauseActionId = 40;
+	public const int WithGroupActionId = 50;
 
 	#endregion
 
@@ -41,6 +54,7 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 	public const string StepDurationColumn = "step_duration";
 	public const string TaskColumn = "task";
 	public const string CommentColumn = "comment";
+	public const string TargetColumn = "target";
 
 	#endregion
 

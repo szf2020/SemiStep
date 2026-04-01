@@ -1,67 +1,89 @@
-﻿using Core.Exceptions;
+﻿using FluentResults;
 
-using Shared.Core;
+using TypesShared.Core;
 
 namespace Core.Formulas;
 
-internal sealed class StepVariableAdapter
+internal static class StepVariableAdapter
 {
-	public static IReadOnlyDictionary<string, double> ExtractVariableNames(Step step, IReadOnlyList<string> variableNames)
+	public static Result<IReadOnlyDictionary<string, double>> ExtractVariables(
+		Step step,
+		IReadOnlyList<string> variableNames)
 	{
 		var values = new Dictionary<string, double>(variableNames.Count, StringComparer.OrdinalIgnoreCase);
 
 		foreach (var variableName in variableNames)
 		{
-			var columnId = new ColumnId(variableName);
+			var columnId = new PropertyId(variableName);
 
 			if (!step.Properties.TryGetValue(columnId, out var propertyValue))
 			{
-				throw new FormulaVariableNotFoundException(
-					$"Could not find variable '{variableName}' in step properties.");
+				return Result.Fail<IReadOnlyDictionary<string, double>>(
+					$"Variable '{variableName}' not found in step properties");
 			}
 
-			values[variableName] = GetDoubleOrThrow(propertyValue);
+			var numericResult = ToDouble(propertyValue);
+			if (numericResult.IsFailed)
+			{
+				return numericResult.ToResult<IReadOnlyDictionary<string, double>>();
+			}
+
+			values[variableName] = numericResult.Value;
 		}
 
-		return values;
+		return Result.Ok<IReadOnlyDictionary<string, double>>(values);
 	}
 
-	public static Step ApplyChanges(Step originalStep, IReadOnlyDictionary<string, double> variableUpdates)
+	public static Result<Step> ApplyChanges(
+		Step originalStep,
+		IReadOnlyDictionary<string, double> variableUpdates)
 	{
-		var propertyUpdates = new List<KeyValuePair<ColumnId, PropertyValue>>();
+		var propertyUpdates = new List<KeyValuePair<PropertyId, PropertyValue>>();
 
 		foreach (var (variableName, formulaValue) in variableUpdates)
 		{
-			var columnId = new ColumnId(variableName);
+			var columnId = new PropertyId(variableName);
 
 			if (!originalStep.Properties.TryGetValue(columnId, out var existingProperty))
 			{
 				continue;
 			}
 
-			var updatedProperty = existingProperty.Type switch
+			var convertResult = FromDouble(formulaValue, existingProperty.Type);
+			if (convertResult.IsFailed)
 			{
-				PropertyType.Int => PropertyValue.FromInt((int)Math.Round(formulaValue)),
-				PropertyType.Float => PropertyValue.FromFloat((float)formulaValue),
-				_ => throw new TypeMismatchException(
-					$"Cannot convert formula value to target property type '{existingProperty.Type}'.")
-			};
+				return convertResult.ToResult<Step>();
+			}
 
-			propertyUpdates.Add(KeyValuePair.Create(columnId, updatedProperty));
+			propertyUpdates.Add(KeyValuePair.Create(columnId, convertResult.Value));
 		}
 
-		var updatedStep = originalStep with { Properties = originalStep.Properties.SetItems(propertyUpdates) };
+		var updatedStep = originalStep with
+		{
+			Properties = originalStep.Properties.SetItems(propertyUpdates)
+		};
 
-		return updatedStep;
+		return Result.Ok(updatedStep);
 	}
 
-	private static double GetDoubleOrThrow(PropertyValue value)
+	private static Result<double> ToDouble(PropertyValue value)
 	{
 		return value.Value switch
 		{
 			int i => i,
 			float f => f,
-			_ => throw new TypeMismatchException($"Could not convert value '{value.Value}' to a numeric value.")
+			_ => Result.Fail<double>($"Cannot convert value '{value.Value}' to numeric")
+		};
+	}
+
+	private static Result<PropertyValue> FromDouble(double value, PropertyType targetType)
+	{
+		return targetType switch
+		{
+			PropertyType.Int => PropertyValue.FromInt((int)Math.Round(value)),
+			PropertyType.Float => PropertyValue.FromFloat((float)value),
+			_ => Result.Fail<PropertyValue>(
+				$"Cannot convert formula result to property type '{targetType}'")
 		};
 	}
 }

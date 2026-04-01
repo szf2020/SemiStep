@@ -1,7 +1,7 @@
-﻿using Shared.Config;
-using Shared.Core;
+﻿using TypesShared.Config;
+using TypesShared.Core;
 
-namespace Domain.Services;
+namespace Domain.Helpers;
 
 internal static class CellStateResolver
 {
@@ -32,6 +32,6 @@ internal static class CellStateResolver
 
 	private static bool IsPropertyPresentInAction(string columnKey, ActionDefinition action)
 	{
-		return action.Columns.Any(col => col.Key == columnKey);
+		return action.Properties.Any(col => col.Key == columnKey);
 	}
 }

@@ -1,17 +1,18 @@
-﻿using Core.Exceptions;
+﻿using FluentResults;
 
-using Shared.Core;
+using TypesShared.Core;
+using TypesShared.Results;
 
 namespace Core.Analysis;
 
 internal sealed class LoopParser(CoreConfig config)
 {
-	private readonly ColumnId _iterationColumnName = config.IterationColumnId;
+	private readonly PropertyId _iterationPropertyName = config.IterationPropertyId;
 
-	public LoopParseResult Parse(Recipe recipe)
+	public Result<List<LoopInfo>> Parse(Recipe recipe)
 	{
 		var validLoops = new List<LoopInfo>();
-		var errors = new List<string>();
+		var reasons = new List<IReason>();
 		var stack = new Stack<ForFrame>();
 
 		for (var i = 0; i < recipe.Steps.Count; i++)
@@ -23,7 +24,16 @@ internal sealed class LoopParser(CoreConfig config)
 			{
 				case (int)ServiceActionId.ForLoop:
 				{
-					var iterations = ExtractIterationCountOrThrow(step);
+					var iterationsResult = ExtractIterationCount(step);
+
+					if (iterationsResult.IsFailed)
+					{
+						return Result
+							.Fail(iterationsResult.Errors)
+							.WithReasons(reasons);
+					}
+
+					var iterations = iterationsResult.Value;
 					var depth = stack.Count + 1;
 
 					stack.Push(new ForFrame(i, iterations, depth));
@@ -32,7 +42,7 @@ internal sealed class LoopParser(CoreConfig config)
 				}
 				case (int)ServiceActionId.EndForLoop when stack.Count == 0:
 				{
-					errors.Add($"Unmatched EndFor at step {i}");
+					reasons.Add(new Warning($"Unmatched EndFor at step {i}"));
 
 					break;
 				}
@@ -54,15 +64,17 @@ internal sealed class LoopParser(CoreConfig config)
 		while (stack.Count > 0)
 		{
 			var frame = stack.Pop();
-			errors.Add($"Unclosed For loop starting at step {frame.StartIndex}");
+			reasons.Add(new Warning($"Unclosed For loop starting at step {frame.StartIndex}"));
 		}
 
-		return new LoopParseResult(validLoops, errors);
+		return Result
+			.Ok(validLoops)
+			.WithReasons(reasons);
 	}
 
-	private int ExtractIterationCountOrThrow(Step step)
+	private Result<int> ExtractIterationCount(Step step)
 	{
-		if (!step.Properties.TryGetValue(_iterationColumnName, out var iterationProperty))
+		if (!step.Properties.TryGetValue(_iterationPropertyName, out var iterationProperty))
 		{
 			return 1;
 		}
@@ -71,8 +83,8 @@ internal sealed class LoopParser(CoreConfig config)
 		{
 			PropertyType.Int => iterationProperty.AsInt(),
 			PropertyType.Float => (int)iterationProperty.AsFloat(),
-			_ => throw new TypeMismatchException(
-				$"Iteration count property has unsupported type '{iterationProperty.Type}' in step {step.ActionKey}.")
+			_ => new Error($"Iteration count property has unsupported type " +
+						   $"'{iterationProperty.Type}' in step {step.ActionKey}")
 		};
 	}
 

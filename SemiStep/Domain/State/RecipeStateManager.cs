@@ -1,27 +1,38 @@
-﻿using Shared.Core;
+﻿using FluentResults;
+
+using TypesShared.Core;
+using TypesShared.Results;
 
 namespace Domain.State;
 
 internal sealed class RecipeStateManager
 {
-	public RecipeSnapshot? LastSnapshot { get; private set; }
-	public Recipe Current => LastSnapshot?.Recipe ?? Recipe.Empty;
+	public Result<RecipeSnapshot>? LatestSnapshot { get; private set; } = Result.Ok(RecipeSnapshot.Empty);
+	public Recipe Current => LatestSnapshot is { IsSuccess: true }
+		? LatestSnapshot.Value.Recipe
+		: Recipe.Empty;
 	public Recipe LastValidRecipe { get; private set; } = Recipe.Empty;
 
 	public bool IsDirty { get; private set; }
-	public bool IsValid => LastSnapshot?.IsValid ?? false;
+	public bool IsValid => LatestSnapshot is not null
+		&& LatestSnapshot.IsSuccess
+		&& !LatestSnapshot.Reasons.OfType<ValidationError>().Any();
 
 	public event Action<Recipe>? RecipeChanged;
 
-	public void Update(RecipeSnapshot snapshot)
+	public void Update(Result<RecipeSnapshot> snapshot)
 	{
-		LastSnapshot = snapshot;
+		LatestSnapshot = snapshot;
 		IsDirty = true;
 
-		if (snapshot.IsValid)
+		if (snapshot.IsSuccess && !snapshot.Reasons.OfType<ValidationError>().Any())
 		{
-			LastValidRecipe = snapshot.Recipe;
-			RecipeChanged?.Invoke(LastValidRecipe);
+			LastValidRecipe = snapshot.Value.Recipe;
+		}
+
+		if (snapshot.IsSuccess)
+		{
+			RecipeChanged?.Invoke(snapshot.Value.Recipe);
 		}
 	}
 
@@ -32,7 +43,7 @@ internal sealed class RecipeStateManager
 
 	public void Reset()
 	{
-		LastSnapshot = RecipeSnapshot.Empty;
+		LatestSnapshot = RecipeSnapshot.Empty;
 		LastValidRecipe = Recipe.Empty;
 		IsDirty = false;
 	}

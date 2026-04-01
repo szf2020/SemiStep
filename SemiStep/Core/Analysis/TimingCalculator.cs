@@ -1,12 +1,12 @@
-﻿using Shared.Core;
+﻿using TypesShared.Core;
 
 namespace Core.Analysis;
 
-internal sealed class TimingCalculator
+internal static class TimingCalculator
 {
-	private static readonly ColumnId _durationColumn = new("step_duration");
+	private static readonly PropertyId _durationProperty = new("step_duration");
 
-	public (IReadOnlyDictionary<int, TimeSpan> StepStartTimes, TimeSpan TotalDuration) Calculate(
+	public static (IReadOnlyDictionary<int, TimeSpan> StepStartTimes, TimeSpan TotalDuration) Calculate(
 		Recipe recipe,
 		IReadOnlyList<LoopInfo> loops)
 	{
@@ -48,7 +48,7 @@ internal sealed class TimingCalculator
 
 	private static TimeSpan ExtractStepDuration(Step step)
 	{
-		if (!step.Properties.TryGetValue(_durationColumn, out var durationProperty))
+		if (!step.Properties.TryGetValue(_durationProperty, out var durationProperty))
 		{
 			return TimeSpan.Zero;
 		}

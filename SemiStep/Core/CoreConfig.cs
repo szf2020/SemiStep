@@ -1,4 +1,4 @@
-﻿using Shared.Core;
+﻿using TypesShared.Core;
 
 namespace Core;
 
@@ -6,5 +6,5 @@ internal class CoreConfig
 {
 	private const string IterationColumnName = "task";
 
-	public readonly ColumnId IterationColumnId = new(IterationColumnName);
+	public PropertyId IterationPropertyId { get; } = new(IterationColumnName);
 }

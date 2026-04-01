@@ -1,77 +1,67 @@
 ﻿using System.Collections.Immutable;
 
-using Domain.Services;
+using Domain.Helpers;
 using Domain.State;
 
 using FluentResults;
 
 using Serilog;
 
-using Shared.Config;
-using Shared.Config.Contracts;
-using Shared.Core;
-using Shared.Plc;
-using Shared.Results;
-using Shared.ServiceContracts;
+using TypesShared.Config;
+using TypesShared.Core;
+using TypesShared.Domain;
+using TypesShared.Plc;
 
 namespace Domain.Facade;
 
 public sealed class DomainFacade : IDisposable
 {
-	private readonly IActionRegistry _actionRegistry;
 	private readonly AppConfiguration _appConfiguration;
-	private readonly ICsvClipboardService _clipboardService;
-	private readonly IColumnRegistry _columnRegistry;
-	private readonly IS7ConnectionService _connectionService;
-	private readonly CoreService _coreService;
+	private readonly IClipboardService _clipboardService;
+	private readonly ConfigRegistry _configRegistry;
+	private readonly IS7Service _connectionService;
+	private readonly ICoreService _coreService;
 	private readonly ICsvService _csvService;
-	private readonly IGroupRegistry _groupRegistry;
 	private readonly RecipeHistoryManager _historyManager;
-	private readonly IPropertyRegistry _propertyRegistry;
+	private readonly ImportedRecipeValidator _importedRecipeValidator;
+	private readonly IPropertyParser _propertyParser;
 	private readonly RecipeStateManager _stateManager;
 	private Action<PlcConnectionState>? _connectionStateChangedRelay;
 
 	private bool _disposed;
-	private Action<Recipe>? _recipeChangedRelay;
 
 	internal DomainFacade(
 		AppConfiguration appConfiguration,
-		IActionRegistry actionRegistry,
-		IPropertyRegistry propertyRegistry,
-		IColumnRegistry columnRegistry,
-		IGroupRegistry groupRegistry,
-		CoreService coreService,
+		ConfigRegistry configRegistry,
+		ICoreService coreService,
 		RecipeStateManager stateManager,
 		RecipeHistoryManager historyManager,
 		ICsvService csvService,
-		IS7ConnectionService connectionService,
-		ICsvClipboardService clipboardService)
+		IS7Service connectionService,
+		IClipboardService clipboardService,
+		ImportedRecipeValidator importedRecipeValidator,
+		IPropertyParser propertyParser)
 	{
 		_appConfiguration = appConfiguration;
-		_actionRegistry = actionRegistry;
-		_propertyRegistry = propertyRegistry;
-		_columnRegistry = columnRegistry;
-		_groupRegistry = groupRegistry;
+		_configRegistry = configRegistry;
 		_coreService = coreService;
 		_stateManager = stateManager;
 		_historyManager = historyManager;
 		_csvService = csvService;
 		_connectionService = connectionService;
 		_clipboardService = clipboardService;
+		_importedRecipeValidator = importedRecipeValidator;
+		_propertyParser = propertyParser;
 	}
 
 	public Recipe CurrentRecipe => _stateManager.Current;
 	public Recipe LastValidRecipe => _stateManager.LastValidRecipe;
-
 	public bool IsDirty => _stateManager.IsDirty;
 	public bool IsValid => _stateManager.IsValid;
-	public RecipeSnapshot Snapshot => _stateManager.LastSnapshot ?? RecipeSnapshot.Empty;
+	public Result<RecipeSnapshot> Snapshot => _stateManager.LatestSnapshot ?? RecipeSnapshot.Empty;
 
 	public bool CanUndo => _historyManager.CanUndo;
 	public bool CanRedo => _historyManager.CanRedo;
-
-	public bool IsConnected => _connectionService.IsConnected;
-	public string? LastConnectionError { get; private set; }
 
 	public void Dispose()
 	{
@@ -82,149 +72,194 @@ public sealed class DomainFacade : IDisposable
 
 		_disposed = true;
 
-		if (_recipeChangedRelay is not null)
-		{
-			_stateManager.RecipeChanged -= _recipeChangedRelay;
-		}
-
 		if (_connectionStateChangedRelay is not null)
 		{
 			_connectionService.StateChanged -= _connectionStateChangedRelay;
 		}
 	}
 
-	public event Action<Recipe>? RecipeChanged;
-
 	public static CellState GetCellState(GridColumnDefinition column, ActionDefinition action)
 	{
 		return CellStateResolver.GetCellState(column, action);
 	}
 
-	public event Action? ConnectionStateChanged;
-
 	public void Initialize()
 	{
-		_actionRegistry.Initialize(_appConfiguration.Actions);
-		_propertyRegistry.Initialize(_appConfiguration.Properties);
-		_columnRegistry.Initialize(_appConfiguration.Columns);
-		_groupRegistry.Initialize(_appConfiguration.Groups);
-
-		_coreService.NewRecipe();
-
-		_recipeChangedRelay = recipe => RecipeChanged?.Invoke(recipe);
-		_stateManager.RecipeChanged += _recipeChangedRelay;
+		SetNewRecipe();
 
 		_connectionStateChangedRelay = _ => ConnectionStateChanged?.Invoke();
 		_connectionService.StateChanged += _connectionStateChangedRelay;
 		StartPlcConnection(_appConfiguration.PlcConfiguration);
 	}
 
-	public void NewRecipe()
+	public Result AppendStep(int actionId)
 	{
-		_historyManager.Clear();
-		_coreService.NewRecipe();
+		var snapshot = _coreService.AppendStep(CurrentRecipe, actionId);
+
+		return ApplyIfSucceeded(snapshot);
 	}
 
-	public void InsertStep(int index, int actionId)
+	public Result InsertStep(int index, int actionId)
 	{
-		_historyManager.Push(_stateManager.Current);
-		var snapshot = _coreService.InsertStep(index, actionId);
-		_stateManager.Update(snapshot);
+		var snapshot = _coreService.InsertStep(CurrentRecipe, index, actionId);
+
+		return ApplyIfSucceeded(snapshot);
 	}
 
-	public void AppendStep(int actionId)
+	public Result RemoveStep(int index)
 	{
-		_historyManager.Push(_stateManager.Current);
-		var snapshot = _coreService.AppendStep(actionId);
-		_stateManager.Update(snapshot);
+		var snapshot = _coreService.RemoveStep(CurrentRecipe, index);
+
+		return ApplyIfSucceeded(snapshot);
 	}
 
-	public void ChangeStepAction(int stepIndex, int newActionId)
+	public Result InsertSteps(int startIndex, IReadOnlyList<Step> steps)
 	{
-		_historyManager.Push(_stateManager.Current);
-		var snapshot = _coreService.ChangeStepAction(stepIndex, newActionId);
-		_stateManager.Update(snapshot);
+		var snapshot = _coreService.InsertSteps(CurrentRecipe, startIndex, steps);
+
+		return ApplyIfSucceeded(snapshot);
 	}
 
-	public void RemoveStep(int index)
+	public Result RemoveSteps(IReadOnlyList<int> indices)
 	{
-		var snapshot = _coreService.RemoveStep(index);
+		var snapshot = _coreService.RemoveSteps(CurrentRecipe, indices);
 
-		HistoryPushOnlyValidState(snapshot);
-		_stateManager.Update(snapshot);
+		return ApplyIfSucceeded(snapshot);
 	}
 
-	public void InsertSteps(int startIndex, IReadOnlyList<Step> steps)
+	public Result ChangeStepAction(int stepIndex, int newActionId)
 	{
-		_historyManager.Push(_stateManager.Current);
-		var snapshot = _coreService.InsertSteps(startIndex, steps);
-		_stateManager.Update(snapshot);
+		var snapshot = _coreService.ChangeStepAction(CurrentRecipe, stepIndex, newActionId);
+
+		return ApplyIfSucceeded(snapshot);
 	}
 
-	public void RemoveSteps(IReadOnlyList<int> indices)
+	public Result UpdateStepProperty(int stepIndex, string columnKey, string value)
 	{
-		var snapshot = _coreService.RemoveSteps(indices);
+		var propertyResult = ResolvePropertyDefinition(stepIndex, columnKey);
+		if (propertyResult.IsFailed)
+		{
+			return propertyResult.ToResult();
+		}
 
-		HistoryPushOnlyValidState(snapshot);
-		_stateManager.Update(snapshot);
+		var parseResult = _propertyParser.Parse(value, propertyResult.Value);
+		if (parseResult.IsFailed)
+		{
+			return parseResult.ToResult();
+		}
+
+		var snapshot = _coreService.UpdateStepProperty(
+			CurrentRecipe, stepIndex, columnKey, parseResult.Value);
+
+		return ApplyIfSucceeded(snapshot);
 	}
 
-	public void UpdateStepProperty(int stepIndex, string columnKey, string value)
-	{
-		var snapshot = _coreService.UpdateStepProperty(stepIndex, columnKey, value);
-
-		HistoryPushOnlyValidState(snapshot);
-		_stateManager.Update(snapshot);
-	}
-
-	public RecipeSnapshot? Undo()
+	public Result Undo()
 	{
 		var previous = _historyManager.Undo(_stateManager.Current);
 		if (previous is null)
 		{
-			return null;
+			return Result.Fail("No state to undo to");
 		}
 
 		var snapshot = _coreService.AnalyzeRecipe(previous);
 		_stateManager.Update(snapshot);
 
-		return snapshot;
+		if (snapshot.IsFailed)
+		{
+			return snapshot.ToResult();
+		}
+
+		return Result.Ok().WithReasons(snapshot.Reasons);
 	}
 
-	public RecipeSnapshot? Redo()
+	public Result Redo()
 	{
 		var next = _historyManager.Redo(_stateManager.Current);
 		if (next is null)
 		{
-			return null;
+			return Result.Fail("No state to redo to");
 		}
 
 		var snapshot = _coreService.AnalyzeRecipe(next);
 		_stateManager.Update(snapshot);
 
-		return snapshot;
+		if (snapshot.IsFailed)
+		{
+			return snapshot.ToResult();
+		}
+
+		return Result.Ok().WithReasons(snapshot.Reasons);
 	}
 
-	public async Task<Result<Recipe>> LoadRecipeAsync(string filePath, CancellationToken ct = default)
+	public async Task<Result> LoadRecipeAsync(
+		string filePath,
+		CancellationToken ct = default)
 	{
-		var result = await _csvService.LoadAsync(filePath, ct);
-		if (result.IsFailed)
+		var loadResult = await _csvService.LoadAsync(filePath, ct);
+		if (loadResult.IsFailed)
 		{
-			return result;
+			return loadResult.ToResult();
+		}
+
+		var validationResult = _importedRecipeValidator.Validate(loadResult.Value);
+		if (validationResult.IsFailed)
+		{
+			return validationResult;
 		}
 
 		_historyManager.Clear();
-		var snapshot = _coreService.AnalyzeRecipe(result.Value);
+		var snapshot = _coreService.AnalyzeRecipe(loadResult.Value);
 		_stateManager.Update(snapshot);
 		_stateManager.MarkSaved();
 
-		return result;
+		if (snapshot.IsFailed)
+		{
+			return snapshot.ToResult();
+		}
+
+		return Result.Ok().WithReasons(snapshot.Reasons);
 	}
 
-	public async Task SaveRecipeAsync(string filePath, CancellationToken ct = default)
+	public async Task SaveRecipeAsync(
+		string filePath,
+		CancellationToken ct = default)
 	{
 		await _csvService.SaveAsync(_stateManager.Current, filePath, ct);
 		_stateManager.MarkSaved();
+	}
+
+	public void MarkSaved()
+	{
+		_stateManager.MarkSaved();
+	}
+
+	private Result ApplyIfSucceeded(Result<RecipeSnapshot> snapshot)
+	{
+		if (snapshot.IsFailed)
+		{
+			return snapshot.ToResult();
+		}
+
+		_historyManager.Push(_stateManager.Current);
+		_stateManager.Update(snapshot);
+
+		return Result.Ok().WithReasons(snapshot.Reasons);
+	}
+
+	private Result<PropertyTypeDefinition> ResolvePropertyDefinition(
+		int stepIndex,
+		string columnKey)
+	{
+		var recipe = _stateManager.Current;
+
+		var validationResult = ValidateStepIndex(stepIndex);
+		if (validationResult.IsFailed)
+		{
+			return validationResult.ToResult<PropertyTypeDefinition>();
+		}
+
+		return _configRegistry.ResolvePropertyType(recipe, stepIndex, columnKey);
 	}
 
 	public string SerializeStepsForClipboard(IReadOnlyList<Step> steps)
@@ -236,21 +271,31 @@ public sealed class DomainFacade : IDisposable
 
 	public Result<Recipe> DeserializeStepsFromClipboard(string csvBody)
 	{
-		return _clipboardService.DeserializeSteps(csvBody);
+		var result = _clipboardService.DeserializeSteps(csvBody);
+		if (result.IsFailed)
+		{
+			return result;
+		}
+
+		var validationResult = _importedRecipeValidator.Validate(result.Value);
+		if (validationResult.IsFailed)
+		{
+			return validationResult.ToResult<Recipe>();
+		}
+
+		return result;
 	}
 
-	public void MarkSaved()
-	{
-		_stateManager.MarkSaved();
-	}
+	public bool IsConnected => _connectionService.IsConnected;
+	public string? LastConnectionError { get; private set; }
 
-	public void StartPlcConnection(
-		PlcConfiguration plcConfiguration)
+	public event Action? ConnectionStateChanged;
+
+	public void StartPlcConnection(PlcConfiguration plcConfiguration)
 	{
 		if (IsConnected)
 		{
 			Log.Warning("PLC connection is already established");
-
 			return;
 		}
 
@@ -274,7 +319,6 @@ public sealed class DomainFacade : IDisposable
 		if (!IsConnected)
 		{
 			Log.Warning("PLC connection is not established");
-
 			return;
 		}
 
@@ -292,11 +336,28 @@ public sealed class DomainFacade : IDisposable
 		});
 	}
 
-	private void HistoryPushOnlyValidState(RecipeSnapshot snapshot)
+	public void SetNewRecipe()
 	{
-		if (snapshot.IsValid)
+		_historyManager.Clear();
+		_stateManager.Reset();
+
+		var snapshot = _coreService.AnalyzeRecipe(Recipe.Empty);
+		_stateManager.Update(snapshot);
+
+		if (snapshot.IsFailed)
 		{
-			_historyManager.Push(_stateManager.Current);
+			Log.Warning("Empty recipe analysis unexpectedly failed: {Errors}",
+				string.Join("; ", snapshot.Errors.Select(e => e.Message)));
 		}
+	}
+
+	private Result ValidateStepIndex(int stepIndex)
+	{
+		var recipe = _stateManager.Current;
+		if (stepIndex < 0 || stepIndex >= recipe.Steps.Count)
+		{
+			return Result.Fail($"Step index {stepIndex} is out of range for recipe with {recipe.Steps.Count} steps");
+		}
+		return Result.Ok();
 	}
 }

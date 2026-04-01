@@ -1,9 +1,9 @@
-﻿using Domain.Services;
+﻿using Domain.Helpers;
 
 using FluentAssertions;
 
-using Shared.Config;
-using Shared.Core;
+using TypesShared.Config;
+using TypesShared.Core;
 
 using Xunit;
 
@@ -14,13 +14,13 @@ namespace Tests.Core.Unit.Properties;
 [Trait("Area", "PropertyState")]
 public sealed class CorePropertyStateTests
 {
-	private static readonly ActionColumnDefinition _stepDurationColumn = new(
+	private static readonly ActionPropertyDefinition _stepDurationProperties = new(
 		Key: "step_duration",
 		GroupName: null,
 		PropertyTypeId: "time",
 		DefaultValue: "10");
 
-	private static readonly ActionColumnDefinition _commentColumn = new(
+	private static readonly ActionPropertyDefinition _commentProperties = new(
 		Key: "comment",
 		GroupName: null,
 		PropertyTypeId: "string",
@@ -30,7 +30,7 @@ public sealed class CorePropertyStateTests
 		Id: 10,
 		UiName: "Wait",
 		DeployDuration: "longlasting",
-		Columns: [_stepDurationColumn, _commentColumn]);
+		Properties: [_stepDurationProperties, _commentProperties]);
 
 	[Fact]
 	public void StepStartTimeColumn_IsReadonly()

@@ -14,51 +14,51 @@ public sealed class CoreValidityTests(CoreFixture fixture) : IClassFixture<CoreF
 	[Fact]
 	public void EmptyRecipe_IsValid_ButHasWarning()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 
 		driver.IsValid.Should().BeTrue();
-		driver.Snapshot.Warnings.Should().NotBeEmpty();
-		driver.Snapshot.Warnings.Should().ContainSingle(w => w.Contains("empty", StringComparison.OrdinalIgnoreCase));
+		driver.Warnings.Should().NotBeEmpty();
+		driver.Warnings.Should().ContainSingle(w => w.Contains("no steps", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
 	public void ValidRecipe_NoErrors()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(20f);
 
 		driver.IsValid.Should().BeTrue();
-		driver.Snapshot.Errors.Should().BeEmpty();
+		driver.Errors.Should().BeEmpty();
 	}
 
 	[Fact]
 	public void RecipeWithClosedLoop_IsValid()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddFor(3).AddWait(10f).AddEndFor();
 
 		driver.IsValid.Should().BeTrue();
-		driver.Snapshot.Errors.Should().BeEmpty();
+		driver.Errors.Should().BeEmpty();
 	}
 
 	[Fact]
-	public void BrokenLoop_HasLoopIntegrityError()
+	public void UnclosedLoop_ProducesWarning()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddFor(3).AddWait(10f);
 
-		driver.IsValid.Should().BeFalse();
-		driver.Snapshot.Errors.Should().ContainSingle(e => e.Contains("Unclosed For loop", StringComparison.OrdinalIgnoreCase));
+		driver.IsValid.Should().BeTrue("unclosed loops are warnings, not errors");
+		driver.Warnings.Should().ContainSingle(w => w.Contains("Unclosed For loop", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
-	public void MaxDepth3Exceeded_HasLoopNestingDepthError()
+	public void MaxDepth3Exceeded_HasError()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 
 		driver.AddFor(1).AddFor(1).AddFor(1).AddFor(1);
@@ -66,44 +66,46 @@ public sealed class CoreValidityTests(CoreFixture fixture) : IClassFixture<CoreF
 		driver.AddEndFor().AddEndFor().AddEndFor().AddEndFor();
 
 		driver.IsValid.Should().BeFalse();
-		driver.Snapshot.Errors.Should().ContainSingle(e => e.Contains("nesting depth", StringComparison.OrdinalIgnoreCase));
+		driver.Errors.Should().ContainSingle(e => e.Message.Contains("nesting depth", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
-	public void IsValid_DerivedFromReasons()
+	public void IsValid_FalseWhenErrorsPresent()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f);
 
-		driver.Snapshot.Errors.Should().BeEmpty();
-		driver.Snapshot.IsValid.Should().BeTrue("IsValid should be true when Errors is empty");
+		driver.Errors.Should().BeEmpty();
+		driver.IsValid.Should().BeTrue();
 
-		driver.AddFor(2);
+		driver.AddFor(1).AddFor(1).AddFor(1).AddFor(1)
+			.AddWait(1f)
+			.AddEndFor().AddEndFor().AddEndFor().AddEndFor();
 
-		driver.Snapshot.Errors.Should().NotBeEmpty();
-		driver.Snapshot.IsValid.Should().BeFalse("IsValid should be false when Errors is non-empty");
+		driver.Errors.Should().NotBeEmpty();
+		driver.IsValid.Should().BeFalse("exceeding max loop depth produces an error");
 	}
 
 	[Fact]
 	public void WarningsDoNotAffectValidity()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 
-		driver.Snapshot.Warnings.Should().NotBeEmpty();
+		driver.Warnings.Should().NotBeEmpty();
 		driver.IsValid.Should().BeTrue("warnings alone should not invalidate the recipe");
 	}
 
 	[Fact]
-	public void MultipleErrors_AllCaptured()
+	public void MultipleWarnings_AllCaptured()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 
 		driver.AddFor(1).AddFor(1).AddWait(5f);
 
-		driver.IsValid.Should().BeFalse();
-		driver.Snapshot.Errors.Should().HaveCountGreaterThanOrEqualTo(2);
+		driver.Warnings.Should().HaveCountGreaterThanOrEqualTo(2,
+			"two unclosed For loops should produce at least two warnings");
 	}
 }

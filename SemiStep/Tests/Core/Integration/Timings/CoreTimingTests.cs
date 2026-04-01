@@ -14,7 +14,7 @@ public sealed class CoreTimingTests(CoreFixture fixture) : IClassFixture<CoreFix
 	[Fact]
 	public void EmptyRecipe_ZeroDuration()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 
 		driver.Snapshot.TotalDuration.Should().Be(TimeSpan.Zero);
@@ -23,7 +23,7 @@ public sealed class CoreTimingTests(CoreFixture fixture) : IClassFixture<CoreFix
 	[Fact]
 	public void SingleWaitStep_TotalDurationMatchesStepDuration()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 
 		const float Duration = 15f;
 
@@ -36,7 +36,7 @@ public sealed class CoreTimingTests(CoreFixture fixture) : IClassFixture<CoreFix
 	[Fact]
 	public void MultipleWaitSteps_TotalDurationIsCumulative()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(20f).AddWait(30f);
 
@@ -46,7 +46,7 @@ public sealed class CoreTimingTests(CoreFixture fixture) : IClassFixture<CoreFix
 	[Fact]
 	public void StepStartTimes_AccumulateCorrectly()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(20f).AddWait(30f);
 
@@ -60,7 +60,7 @@ public sealed class CoreTimingTests(CoreFixture fixture) : IClassFixture<CoreFix
 	[Fact]
 	public void ImmediateAction_ZeroDuration()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddPause();
 
@@ -70,7 +70,7 @@ public sealed class CoreTimingTests(CoreFixture fixture) : IClassFixture<CoreFix
 	[Fact]
 	public void MixedActions_OnlyLongLastingContributeToTotalDuration()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 
 		driver.AddPause().AddWait(15f).AddFor(3);
@@ -81,7 +81,7 @@ public sealed class CoreTimingTests(CoreFixture fixture) : IClassFixture<CoreFix
 	[Fact]
 	public void UpdateDuration_RecalculatesTotal()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(10f);
 
@@ -95,7 +95,7 @@ public sealed class CoreTimingTests(CoreFixture fixture) : IClassFixture<CoreFix
 	[Fact]
 	public void RemoveStep_RecalculatesTotalDuration()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddWait(10f).AddWait(20f).AddWait(30f);
 

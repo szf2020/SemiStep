@@ -8,9 +8,9 @@ using Domain.Facade;
 
 using Microsoft.Extensions.DependencyInjection;
 
-using Shared.ServiceContracts;
-
 using Tests.Helpers;
+
+using TypesShared.Domain;
 
 namespace Tests.Core.Helpers;
 
@@ -28,8 +28,8 @@ public static class CoreTestHelper
 			.AddRecipe()
 			.AddDomain()
 			.AddSingleton<ICsvService, StubCsvService>()
-			.AddSingleton<ICsvClipboardService, StubCsvClipboardService>()
-			.AddSingleton<IS7ConnectionService, StubS7ConnectionService>()
+			.AddSingleton<IClipboardService, StubClipboardService>()
+			.AddSingleton<IS7Service, StubIs7Service>()
 			.BuildServiceProvider();
 
 		var domainFacade = services.GetRequiredService<DomainFacade>();

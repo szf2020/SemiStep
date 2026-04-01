@@ -1,8 +1,12 @@
 ﻿using FluentAssertions;
 
-using Shared.Config.Contracts;
+using FluentResults;
+
+using Microsoft.Extensions.DependencyInjection;
 
 using Tests.Core.Helpers;
+
+using TypesShared.Config;
 
 using Xunit;
 
@@ -14,22 +18,22 @@ namespace Tests.Core.Integration.Targets;
 public sealed class CoreTargetsEdgeCasesTests(CoreFixture fixture) : IClassFixture<CoreFixture>
 {
 	[Fact]
-	public void GetActionByName_EmptyName_Throws()
+	public void GetActionByName_EmptyName_Fails()
 	{
-		var actionRegistry = (IActionRegistry)fixture.Services.GetService(typeof(IActionRegistry))!;
+		var configRegistry = fixture.Services.GetRequiredService<ConfigRegistry>();
 
-		var act = () => actionRegistry.GetActionByName("");
+		var result = configRegistry.GetActionByName("");
 
-		act.Should().Throw<KeyNotFoundException>("empty string does not match any registered action name");
+		result.IsFailed.Should().BeTrue("empty string does not match any registered action name");
 	}
 
 	[Fact]
-	public void GetGroup_InvalidId_Throws()
+	public void GetGroup_InvalidId_Fails()
 	{
-		var groupRegistry = (IGroupRegistry)fixture.Services.GetService(typeof(IGroupRegistry))!;
+		var configRegistry = fixture.Services.GetRequiredService<ConfigRegistry>();
 
-		var act = () => groupRegistry.GetGroup("nonexistent");
+		var result = configRegistry.GetGroup("nonexistent");
 
-		act.Should().Throw<KeyNotFoundException>("no group is registered with the given ID");
+		result.IsFailed.Should().BeTrue("no group is registered with the given ID");
 	}
 }

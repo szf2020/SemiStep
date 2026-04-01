@@ -1,8 +1,12 @@
 ﻿using FluentAssertions;
 
-using Shared.Config.Contracts;
+using FluentResults;
+
+using Microsoft.Extensions.DependencyInjection;
 
 using Tests.Core.Helpers;
+
+using TypesShared.Config;
 
 using Xunit;
 
@@ -16,8 +20,8 @@ public sealed class CoreTargetsTests(CoreFixture fixture) : IClassFixture<CoreFi
 	[Fact]
 	public void Actions_List_NotEmpty()
 	{
-		var actionRegistry = (IActionRegistry)fixture.Services.GetService(typeof(IActionRegistry))!;
-		var actions = actionRegistry.GetAll();
+		var configRegistry = fixture.Services.GetRequiredService<ConfigRegistry>();
+		var actions = configRegistry.GetAllActions();
 
 		actions.Should().NotBeEmpty("Standard config defines at least 4 actions");
 	}
@@ -25,18 +29,19 @@ public sealed class CoreTargetsTests(CoreFixture fixture) : IClassFixture<CoreFi
 	[Fact]
 	public void EnumOptions_ForGroupColumn_Succeeds()
 	{
-		var groupRegistry = (IGroupRegistry)fixture.Services.GetService(typeof(IGroupRegistry))!;
-		var group = groupRegistry.GetGroup("valve");
+		var configRegistry = fixture.Services.GetRequiredService<ConfigRegistry>();
+		var groupResult = configRegistry.GetGroup("valve");
 
-		group.Items.Should().NotBeEmpty("WithGroups config defines a valve group with items");
+		groupResult.IsSuccess.Should().BeTrue();
+		groupResult.Value.Items.Should().NotBeEmpty("WithGroups config defines a valve group with items");
 	}
 
 	[Fact]
 	public void GroupExists_ForDefinedGroup_ReturnsTrue()
 	{
-		var groupRegistry = (IGroupRegistry)fixture.Services.GetService(typeof(IGroupRegistry))!;
-		var exists = groupRegistry.GroupExists("valve");
+		var configRegistry = fixture.Services.GetRequiredService<ConfigRegistry>();
+		var exists = configRegistry.GroupExists("valve");
 
-		exists.Should().BeTrue("valve group is defined in WithGroups config");
+		exists.IsSuccess.Should().BeTrue("valve group is defined in WithGroups config");
 	}
 }

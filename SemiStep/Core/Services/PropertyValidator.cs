@@ -1,64 +1,70 @@
-﻿using Core.Exceptions;
+﻿using FluentResults;
 
-using Shared.Core;
+using TypesShared.Config;
+using TypesShared.Core;
 
 namespace Core.Services;
 
-internal sealed class PropertyValidator
+internal static class PropertyValidator
 {
-	public static void ThrowIfInvalid(PropertyDefinition property, object value)
+	internal static Result Validate(PropertyTypeDefinition property, object value)
 	{
-		var expectedType = TryGetExpectedType(property.SystemType);
-
-		if (expectedType == typeof(int) || expectedType == typeof(float))
+		return property.SystemType.ToLowerInvariant() switch
 		{
-			var convertedValue = Convert.ChangeType(value, expectedType);
-			TryValidateRange(property, convertedValue);
-		}
-
-		if (expectedType == typeof(string))
-		{
-			TryValidateStringLength(property, value);
-		}
+			"int" => value is int intVal
+				? ValidateNumericRange(property, (double)intVal)
+				: Result.Fail($"Expected int value but got {value.GetType().Name} for '{property.Id}'"),
+			"float" => value is float floatVal
+				? ValidateNumericRange(property, (double)floatVal)
+				: Result.Fail($"Expected float value but got {value.GetType().Name} for '{property.Id}'"),
+			"string" => ValidateStringLength(property, value),
+			_ => Result.Fail($"Unsupported property system type: {property.SystemType}")
+		};
 	}
 
-	private static void TryValidateRange(PropertyDefinition property, object convertedValue)
+	internal static Result ValidateGroupValue(
+		ActionPropertyDefinition actionProperty,
+		PropertyValue parsed,
+		ConfigRegistry configRegistry)
 	{
-		// Convert to double for comparison since Min/Max are defined as double
-		var asDouble = Convert.ToDouble(convertedValue);
-
-		if (property.Min.HasValue && asDouble < property.Min.Value)
+		if (actionProperty.GroupName is null)
 		{
-			throw new ValueOutOfRangeException(
-				$"Value {convertedValue} is lower than {property.Min.Value} at {property.PropertyTypeId}");
+			return Result.Ok();
 		}
 
-		if (property.Max.HasValue && asDouble > property.Max.Value)
+		if (parsed.Value is not int intKey)
 		{
-			throw new ValueOutOfRangeException(
-				$"Value {convertedValue} is greater than {property.Max.Value} at {property.PropertyTypeId}");
+			return Result.Fail($"Group value must be integer, got {parsed.Type}");
 		}
+
+		return configRegistry.GroupHasIntKey(intKey, actionProperty.GroupName);
 	}
 
-	private static void TryValidateStringLength(PropertyDefinition property, object value)
+	private static Result ValidateNumericRange(PropertyTypeDefinition property, double value)
+	{
+		if (property.Min.HasValue && value < property.Min.Value)
+		{
+			return Result.Fail(
+				$"Value {value} is below minimum {property.Min.Value} for '{property.Id}'");
+		}
+
+		if (property.Max.HasValue && value > property.Max.Value)
+		{
+			return Result.Fail(
+				$"Value {value} exceeds maximum {property.Max.Value} for '{property.Id}'");
+		}
+
+		return Result.Ok();
+	}
+
+	private static Result ValidateStringLength(PropertyTypeDefinition property, object value)
 	{
 		if (value is string str && property.MaxLength.HasValue && str.Length > property.MaxLength.Value)
 		{
-			throw new StringTooLongException(
-				$"String length of {str.Length} exceeds max applicable length {property.MaxLength.Value} at {property.PropertyTypeId}");
+			return Result.Fail(
+				$"String length {str.Length} exceeds maximum {property.MaxLength.Value} for '{property.Id}'");
 		}
-	}
 
-	private static Type TryGetExpectedType(string systemType)
-	{
-		return systemType.ToLowerInvariant() switch
-		{
-			"int" => typeof(int),
-			"float" => typeof(float),
-			"string" => typeof(string),
-
-			_ => throw new ArgumentException(
-				$"Unsupported property system type: {systemType}"),
-		};
+		return Result.Ok();
 	}
 }

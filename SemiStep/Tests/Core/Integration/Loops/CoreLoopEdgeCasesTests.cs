@@ -14,7 +14,7 @@ public sealed class CoreLoopEdgeCasesTests(CoreFixture fixture) : IClassFixture<
 	[Fact]
 	public void ZeroIterations_LoopStillValid()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddFor(0).AddWait(5f).AddEndFor();
 
@@ -26,7 +26,7 @@ public sealed class CoreLoopEdgeCasesTests(CoreFixture fixture) : IClassFixture<
 	[Fact]
 	public void NegativeIterations_LoopStillValid()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver.AddFor(-5).AddWait(5f).AddEndFor();
 
@@ -38,7 +38,7 @@ public sealed class CoreLoopEdgeCasesTests(CoreFixture fixture) : IClassFixture<
 	[Fact]
 	public void EnclosingLoops_OrderedOuterToInner()
 	{
-		fixture.Facade.NewRecipe();
+		fixture.Facade.SetNewRecipe();
 
 		var driver = new RecipeTestDriver(fixture.Facade);
 		driver

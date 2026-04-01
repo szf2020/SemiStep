@@ -1,4 +1,4 @@
-﻿using Shared.Core;
+﻿using TypesShared.Core;
 
 namespace Core.Formulas;
 
