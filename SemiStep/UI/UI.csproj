@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.2.2"/>
     <PackageReference Include="Avalonia.Desktop" Version="11.2.2"/>
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.2"/>
@@ -13,7 +19,30 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Domain\Domain.csproj"/>
-    <ProjectReference Include="..\Shared\Shared.csproj"/>
+    <ProjectReference Include="..\TypesShared\TypesShared.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Dialogs\ErrorWindow.axaml.cs">
+      <DependentUpon>ErrorWindow.axaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="ShutdownService\ExitConfirmationDialog.axaml.cs">
+      <DependentUpon>ExitConfirmationDialog.axaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="MessageService\MessagePanel.axaml.cs">
+      <DependentUpon>MessagePanel.axaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="MainWindow\AppStatusBar.axaml.cs">
+      <DependentUpon>AppStatusBar.axaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="MainWindow\RecipeMenuBar.axaml.cs">
+      <DependentUpon>RecipeMenuBar.axaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
 
 </Project>

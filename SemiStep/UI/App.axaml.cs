@@ -7,10 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 using ReactiveUI;
 
-using UI.Services;
-using UI.ViewModels;
-using UI.Views;
-using UI.Windows;
+using UI.Dialogs;
+using UI.MainWindow;
 
 namespace UI;
 
@@ -42,11 +40,8 @@ public class App : Application
 				var mainWindowViewModel = _serviceProvider.GetRequiredService<MainWindowViewModel>();
 				mainWindowViewModel.Initialize();
 
-				var mainWindow = new MainWindow { DataContext = mainWindowViewModel };
+				var mainWindow = new MainWindow.MainWindow { DataContext = mainWindowViewModel };
 				desktop.MainWindow = mainWindow;
-
-				var notificationService = _serviceProvider.GetRequiredService<INotificationService>();
-				notificationService.SetHostWindow(mainWindow);
 			}
 		}
 

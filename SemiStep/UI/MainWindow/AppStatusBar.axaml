@@ -1,0 +1,112 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="UI.MainWindow.AppStatusBar">
+
+    <UserControl.Styles>
+        <!-- Connection indicator color via style class binding -->
+        <Style Selector="Ellipse.connection-dot">
+            <Setter Property="Fill" Value="{DynamicResource DisconnectedBrush}" />
+        </Style>
+        <Style Selector="Ellipse.connection-dot.connected">
+            <Setter Property="Fill" Value="{DynamicResource ConnectedBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border Name="StatusBarBorder"
+            Background="{DynamicResource StatusBarBackgroundBrush}"
+            BorderBrush="{DynamicResource SubtleBorderBrush}"
+            BorderThickness="0,1,0,0"
+            Padding="8,4">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Status Text (Modified/Saved) -->
+            <TextBlock Grid.Column="0"
+                       Name="StatusText"
+                       Text="{Binding StatusText}"
+                       VerticalAlignment="Center"
+                       FontSize="12" />
+
+            <!-- Separator -->
+            <Border Grid.Column="1"
+                    Width="1"
+                    Background="{DynamicResource SeparatorBrush}"
+                    Margin="12,2" />
+
+            <!-- Error/Warning counts - clickable to toggle log panel -->
+            <Button Grid.Column="2"
+                    Command="{Binding MessagePanel.ToggleCommand}"
+                    IsVisible="{Binding MessagePanel.HasStatusErrors}"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="4,2"
+                    VerticalAlignment="Center"
+                    Cursor="Hand">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <!-- Error count -->
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="4"
+                                IsVisible="{Binding MessagePanel.HasErrors}">
+                        <Ellipse Width="8" Height="8"
+                                 Fill="{DynamicResource ErrorBrush}"
+                                 VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding MessagePanel.ErrorCountText}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource ErrorBrush}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Warning count -->
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="4"
+                                IsVisible="{Binding MessagePanel.HasWarnings}">
+                        <Ellipse Width="8" Height="8"
+                                 Fill="{DynamicResource WarningBrush}"
+                                 VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding MessagePanel.WarningCountText}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource WarningBrush}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+            </Button>
+
+            <!-- Separator (only if errors visible) -->
+            <Border Grid.Column="3"
+                    Width="1"
+                    Background="{DynamicResource SeparatorBrush}"
+                    Margin="12,2"
+                    IsVisible="{Binding MessagePanel.HasStatusErrors}" />
+
+            <!-- Spacer -->
+            <Panel Grid.Column="4" />
+
+            <!-- Connection Status -->
+            <StackPanel Grid.Column="5"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <Ellipse Width="8"
+                         Height="8"
+                         Margin="0,0,6,0"
+                         VerticalAlignment="Center"
+                         Classes="connection-dot"
+                         Classes.connected="{Binding IsConnectedToPlc}" />
+                <TextBlock Name="ConnectionText"
+                           Text="{Binding ConnectionStatus}"
+                           VerticalAlignment="Center"
+                           FontSize="12" />
+            </StackPanel>
+        </Grid>
+    </Border>
+
+</UserControl>
