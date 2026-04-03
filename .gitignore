@@ -397,7 +397,9 @@ FodyWeavers.xsd
 # nuke
 .nuke/
 
-.opencode
+# LLM
+.opencode/
+.claude/
 
 AGENTS.md
 CLAUDE.md

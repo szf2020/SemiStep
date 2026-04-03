@@ -65,6 +65,22 @@
     - key: comment
       property_type_id: string
 
+# For
+20:
+  ui_name: "For"
+  deploy_duration: immediate
+  columns:
+    - key: comment
+      property_type_id: string
+
+# End_For
+30:
+  ui_name: "End_For"
+  deploy_duration: immediate
+  columns:
+    - key: comment
+      property_type_id: string
+
 # Pause
 40:
   ui_name: "Pause"

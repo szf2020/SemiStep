@@ -1,5 +1,7 @@
 ﻿using System.Globalization;
 
+using ClipBoard;
+
 using Config.Facade;
 
 using Core;
@@ -49,6 +51,7 @@ public static class Program
 					.AddDomain()
 					.AddS7()
 					.AddCsv()
+					.AddClipboard()
 					.AddUi();
 
 			var provider = services.BuildServiceProvider();
