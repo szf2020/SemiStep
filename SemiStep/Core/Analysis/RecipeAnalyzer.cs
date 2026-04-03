@@ -11,7 +11,6 @@ internal sealed class RecipeAnalyzer(LoopParser loopParser)
 
 	public Result<RecipeSnapshot> Analyze(Recipe recipe)
 	{
-		var reasons = new List<IReason>();
 
 		if (recipe.Steps.Count == 0)
 		{
@@ -34,7 +33,7 @@ internal sealed class RecipeAnalyzer(LoopParser loopParser)
 
 		if (maxDepth > MaxLoopDepth)
 		{
-			reasons.Add(new ValidationError($"Maximum loop nesting depth ({MaxLoopDepth}) exceeded: {maxDepth}"));
+			return Result.Fail($"Maximum loop nesting depth ({MaxLoopDepth}) exceeded: {maxDepth}");
 		}
 
 		var snapshot = RecipeSnapshot.Create(
@@ -44,7 +43,6 @@ internal sealed class RecipeAnalyzer(LoopParser loopParser)
 			parsedLoops);
 
 		return Result.Ok(snapshot)
-			.WithReasons(reasons)
 			.WithReasons(loopParseResult.Reasons);
 	}
 }

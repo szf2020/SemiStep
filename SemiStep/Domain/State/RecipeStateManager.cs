@@ -1,7 +1,6 @@
 ﻿using FluentResults;
 
 using TypesShared.Core;
-using TypesShared.Results;
 
 namespace Domain.State;
 
@@ -15,8 +14,7 @@ internal sealed class RecipeStateManager
 
 	public bool IsDirty { get; private set; }
 	public bool IsValid => LatestSnapshot is not null
-		&& LatestSnapshot.IsSuccess
-		&& !LatestSnapshot.Reasons.OfType<ValidationError>().Any();
+		&& LatestSnapshot.IsSuccess;
 
 	public event Action<Recipe>? RecipeChanged;
 
@@ -25,7 +23,7 @@ internal sealed class RecipeStateManager
 		LatestSnapshot = snapshot;
 		IsDirty = true;
 
-		if (snapshot.IsSuccess && !snapshot.Reasons.OfType<ValidationError>().Any())
+		if (snapshot.IsSuccess)
 		{
 			LastValidRecipe = snapshot.Value.Recipe;
 		}
