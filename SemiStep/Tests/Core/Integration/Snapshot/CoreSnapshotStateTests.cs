@@ -12,21 +12,25 @@ namespace Tests.Core.Integration.Snapshot;
 public sealed class CoreSnapshotStateTests(CoreFixture fixture) : IClassFixture<CoreFixture>
 {
 	[Fact]
-	public void LastValidRecipe_PreservedAcrossInvalidTransition()
+	public void RejectedMutation_LeavesRecipeAndValidStateUnchanged()
 	{
 		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
+
 		driver.AddWait(5f).AddWait(10f);
-		driver.AddFor(1).AddFor(1).AddFor(1).AddFor(1);
-		driver.AddWait(1f);
+		driver.AddFor(1).AddFor(1).AddFor(1).AddFor(1).AddWait(1f);
 
-		driver.IsValid.Should().BeTrue("unclosed For loops produce warnings, not validation errors");
-		var validStepCount = fixture.Facade.LastValidRecipe.StepCount;
+		driver.IsValid.Should().BeTrue("unclosed For loops produce warnings, not errors");
 
-		driver.AddEndFor();
+		var stepCountBeforeRejection = fixture.Facade.CurrentRecipe.StepCount;
+		var lastValidStepCountBeforeRejection = fixture.Facade.LastValidRecipe.StepCount;
 
-		driver.IsValid.Should().BeFalse("closing the 4th nested loop exceeds the maximum nesting depth");
-		fixture.Facade.LastValidRecipe.StepCount.Should().Be(validStepCount);
+		var result = fixture.Facade.AppendStep(RecipeTestDriver.EndForLoopActionId);
+
+		result.IsFailed.Should().BeTrue("closing a 4th nested loop exceeds the maximum nesting depth");
+		driver.IsValid.Should().BeTrue("mutation was rejected, state is unchanged");
+		fixture.Facade.CurrentRecipe.StepCount.Should().Be(stepCountBeforeRejection, "rejected mutation must not change the recipe");
+		fixture.Facade.LastValidRecipe.StepCount.Should().Be(lastValidStepCountBeforeRejection, "last valid recipe must not change when mutation is rejected");
 	}
 
 	[Fact]

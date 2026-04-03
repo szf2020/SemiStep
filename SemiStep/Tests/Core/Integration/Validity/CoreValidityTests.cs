@@ -56,21 +56,24 @@ public sealed class CoreValidityTests(CoreFixture fixture) : IClassFixture<CoreF
 	}
 
 	[Fact]
-	public void MaxDepth3Exceeded_HasError()
+	public void MaxDepth3Exceeded_RejectsMutation()
 	{
 		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
 
-		driver.AddFor(1).AddFor(1).AddFor(1).AddFor(1);
-		driver.AddWait(1f);
-		driver.AddEndFor().AddEndFor().AddEndFor().AddEndFor();
+		driver.AddFor(1).AddFor(1).AddFor(1).AddFor(1).AddWait(1f);
 
-		driver.IsValid.Should().BeFalse();
-		driver.Errors.Should().ContainSingle(e => e.Message.Contains("nesting depth", StringComparison.OrdinalIgnoreCase));
+		var stepCountBeforeRejection = driver.StepCount;
+		var result = fixture.Facade.AppendStep(RecipeTestDriver.EndForLoopActionId);
+
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().ContainSingle(e => e.Message.Contains("nesting depth", StringComparison.OrdinalIgnoreCase));
+		driver.IsValid.Should().BeTrue("the mutation was rejected, recipe is unchanged");
+		driver.StepCount.Should().Be(stepCountBeforeRejection);
 	}
 
 	[Fact]
-	public void IsValid_FalseWhenErrorsPresent()
+	public void ExceedingMaxDepth_RejectsMutation_AndRecipeRemainsValid()
 	{
 		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
@@ -79,12 +82,14 @@ public sealed class CoreValidityTests(CoreFixture fixture) : IClassFixture<CoreF
 		driver.Errors.Should().BeEmpty();
 		driver.IsValid.Should().BeTrue();
 
-		driver.AddFor(1).AddFor(1).AddFor(1).AddFor(1)
-			.AddWait(1f)
-			.AddEndFor().AddEndFor().AddEndFor().AddEndFor();
+		driver.AddFor(1).AddFor(1).AddFor(1).AddFor(1).AddWait(1f);
+		var stepCountBeforeRejection = driver.StepCount;
 
-		driver.Errors.Should().NotBeEmpty();
-		driver.IsValid.Should().BeFalse("exceeding max loop depth produces an error");
+		var result = fixture.Facade.AppendStep(RecipeTestDriver.EndForLoopActionId);
+
+		result.IsFailed.Should().BeTrue("exceeding max loop depth produces an error");
+		driver.IsValid.Should().BeTrue("the mutation was rejected, recipe is unchanged");
+		driver.StepCount.Should().Be(stepCountBeforeRejection);
 	}
 
 	[Fact]

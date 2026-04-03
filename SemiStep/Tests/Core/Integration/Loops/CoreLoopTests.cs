@@ -102,7 +102,7 @@ public sealed class CoreLoopTests(CoreFixture fixture) : IClassFixture<CoreFixtu
 	}
 
 	[Fact]
-	public void MaxDepthExceeded_HasError()
+	public void MaxDepthExceeded_RejectsMutation()
 	{
 		fixture.Facade.SetNewRecipe();
 		var driver = new RecipeTestDriver(fixture.Facade);
@@ -112,14 +112,15 @@ public sealed class CoreLoopTests(CoreFixture fixture) : IClassFixture<CoreFixtu
 			driver.AddFor(1);
 		}
 
-		driver.AddWait(2f);
+		driver.AddWait(1f);
 
-		for (var i = 0; i <= MaxAllowedNestingDepth; i++)
-		{
-			driver.AddEndFor();
-		}
+		var stepCountBeforeRejection = driver.StepCount;
+		var result = fixture.Facade.AppendStep(RecipeTestDriver.EndForLoopActionId);
 
-		driver.IsValid.Should().BeFalse();
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().ContainSingle(e => e.Message.Contains("nesting depth", StringComparison.OrdinalIgnoreCase));
+		driver.IsValid.Should().BeTrue("the mutation was rejected, recipe is unchanged");
+		driver.StepCount.Should().Be(stepCountBeforeRejection);
 	}
 
 	[Fact]

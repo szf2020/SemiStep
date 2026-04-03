@@ -4,9 +4,9 @@ using FluentAssertions;
 
 using FluentResults;
 
-using Shared.Core;
-
 using Tests.Csv.Helpers;
+
+using TypesShared.Core;
 
 using Xunit;
 
@@ -20,9 +20,9 @@ public sealed class CsvDeserializationTests(CsvFixture fixture) : IClassFixture<
 	[Fact]
 	public void Deserialize_RoundTrip_PreservesRecipe()
 	{
-		var step = new Step(10, ImmutableDictionary<ColumnId, PropertyValue>.Empty
-			.Add(new ColumnId("step_duration"), PropertyValue.FromFloat(5.0f))
-			.Add(new ColumnId("comment"), PropertyValue.FromString("test comment")));
+		var step = new Step(10, ImmutableDictionary<PropertyId, PropertyValue>.Empty
+			.Add(new PropertyId("step_duration"), PropertyValue.FromFloat(5.0f))
+			.Add(new PropertyId("comment"), PropertyValue.FromString("test comment")));
 
 		var original = new Recipe(ImmutableList.Create(step));
 		var csv = fixture.FileSerializer.Serialize(original);
@@ -63,13 +63,13 @@ public sealed class CsvDeserializationTests(CsvFixture fixture) : IClassFixture<
 	[Fact]
 	public void ClipboardRoundTrip_SerializeAndDeserializeWithoutHeaders()
 	{
-		var step1 = new Step(10, ImmutableDictionary<ColumnId, PropertyValue>.Empty
-			.Add(new ColumnId("step_duration"), PropertyValue.FromFloat(5.0f))
-			.Add(new ColumnId("comment"), PropertyValue.FromString("first")));
+		var step1 = new Step(10, ImmutableDictionary<PropertyId, PropertyValue>.Empty
+			.Add(new PropertyId("step_duration"), PropertyValue.FromFloat(5.0f))
+			.Add(new PropertyId("comment"), PropertyValue.FromString("first")));
 
-		var step2 = new Step(10, ImmutableDictionary<ColumnId, PropertyValue>.Empty
-			.Add(new ColumnId("step_duration"), PropertyValue.FromFloat(15.0f))
-			.Add(new ColumnId("comment"), PropertyValue.FromString("second")));
+		var step2 = new Step(10, ImmutableDictionary<PropertyId, PropertyValue>.Empty
+			.Add(new PropertyId("step_duration"), PropertyValue.FromFloat(15.0f))
+			.Add(new PropertyId("comment"), PropertyValue.FromString("second")));
 
 		var steps = new List<Step> { step1, step2 };
 		var recipe = new Recipe(steps.ToImmutableList());

@@ -2,6 +2,8 @@
 
 using Domain.Facade;
 
+using FluentResults;
+
 using TypesShared.Core;
 using TypesShared.Results;
 
@@ -17,9 +19,9 @@ public sealed class RecipeTestDriver(DomainFacade domainFacade)
 
 	public int StepCount => Recipe.StepCount;
 
-	public IReadOnlyList<ValidationError> Errors => domainFacade.Snapshot
+	public IReadOnlyList<IError> Errors => domainFacade.Snapshot
 		.Reasons
-		.OfType<ValidationError>()
+		.OfType<IError>()
 		.ToList();
 
 	public IReadOnlyList<string> Warnings => domainFacade.Snapshot

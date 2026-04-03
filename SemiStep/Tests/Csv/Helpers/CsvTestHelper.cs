@@ -1,25 +1,26 @@
-﻿using Config;
+﻿using ClipBoard;
+
+using Config;
 using Config.Facade;
 
 using Core;
 
-using Csv.ClipboardService;
-using Csv.FsService;
+using Csv;
 
 using Domain;
 using Domain.Facade;
 
 using Microsoft.Extensions.DependencyInjection;
 
-using Shared.ServiceContracts;
-
 using Tests.Helpers;
+
+using TypesShared.Domain;
 
 namespace Tests.Csv.Helpers;
 
 internal static class CsvTestHelper
 {
-	public static async Task<(CsvFileSerializer Serializer, CsvClipboardSerializer ClipboardSerializer, IServiceProvider Services)> BuildAsync(
+	public static async Task<(CsvFileSerializer FileSerializer, ClipboardSerializer ClipboardSerializer, IServiceProvider Services)> BuildAsync(
 		string configName = "Standard")
 	{
 		var configDir = TestConfigLocator.GetConfigDirectory(configName);
@@ -30,17 +31,18 @@ internal static class CsvTestHelper
 			.AddRecipe()
 			.AddDomain()
 			.AddSingleton<ICsvService, StubCsvService>()
-			.AddSingleton<ICsvClipboardService, StubCsvClipboardService>()
-			.AddSingleton<IS7ConnectionService, StubS7ConnectionService>()
+			.AddSingleton<IClipboardService, StubClipboardService>()
+			.AddSingleton<IS7Service, StubIs7Service>()
+			.AddSingleton<CsvRowConverter>()
 			.AddSingleton<CsvFileSerializer>()
-			.AddSingleton<CsvClipboardSerializer>()
+			.AddSingleton<ClipboardSerializer>()
 			.BuildServiceProvider();
 
 		var domainFacade = services.GetRequiredService<DomainFacade>();
 		domainFacade.Initialize();
 
-		var serializer = services.GetRequiredService<CsvFileSerializer>();
-		var clipboardSerializer = services.GetRequiredService<CsvClipboardSerializer>();
-		return (serializer, clipboardSerializer, services);
+		var fileSerializer = services.GetRequiredService<CsvFileSerializer>();
+		var clipboardSerializer = services.GetRequiredService<ClipboardSerializer>();
+		return (fileSerializer, clipboardSerializer, services);
 	}
 }

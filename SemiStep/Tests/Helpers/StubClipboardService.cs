@@ -1,11 +1,11 @@
 ﻿using FluentResults;
 
-using Shared.Core;
-using Shared.ServiceContracts;
+using TypesShared.Core;
+using TypesShared.Domain;
 
 namespace Tests.Helpers;
 
-public sealed class StubCsvClipboardService : ICsvClipboardService
+public sealed class StubClipboardService : IClipboardService
 {
 	public string SerializeSteps(Recipe recipe)
 	{

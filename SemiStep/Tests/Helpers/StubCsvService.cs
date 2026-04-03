@@ -1,7 +1,7 @@
 ﻿using FluentResults;
 
-using Shared.Core;
-using Shared.ServiceContracts;
+using TypesShared.Core;
+using TypesShared.Domain;
 
 namespace Tests.Helpers;
 

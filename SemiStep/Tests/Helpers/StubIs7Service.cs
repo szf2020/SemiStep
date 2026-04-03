@@ -1,9 +1,9 @@
-﻿using Shared.Plc;
-using Shared.ServiceContracts;
+﻿using TypesShared.Domain;
+using TypesShared.Plc;
 
 namespace Tests.Helpers;
 
-public sealed class StubS7ConnectionService : IS7ConnectionService
+public sealed class StubIs7Service : IS7Service
 {
 	public bool IsConnected => false;
 
