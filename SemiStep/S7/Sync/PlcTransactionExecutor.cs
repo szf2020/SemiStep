@@ -3,8 +3,8 @@ using S7.Serialization;
 
 using Serilog;
 
-using Shared.Core;
-using Shared.Plc;
+using TypesShared.Core;
+using TypesShared.Plc;
 
 namespace S7.Sync;
 

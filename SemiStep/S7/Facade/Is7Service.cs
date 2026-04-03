@@ -1,11 +1,11 @@
 ﻿using Serilog;
 
-using Shared.Plc;
-using Shared.ServiceContracts;
+using TypesShared.Domain;
+using TypesShared.Plc;
 
 namespace S7.Facade;
 
-internal sealed class S7ConnectionService(S7Driver transport) : IS7ConnectionService
+internal sealed class Is7Service(S7Driver transport) : IS7Service
 {
 	private readonly Lock _stateLock = new();
 	private bool _autoReconnectEnabled;

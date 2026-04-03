@@ -1,6 +1,6 @@
 ﻿using System.Collections.Immutable;
 
-namespace Csv.FsService;
+namespace Csv;
 
 internal sealed record CsvMetadata(
 	char Separator = ';',

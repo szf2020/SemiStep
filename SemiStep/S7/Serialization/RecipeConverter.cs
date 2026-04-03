@@ -1,12 +1,12 @@
 ﻿using System.Collections.Immutable;
 
-using Shared.Config.Contracts;
-using Shared.Core;
-using Shared.Plc;
+using TypesShared.Config;
+using TypesShared.Core;
+using TypesShared.Plc;
 
 namespace S7.Serialization;
 
-internal sealed class RecipeConverter(IActionRegistry actions, IPropertyRegistry properties)
+internal sealed class RecipeConverter(ConfigRegistry configRegistry)
 {
 	public PlcRecipeData FromRecipe(Recipe recipe)
 	{
@@ -23,12 +23,12 @@ internal sealed class RecipeConverter(IActionRegistry actions, IPropertyRegistry
 		{
 			intValues.Add(step.ActionKey);
 
-			var action = actions.GetAction(step.ActionKey);
+			var action = configRegistry.GetAction(step.ActionKey).Value;
 
-			foreach (var columnDef in action.Columns)
+			foreach (var columnDef in action.Properties)
 			{
-				var columnId = new ColumnId(columnDef.Key);
-				var propertyDef = properties.GetProperty(columnDef.PropertyTypeId);
+				var columnId = new PropertyId(columnDef.Key);
+				var propertyDef = configRegistry.GetProperty(columnDef.PropertyTypeId).Value;
 				var propertyType = PropertyTypeMapping.FromSystemType(propertyDef.SystemType);
 
 				if (!step.Properties.TryGetValue(columnId, out var propertyValue))
@@ -85,14 +85,14 @@ internal sealed class RecipeConverter(IActionRegistry actions, IPropertyRegistry
 			}
 
 			var actionKey = data.IntValues[intIndex++];
-			var action = actions.GetAction(actionKey);
+			var action = configRegistry.GetAction(actionKey).Value;
 
-			var properties1 = ImmutableDictionary.CreateBuilder<ColumnId, PropertyValue>();
+			var properties1 = ImmutableDictionary.CreateBuilder<PropertyId, PropertyValue>();
 
-			foreach (var columnDef in action.Columns)
+			foreach (var columnDef in action.Properties)
 			{
-				var columnId = new ColumnId(columnDef.Key);
-				var propertyDef = properties.GetProperty(columnDef.PropertyTypeId);
+				var columnId = new PropertyId(columnDef.Key);
+				var propertyDef = configRegistry.GetProperty(columnDef.PropertyTypeId).Value;
 				var propertyType = PropertyTypeMapping.FromSystemType(propertyDef.SystemType);
 
 				PropertyValue propertyValue;

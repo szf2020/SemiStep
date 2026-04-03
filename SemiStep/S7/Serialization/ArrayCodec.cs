@@ -3,7 +3,7 @@ using System.Text;
 
 using S7.Protocol;
 
-using Shared.Plc.Memory;
+using TypesShared.Plc.Memory;
 
 namespace S7.Serialization;
 

@@ -1,9 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.Text;
 
-using Csv.FsService;
-
-namespace Csv.Helpers;
+namespace Csv;
 
 internal static class CsvFileIo
 {

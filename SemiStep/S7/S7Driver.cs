@@ -1,6 +1,6 @@
 ﻿using S7.Net;
 
-using Shared.Plc;
+using TypesShared.Plc;
 
 namespace S7;
 

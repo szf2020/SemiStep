@@ -1,21 +1,19 @@
-﻿using Domain.Facade;
-
-using S7.Protocol;
+﻿using S7.Protocol;
 
 using Serilog;
 
-using Shared.Core;
-using Shared.ServiceContracts;
+using TypesShared.Core;
+using TypesShared.Domain;
 
 namespace S7.Sync;
 
-internal sealed class PlcSyncCoordinator : IDisposable
+internal sealed class PlcSyncCoordinator(
+	PlcTransactionExecutor transactionExecutor,
+	IS7Service connectionService)
+	: IDisposable
 {
 	private const int DebounceDelayMs = 1000;
-	private readonly IS7ConnectionService _connectionService;
-	private readonly DomainFacade _domainFacade;
 	private readonly Lock _lock = new();
-	private readonly PlcTransactionExecutor _transactionExecutor;
 
 	private CancellationTokenSource? _debounceCts;
 	private bool _disposed;
@@ -23,18 +21,6 @@ internal sealed class PlcSyncCoordinator : IDisposable
 	private Recipe? _pendingSnapshot;
 	private SyncStatus _status = SyncStatus.Idle;
 	private Task? _syncTask;
-
-	public PlcSyncCoordinator(
-		PlcTransactionExecutor transactionExecutor,
-		IS7ConnectionService connectionService,
-		DomainFacade domainFacade)
-	{
-		_transactionExecutor = transactionExecutor;
-		_connectionService = connectionService;
-		_domainFacade = domainFacade;
-
-		_domainFacade.RecipeChanged += OnRecipeChanged;
-	}
 
 	public SyncStatus Status
 	{
@@ -86,7 +72,6 @@ internal sealed class PlcSyncCoordinator : IDisposable
 		}
 
 		_disposed = true;
-		_domainFacade.RecipeChanged -= OnRecipeChanged;
 		_debounceCts?.Cancel();
 		_debounceCts?.Dispose();
 	}
@@ -170,7 +155,7 @@ internal sealed class PlcSyncCoordinator : IDisposable
 			return;
 		}
 
-		if (!_connectionService.IsConnected)
+		if (!connectionService.IsConnected)
 		{
 			Log.Debug("Skipping sync: not connected to PLC");
 
@@ -179,7 +164,7 @@ internal sealed class PlcSyncCoordinator : IDisposable
 
 		try
 		{
-			var isRecipeActive = await _transactionExecutor.IsRecipeActiveAsync(ct);
+			var isRecipeActive = await transactionExecutor.IsRecipeActiveAsync(ct);
 			if (isRecipeActive)
 			{
 				Status = SyncStatus.BlockedByExecution;
@@ -192,7 +177,7 @@ internal sealed class PlcSyncCoordinator : IDisposable
 			Status = SyncStatus.Syncing;
 			LastError = null;
 
-			await _transactionExecutor.WriteRecipeWithRetryAsync(snapshotToSync, ct);
+			await transactionExecutor.WriteRecipeWithRetryAsync(snapshotToSync, ct);
 
 			Status = SyncStatus.Synced;
 			LastError = null;
