@@ -1,0 +1,91 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build, Test & Release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: extract version and release notes from tag
+        id: version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          # Extract annotated tag message (empty for lightweight tags)
+          BODY=$(git tag -l --format='%(contents)' "$TAG" | sed '/^$/d')
+          if [ -n "$BODY" ]; then
+            echo "Release notes found in tag annotation"
+          else
+            BODY="Release $VERSION"
+            echo "No tag annotation found, using default body"
+          fi
+
+          # Write multiline body to GITHUB_OUTPUT
+          {
+            echo "body<<RELEASE_NOTES_EOF"
+            echo "$BODY"
+            echo "RELEASE_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: restore
+        run: dotnet restore SemiStep/SemiStep.slnx
+
+      - name: build
+        run: dotnet build SemiStep/SemiStep.slnx -c Release --no-restore
+
+      - name: test
+        run: dotnet test SemiStep/Tests/Tests.csproj -c Release --no-build --logger "console;verbosity=normal"
+
+      - name: publish
+        run: dotnet publish SemiStep/Application/Application.csproj -c Release -p:Version=${{ steps.version.outputs.version }}
+
+      - name: install Inno Setup
+        shell: powershell
+        run: |
+          $url = "https://jrsoftware.org/download.php/is.exe"
+          $installer = "$env:TEMP\innosetup.exe"
+          Invoke-WebRequest -Uri $url -OutFile $installer -UseBasicParsing
+          Start-Process -FilePath $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-' -Wait
+          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: build installer
+        shell: cmd
+        run: iscc.exe /DAppVersion=${{ steps.version.outputs.version }} Installer/SemiStep.iss
+
+      - name: create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: SemiStep ${{ steps.version.outputs.version }}
+          body: ${{ steps.version.outputs.body }}
+          draft: false
+          prerelease: false
+          make_latest: true
+          files: |
+            Installer/Output/SemiStep-${{ steps.version.outputs.version }}-Setup.exe
