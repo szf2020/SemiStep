@@ -8,6 +8,7 @@ using ReactiveUI;
 
 using TypesShared.Config;
 using TypesShared.Core;
+using TypesShared.Plc;
 
 using UI.Coordinator;
 using UI.MessageService;
@@ -17,6 +18,7 @@ namespace UI.RecipeGrid;
 public class RecipeGridViewModel : ReactiveObject, IDisposable
 {
 	private readonly ObservableAsPropertyHelper<bool> _canDeleteStep;
+	private readonly ObservableAsPropertyHelper<bool> _isReadOnly;
 	private readonly RecipeMutationCoordinator _coordinator;
 	private readonly CompositeDisposable _disposables = new();
 	private readonly MessagePanelViewModel _messagePanel;
@@ -41,6 +43,17 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 			.ToProperty(this, x => x.CanDeleteStep)
 			.DisposeWith(_disposables);
 
+		_isReadOnly = coordinator.ExecutionState
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Select(info => info.RecipeActive)
+			.ToProperty(this, x => x.IsReadOnly)
+			.DisposeWith(_disposables);
+
+		coordinator.ExecutionState
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(OnExecutionStateChanged)
+			.DisposeWith(_disposables);
+
 		coordinator.StateChanged.Subscribe(OnStateChange).DisposeWith(_disposables);
 	}
 
@@ -49,6 +62,8 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 	public ObservableCollection<RecipeRowViewModel> RecipeRows { get; }
 
 	public bool CanDeleteStep => _canDeleteStep.Value;
+
+	public bool IsReadOnly => _isReadOnly.Value;
 
 	public int SelectedRowIndex
 	{
@@ -72,6 +87,23 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 	public void Initialize()
 	{
 		FullRebuild(_coordinator.CurrentRecipe);
+	}
+
+	private void OnExecutionStateChanged(PlcExecutionInfo info)
+	{
+		for (var i = 0; i < RecipeRows.Count; i++)
+		{
+			if (info.RecipeActive)
+			{
+				RecipeRows[i].IsCurrentStep = i == info.ActualLine;
+				RecipeRows[i].IsPastStep = i < info.ActualLine;
+			}
+			else
+			{
+				RecipeRows[i].IsCurrentStep = false;
+				RecipeRows[i].IsPastStep = false;
+			}
+		}
 	}
 
 	private void OnStateChange(MutationSignal signal)

@@ -4,7 +4,7 @@ using TypesShared.Plc;
 
 namespace S7;
 
-internal sealed class S7Driver : IAsyncDisposable
+internal sealed class S7Driver : IS7Driver
 {
 	private Plc? _plc;
 

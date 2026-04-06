@@ -104,7 +104,7 @@ internal sealed class ArrayCodec(DataDbLayout intLayout, DataDbLayout floatLayou
 		return bytes;
 	}
 
-	public int ReadArrayCurrentSize(byte[] headerData, DataDbLayout layout)
+	public static int ReadArrayCurrentSize(byte[] headerData, DataDbLayout layout)
 	{
 		return (int)BinaryPrimitives.ReadUInt32BigEndian(headerData.AsSpan(layout.CurrentSizeOffset));
 	}

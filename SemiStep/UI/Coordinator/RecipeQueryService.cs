@@ -4,6 +4,7 @@ using FluentResults;
 
 using TypesShared.Config;
 using TypesShared.Core;
+using TypesShared.Plc;
 
 namespace UI.Coordinator;
 
@@ -21,6 +22,13 @@ public sealed class RecipeQueryService(
 	public bool CanUndo => domainFacade.CanUndo;
 	public bool CanRedo => domainFacade.CanRedo;
 	public bool IsConnected => domainFacade.IsConnected;
+
+	public IObservable<PlcExecutionInfo> ExecutionState => domainFacade.ExecutionState;
+	public bool IsRecipeActive => domainFacade.IsRecipeActive;
+	public PlcSyncStatus SyncStatus => domainFacade.SyncStatus;
+	public string? SyncLastError => domainFacade.SyncLastError;
+	public DateTimeOffset? LastSyncTime => domainFacade.LastSyncTime;
+	public bool IsSyncEnabled => domainFacade.IsSyncEnabled;
 
 	public CellState GetCellState(GridColumnDefinition column, ActionDefinition action)
 	{

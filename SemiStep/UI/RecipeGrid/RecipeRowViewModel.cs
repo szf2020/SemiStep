@@ -34,7 +34,13 @@ public class RecipeRowViewModel(
 
 	public string ActionName => action.UiName;
 
-	public bool IsExecuting
+	public bool IsCurrentStep
+	{
+		get;
+		set => this.RaiseAndSetIfChanged(ref field, value);
+	}
+
+	public bool IsPastStep
 	{
 		get;
 		set => this.RaiseAndSetIfChanged(ref field, value);

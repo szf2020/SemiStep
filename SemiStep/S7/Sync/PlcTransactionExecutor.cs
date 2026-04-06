@@ -1,4 +1,6 @@
-﻿using S7.Protocol;
+﻿using FluentResults;
+
+using S7.Protocol;
 using S7.Serialization;
 
 using Serilog;
@@ -16,10 +18,10 @@ internal sealed class PlcTransactionExecutor
 	private readonly PlcProtocolLayout _layout;
 	private readonly ManagingAreaCodec _managingCodec;
 	private readonly PlcProtocolSettings _protocolSettings;
-	private readonly S7Driver _transport;
+	private readonly IS7Transport _transport;
 
 	public PlcTransactionExecutor(
-		S7Driver transport,
+		IS7Transport transport,
 		RecipeConverter converter,
 		PlcConfiguration plcConfiguration)
 	{
@@ -69,21 +71,21 @@ internal sealed class PlcTransactionExecutor
 			0,
 			_layout.IntDb.DataStartOffset,
 			ct);
-		var intCount = _arrayCodec.ReadArrayCurrentSize(intHeaderBytes, _layout.IntDb);
+		var intCount = ArrayCodec.ReadArrayCurrentSize(intHeaderBytes, _layout.IntDb);
 
 		var floatHeaderBytes = await _transport.ReadBytesAsync(
 			_layout.FloatDb.DbNumber,
 			0,
 			_layout.FloatDb.DataStartOffset,
 			ct);
-		var floatCount = _arrayCodec.ReadArrayCurrentSize(floatHeaderBytes, _layout.FloatDb);
+		var floatCount = ArrayCodec.ReadArrayCurrentSize(floatHeaderBytes, _layout.FloatDb);
 
 		var stringHeaderBytes = await _transport.ReadBytesAsync(
 			_layout.StringDb.DbNumber,
 			0,
 			_layout.StringDb.DataStartOffset,
 			ct);
-		var stringCount = _arrayCodec.ReadArrayCurrentSize(stringHeaderBytes, _layout.StringDb);
+		var stringCount = ArrayCodec.ReadArrayCurrentSize(stringHeaderBytes, _layout.StringDb);
 
 		var intDataSize = _layout.IntDb.DataStartOffset + intCount * ProtocolConstants.IntElementSize;
 		var floatDataSize = _layout.FloatDb.DataStartOffset + floatCount * ProtocolConstants.FloatElementSize;
@@ -97,7 +99,7 @@ internal sealed class PlcTransactionExecutor
 		var floatValues = _arrayCodec.DecodeFloatArray(floatData, floatCount);
 		var stringValues = _arrayCodec.DecodeStringArray(stringData, stringCount);
 
-		var stepCount = intCount > 0 ? intCount : 0;
+		var stepCount = intCount;
 
 		return new PlcRecipeData(intValues, floatValues, stringValues, stepCount);
 	}
@@ -108,81 +110,34 @@ internal sealed class PlcTransactionExecutor
 
 		for (var attempt = 1; attempt <= _protocolSettings.MaxRetryAttempts; attempt++)
 		{
-			try
+			await WriteRecipeDataAsync(recipeData, ct);
+
+			var verified = await VerifyWriteAsync(recipeData, ct);
+
+			if (verified)
 			{
-				await WriteRecipeDataAsync(recipeData, ct);
 				Log.Information(
-					"Recipe synced to PLC successfully ({StepCount} steps)",
-					recipe.StepCount);
+					"Recipe synced to PLC successfully ({StepCount} steps, attempt {Attempt})",
+					recipe.StepCount,
+					attempt);
 
 				return;
 			}
-			catch (PlcSyncException ex) when (attempt < _protocolSettings.MaxRetryAttempts &&
-											  IsRetryableError(ex.ErrorCode))
-			{
-				Log.Warning(
-					"Sync attempt {Attempt} failed with {Error}, retrying...",
-					attempt,
-					ex.ErrorCode);
-			}
+
+			Log.Warning(
+				"Write verification failed on attempt {Attempt} of {MaxAttempts}",
+				attempt,
+				_protocolSettings.MaxRetryAttempts);
 		}
 
-		throw new PlcSyncException(
-			$"Failed to sync recipe after {_protocolSettings.MaxRetryAttempts} attempts",
-			PlcSyncError.ChecksumMismatchMultiple);
+		throw new PlcWriteVerificationException(
+			$"Recipe write verification failed after {_protocolSettings.MaxRetryAttempts} attempts");
 	}
 
-	private async Task WriteRecipeDataAsync(PlcRecipeData data, CancellationToken ct)
+	public async Task<ManagingAreaState> ReadManagingAreaAsync(CancellationToken ct = default)
 	{
 		EnsureConnected();
 
-		var managingState = await ReadManagingAreaAsync(ct);
-		if (managingState.PlcStatus == PlcSyncStatus.Busy)
-		{
-			throw new PlcBusyException("PLC is busy processing another transaction");
-		}
-
-		var transactionId = (uint)Random.Shared.Next();
-
-		var checksumInt = data.IntValues.Length > 0
-			? ChecksumCalculator.ComputeCrc32(data.IntValues)
-			: 0u;
-		var checksumFloat = data.FloatValues.Length > 0
-			? ChecksumCalculator.ComputeCrc32(data.FloatValues)
-			: 0u;
-		var checksumString = data.StringValues.Length > 0
-			? ChecksumCalculator.ComputeStringArrayCrc32(data.StringValues, ProtocolConstants.WStringMaxChars)
-			: 0u;
-
-		var pcData = new ManagingAreaPcData(
-			Status: PcStatus.Writing,
-			TransactionId: transactionId,
-			ChecksumInt: checksumInt,
-			ChecksumFloat: checksumFloat,
-			ChecksumString: checksumString,
-			RecipeLines: (uint)data.StepCount);
-
-		await WriteManagingAreaAsync(pcData, ct);
-
-		var intBytes = _arrayCodec.EncodeIntArray(data.IntValues);
-		var floatBytes = _arrayCodec.EncodeFloatArray(data.FloatValues);
-		var stringBytes = _arrayCodec.EncodeStringArray(data.StringValues);
-
-		await _transport.WriteBytesAsync(_layout.IntDb.DbNumber, 0, intBytes, ct);
-		await _transport.WriteBytesAsync(_layout.FloatDb.DbNumber, 0, floatBytes, ct);
-		await _transport.WriteBytesAsync(_layout.StringDb.DbNumber, 0, stringBytes, ct);
-
-		var commitData = pcData with { Status = PcStatus.CommitRequest };
-		await WriteManagingAreaAsync(commitData, ct);
-
-		await WaitForPlcConfirmationAsync(transactionId, ct);
-
-		var idleData = pcData with { Status = PcStatus.Idle };
-		await WriteManagingAreaAsync(idleData, ct);
-	}
-
-	private async Task<ManagingAreaState> ReadManagingAreaAsync(CancellationToken ct)
-	{
 		var bytes = await _transport.ReadBytesAsync(
 			_layout.ManagingDb.DbNumber,
 			0,
@@ -192,42 +147,106 @@ internal sealed class PlcTransactionExecutor
 		return _managingCodec.Decode(bytes);
 	}
 
+	public async Task<Result<Recipe>> ReadRecipeFromPlcAsync(CancellationToken ct = default)
+	{
+		var managingAreaState = await ReadManagingAreaAsync(ct);
+
+		if (!managingAreaState.Committed)
+		{
+			return Result.Fail("Recipe not committed on PLC");
+		}
+
+		var recipeData = await ReadRecipeDataAsync(ct);
+
+		try
+		{
+			var recipe = _converter.ToRecipe(recipeData);
+			return Result.Ok(recipe);
+		}
+		catch (Exception ex)
+		{
+			Log.Warning(ex, "Failed to convert PLC recipe data to Recipe");
+			return Result.Fail($"Failed to convert PLC data to recipe: {ex.Message}");
+		}
+	}
+
+	private async Task WriteRecipeDataAsync(PlcRecipeData data, CancellationToken ct)
+	{
+		EnsureConnected();
+
+		await WriteManagingAreaAsync(new ManagingAreaPcData(Committed: false, RecipeLines: 0), ct);
+
+		var intBytes = _arrayCodec.EncodeIntArray(data.IntValues);
+		var floatBytes = _arrayCodec.EncodeFloatArray(data.FloatValues);
+		var stringBytes = _arrayCodec.EncodeStringArray(data.StringValues);
+
+		await _transport.WriteBytesAsync(_layout.IntDb.DbNumber, 0, intBytes, ct);
+		await _transport.WriteBytesAsync(_layout.FloatDb.DbNumber, 0, floatBytes, ct);
+		await _transport.WriteBytesAsync(_layout.StringDb.DbNumber, 0, stringBytes, ct);
+
+		await WriteManagingAreaAsync(new ManagingAreaPcData(Committed: false, RecipeLines: data.StepCount), ct);
+
+		await WriteManagingAreaAsync(new ManagingAreaPcData(Committed: true, RecipeLines: data.StepCount), ct);
+	}
+
+	private async Task<bool> VerifyWriteAsync(PlcRecipeData expected, CancellationToken ct)
+	{
+		var actual = await ReadRecipeDataAsync(ct);
+
+		if (actual.IntValues.Length != expected.IntValues.Length)
+		{
+			return false;
+		}
+
+		if (actual.FloatValues.Length != expected.FloatValues.Length)
+		{
+			return false;
+		}
+
+		if (actual.StringValues.Length != expected.StringValues.Length)
+		{
+			return false;
+		}
+
+		for (var i = 0; i < expected.IntValues.Length; i++)
+		{
+			if (actual.IntValues[i] != expected.IntValues[i])
+			{
+				return false;
+			}
+		}
+
+		for (var i = 0; i < expected.FloatValues.Length; i++)
+		{
+			if (!CompareFloats_ExpectedBytesEqual(actual.FloatValues[i], expected.FloatValues[i]))
+			{
+				return false;
+			}
+		}
+
+		for (var i = 0; i < expected.StringValues.Length; i++)
+		{
+			if (actual.StringValues[i] != expected.StringValues[i])
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	// Floats are serialised to raw IEEE 754 bytes, written to the PLC, and read back without
+	// any arithmetic transformation. The round-trip is byte-exact, so bit-exact equality is
+	// the correct comparison here — not an epsilon-based approximation.
+	private static bool CompareFloats_ExpectedBytesEqual(float actual, float expected)
+	{
+		return actual == expected;
+	}
+
 	private async Task WriteManagingAreaAsync(ManagingAreaPcData data, CancellationToken ct)
 	{
 		var bytes = _managingCodec.EncodePcData(data);
 		await _transport.WriteBytesAsync(_layout.ManagingDb.DbNumber, 0, bytes, ct);
-	}
-
-	private async Task WaitForPlcConfirmationAsync(uint transactionId, CancellationToken ct)
-	{
-		var deadline = DateTime.UtcNow.AddMilliseconds(_protocolSettings.CommitTimeoutMs);
-
-		while (DateTime.UtcNow < deadline)
-		{
-			ct.ThrowIfCancellationRequested();
-
-			var state = await ReadManagingAreaAsync(ct);
-
-			switch (state.PlcStatus)
-			{
-				case PlcSyncStatus.Success when state.PlcStoredId == transactionId:
-					return;
-
-				case PlcSyncStatus.Error:
-					throw new PlcSyncException(
-						$"PLC reported sync error: {state.PlcError}",
-						state.PlcError);
-
-				case PlcSyncStatus.Idle:
-				case PlcSyncStatus.CrcComputing:
-				case PlcSyncStatus.Busy:
-				default:
-					break;
-			}
-			await Task.Delay(_protocolSettings.PollingIntervalMs, ct);
-		}
-
-		throw new PlcSyncTimeoutException("Timeout waiting for PLC confirmation");
 	}
 
 	private void EnsureConnected()
@@ -236,14 +255,5 @@ internal sealed class PlcTransactionExecutor
 		{
 			throw new PlcNotConnectedException("Not connected to PLC");
 		}
-	}
-
-	private static bool IsRetryableError(PlcSyncError error)
-	{
-		return error is PlcSyncError.ChecksumMismatchInt
-			or PlcSyncError.ChecksumMismatchFloat
-			or PlcSyncError.ChecksumMismatchString
-			or PlcSyncError.ChecksumMismatchMultiple
-			or PlcSyncError.Timeout;
 	}
 }

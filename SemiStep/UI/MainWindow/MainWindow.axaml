@@ -31,7 +31,7 @@
                   AutoGenerateColumns="False"
                   CanUserReorderColumns="False"
                   CanUserResizeColumns="True"
-                  IsReadOnly="False"
+                  IsReadOnly="{Binding RecipeGrid.IsReadOnly}"
                   GridLinesVisibility="All"
                   HeadersVisibility="Column"
                   BorderThickness="1"

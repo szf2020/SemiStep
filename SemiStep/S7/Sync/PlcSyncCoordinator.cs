@@ -4,13 +4,14 @@ using Serilog;
 
 using TypesShared.Core;
 using TypesShared.Domain;
+using TypesShared.Plc;
 
 namespace S7.Sync;
 
 internal sealed class PlcSyncCoordinator(
 	PlcTransactionExecutor transactionExecutor,
 	IS7Service connectionService)
-	: IDisposable
+	: IPlcSyncService, IDisposable
 {
 	private const int DebounceDelayMs = 1000;
 	private readonly Lock _lock = new();
@@ -18,11 +19,12 @@ internal sealed class PlcSyncCoordinator(
 	private CancellationTokenSource? _debounceCts;
 	private bool _disposed;
 	private string? _lastError;
+	private DateTimeOffset? _lastSyncTime;
 	private Recipe? _pendingSnapshot;
-	private SyncStatus _status = SyncStatus.Idle;
+	private PlcSyncStatus _status = PlcSyncStatus.Idle;
 	private Task? _syncTask;
 
-	public SyncStatus Status
+	public PlcSyncStatus Status
 	{
 		get
 		{
@@ -41,6 +43,8 @@ internal sealed class PlcSyncCoordinator(
 				}
 				_status = value;
 			}
+			// value is captured before leaving the lock. StatusChanged is raised outside the
+			// lock intentionally: subscribers must not re-enter the lock on the same thread.
 			StatusChanged?.Invoke(value);
 		}
 	}
@@ -64,6 +68,47 @@ internal sealed class PlcSyncCoordinator(
 		}
 	}
 
+	public DateTimeOffset? LastSyncTime
+	{
+		get
+		{
+			lock (_lock)
+			{
+				return _lastSyncTime;
+			}
+		}
+		private set
+		{
+			lock (_lock)
+			{
+				_lastSyncTime = value;
+			}
+		}
+	}
+
+	public event Action<PlcSyncStatus>? StatusChanged;
+	public event Action<string?>? ErrorChanged;
+
+	public void NotifyRecipeChanged(Recipe recipe, bool isValid)
+	{
+		if (_disposed)
+		{
+			return;
+		}
+
+		if (!isValid)
+		{
+			lock (_lock)
+			{
+				_pendingSnapshot = null;
+			}
+			Status = PlcSyncStatus.OutOfSync;
+			return;
+		}
+
+		OnRecipeChanged(recipe);
+	}
+
 	public void Dispose()
 	{
 		if (_disposed)
@@ -76,8 +121,19 @@ internal sealed class PlcSyncCoordinator(
 		_debounceCts?.Dispose();
 	}
 
-	public event Action<SyncStatus>? StatusChanged;
-	public event Action<string?>? ErrorChanged;
+	public void Reset()
+	{
+		lock (_lock)
+		{
+			_debounceCts?.Cancel();
+			_debounceCts?.Dispose();
+			_debounceCts = null;
+			_pendingSnapshot = null;
+		}
+
+		LastError = null;
+		Status = PlcSyncStatus.Disconnected;
+	}
 
 	public async Task WaitForPendingSyncAsync(CancellationToken ct = default)
 	{
@@ -117,11 +173,11 @@ internal sealed class PlcSyncCoordinator(
 				return;
 			}
 
-			StartDebounce(recipe);
+			StartDebounce();
 		}
 	}
 
-	private void StartDebounce(Recipe recipe)
+	private void StartDebounce()
 	{
 		_debounceCts?.Cancel();
 		_debounceCts?.Dispose();
@@ -158,6 +214,7 @@ internal sealed class PlcSyncCoordinator(
 		if (!connectionService.IsConnected)
 		{
 			Log.Debug("Skipping sync: not connected to PLC");
+			Status = PlcSyncStatus.Disconnected;
 
 			return;
 		}
@@ -167,40 +224,30 @@ internal sealed class PlcSyncCoordinator(
 			var isRecipeActive = await transactionExecutor.IsRecipeActiveAsync(ct);
 			if (isRecipeActive)
 			{
-				Status = SyncStatus.BlockedByExecution;
+				Status = PlcSyncStatus.Failed;
 				LastError = "Recipe is being executed on PLC";
 				Log.Warning("Sync blocked: recipe is being executed on PLC");
 
 				return;
 			}
 
-			Status = SyncStatus.Syncing;
+			Status = PlcSyncStatus.Syncing;
 			LastError = null;
 
 			await transactionExecutor.WriteRecipeWithRetryAsync(snapshotToSync, ct);
 
-			Status = SyncStatus.Synced;
+			LastSyncTime = DateTimeOffset.UtcNow;
+			Status = PlcSyncStatus.Synced;
 			LastError = null;
-		}
-		catch (PlcRecipeActiveException)
-		{
-			Status = SyncStatus.BlockedByExecution;
-			LastError = "Recipe is being executed on PLC";
-		}
-		catch (PlcSyncException ex)
-		{
-			Status = SyncStatus.Failed;
-			LastError = ex.Message;
-			Log.Error(ex, "Sync failed: {Message}", ex.Message);
 		}
 		catch (PlcNotConnectedException)
 		{
-			Status = SyncStatus.Failed;
+			Status = PlcSyncStatus.Failed;
 			LastError = "Not connected to PLC";
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			Status = SyncStatus.Failed;
+			Status = PlcSyncStatus.Failed;
 			LastError = ex.Message;
 			Log.Error(ex, "Unexpected error during sync");
 		}
@@ -212,10 +259,13 @@ internal sealed class PlcSyncCoordinator(
 				nextSnapshot = _pendingSnapshot;
 			}
 
-			if (nextSnapshot is not null)
+			if (nextSnapshot is not null && !_disposed)
 			{
 				Log.Debug("Changes occurred during sync, starting new debounce");
-				StartDebounce(nextSnapshot);
+				lock (_lock)
+				{
+					StartDebounce();
+				}
 			}
 		}
 	}

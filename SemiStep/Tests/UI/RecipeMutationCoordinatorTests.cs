@@ -35,7 +35,10 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 		var configRegistry = services.GetRequiredService<ConfigRegistry>();
 		_panel = new MessagePanelViewModel();
 		var queryService = new RecipeQueryService(_facade, configRegistry);
-		_coordinator = new RecipeMutationCoordinator(_facade, queryService, _panel);
+		var appConfiguration = services.GetRequiredService<AppConfiguration>();
+		var syncService = new StubPlcSyncService();
+		_coordinator = new RecipeMutationCoordinator(_facade, appConfiguration, queryService, _panel, syncService);
+		_coordinator.Initialize();
 	}
 
 	public Task DisposeAsync()

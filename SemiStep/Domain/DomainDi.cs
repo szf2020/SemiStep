@@ -28,7 +28,8 @@ public static class DomainDi
 			sp.GetRequiredService<IS7Service>(),
 			sp.GetRequiredService<IClipboardService>(),
 			sp.GetRequiredService<ImportedRecipeValidator>(),
-			sp.GetRequiredService<IPropertyParser>()));
+			sp.GetRequiredService<IPropertyParser>(),
+			sp.GetRequiredService<IPlcSyncService>()));
 
 		return services;
 	}

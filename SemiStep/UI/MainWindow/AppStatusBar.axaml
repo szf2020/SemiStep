@@ -26,6 +26,11 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
@@ -88,11 +93,113 @@
                     Margin="12,2"
                     IsVisible="{Binding MessagePanel.HasStatusErrors}" />
 
+            <!-- Sync controls -->
+            <StackPanel Grid.Column="4"
+                        Orientation="Horizontal"
+                        Spacing="6"
+                        VerticalAlignment="Center">
+
+                <!-- Sync toggle button: label switches based on IsSyncEnabled -->
+                <Button Command="{Binding ToggleSyncCommand}"
+                        Padding="6,2"
+                        FontSize="12"
+                        VerticalAlignment="Center">
+                    <Panel>
+                        <TextBlock Text="Sync: ON"
+                                   IsVisible="{Binding IsSyncEnabled}" />
+                        <TextBlock Text="Sync: OFF"
+                                   IsVisible="{Binding IsSyncEnabled,
+                                               Converter={x:Static BoolConverters.Not}}" />
+                    </Panel>
+                </Button>
+
+                <!-- Sync status label -->
+                <TextBlock Text="{Binding PlcSyncStatusText}"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource SecondaryForegroundBrush}" />
+
+                <!-- Sync error text (red, visible only when error present) -->
+                <TextBlock Text="{Binding PlcSyncErrorText}"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ErrorBrush}"
+                           IsVisible="{Binding PlcSyncErrorText,
+                                       Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <!-- Last sync time -->
+                <TextBlock FontSize="12"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource SecondaryForegroundBrush}"
+                           Text="{Binding LastSyncTimeText, StringFormat='Last sync: {0}'}" />
+
+            </StackPanel>
+
+            <!-- Separator before execution info -->
+            <Border Grid.Column="5"
+                    Width="1"
+                    Background="{DynamicResource SeparatorBrush}"
+                    Margin="12,2"
+                    IsVisible="{Binding PlcMonitor.IsRecipeActive}" />
+
+            <!-- Execution time info (visible only when recipe is active) -->
+            <StackPanel Grid.Column="6"
+                        Orientation="Horizontal"
+                        Spacing="10"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding PlcMonitor.IsRecipeActive}">
+
+                <!-- Line time remaining -->
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="Step:"
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryForegroundBrush}"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding PlcMonitor.LineTimeLeft}"
+                               FontSize="12"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+
+            </StackPanel>
+
+            <!-- Separator before FOR loop counters -->
+            <Border Grid.Column="7"
+                    Width="1"
+                    Background="{DynamicResource SeparatorBrush}"
+                    Margin="12,2"
+                    IsVisible="{Binding PlcMonitor.IsRecipeActive}" />
+
+            <!-- FOR loop counters (visible only when recipe is active) -->
+            <StackPanel Grid.Column="8"
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding PlcMonitor.IsRecipeActive}">
+
+                <TextBlock Text="FOR:"
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryForegroundBrush}"
+                           VerticalAlignment="Center" />
+
+                <TextBlock Text="{Binding PlcMonitor.ForLoopCount1}"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+
+                <TextBlock Text="{Binding PlcMonitor.ForLoopCount2}"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+
+                <TextBlock Text="{Binding PlcMonitor.ForLoopCount3}"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+
+            </StackPanel>
+
             <!-- Spacer -->
-            <Panel Grid.Column="4" />
+            <Panel Grid.Column="9" />
 
             <!-- Connection Status -->
-            <StackPanel Grid.Column="5"
+            <StackPanel Grid.Column="10"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
                 <Ellipse Width="8"

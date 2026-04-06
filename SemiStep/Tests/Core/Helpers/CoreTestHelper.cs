@@ -30,6 +30,7 @@ public static class CoreTestHelper
 			.AddSingleton<ICsvService, StubCsvService>()
 			.AddSingleton<IClipboardService, StubClipboardService>()
 			.AddSingleton<IS7Service, StubIs7Service>()
+			.AddSingleton<IPlcSyncService, StubPlcSyncService>()
 			.BuildServiceProvider();
 
 		var domainFacade = services.GetRequiredService<DomainFacade>();

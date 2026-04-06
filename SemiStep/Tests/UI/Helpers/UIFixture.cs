@@ -3,6 +3,7 @@
 using Microsoft.Extensions.DependencyInjection;
 
 using Tests.Core.Helpers;
+using Tests.Helpers;
 
 using TypesShared.Config;
 
@@ -30,7 +31,10 @@ public sealed class UIFixture : IAsyncLifetime
 		ConfigRegistry = services.GetRequiredService<ConfigRegistry>();
 		MessagePanel = new MessagePanelViewModel();
 		QueryService = new RecipeQueryService(Facade, ConfigRegistry);
-		Coordinator = new RecipeMutationCoordinator(Facade, QueryService, MessagePanel);
+		var appConfiguration = services.GetRequiredService<AppConfiguration>();
+		var syncService = new StubPlcSyncService();
+		Coordinator = new RecipeMutationCoordinator(Facade, appConfiguration, QueryService, MessagePanel, syncService);
+		Coordinator.Initialize();
 		Grid = new RecipeGridViewModel(Coordinator, ConfigRegistry, MessagePanel);
 		Grid.Initialize();
 	}

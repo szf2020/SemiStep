@@ -34,6 +34,7 @@ internal partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 				return;
 			}
 
+			ViewModel.MainWindow = this;
 			ViewModel.Clipboard.SetClipboard(Clipboard);
 
 			ViewModel.RecipeFile.OpenFileInteraction

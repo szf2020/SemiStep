@@ -1,4 +1,4 @@
-﻿connection_file_version: 1.0
+connection_file_version: 1.0
 
 # -- Connection info --
 ip: "192.168.0.150:102"
@@ -29,21 +29,9 @@ header_db_total_size: 16
 
 # -- Managing DB --
 managing_db_number: 2
-pc_status_offset: 0
-pc_transaction_id_offset: 2
-pc_checksum_int_offset: 6
-pc_checksum_float_offset: 10
-pc_checksum_string_offset: 14
-pc_recipe_lines_offset: 18
-plc_status_offset: 22
-plc_error_offset: 24
-plc_stored_id_offset: 26
-plc_checksum_int_offset: 30
-plc_checksum_float_offset: 34
-plc_checksum_string_offset: 38
-
-managing_db_total_size: 42
-managing_pc_data_size: 22
+committed_offset: 0
+recipe_lines_offset: 2
+managing_db_total_size: 6
 
 # -- Int DB --
 int_db_number: 3
