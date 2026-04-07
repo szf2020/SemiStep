@@ -137,6 +137,12 @@ public class MessagePanelViewModel : ReactiveObject, IDisposable
 		RecountAndNotify();
 	}
 
+	public void AddWarning(string message, string source)
+	{
+		Entries.Add(new MessageEntry(MessageSeverity.Warning, message, source, DateTime.Now));
+		RecountAndNotify();
+	}
+
 	public void AddInfo(string message, string source)
 	{
 		Entries.Add(new MessageEntry(MessageSeverity.Info, message, source, DateTime.Now));

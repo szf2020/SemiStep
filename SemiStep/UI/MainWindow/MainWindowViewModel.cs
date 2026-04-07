@@ -48,6 +48,11 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		ExitCommand = ReactiveCommand.Create(ExecuteExit);
 		ToggleSyncCommand = ReactiveCommand.CreateFromTask(ExecuteToggleSyncAsync);
 
+		ToggleSyncCommand.ThrownExceptions
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(ex => messagePanel.AddError($"Sync toggle failed: {ex.Message}", "PLC"))
+			.DisposeWith(_disposables);
+
 		_coordinator.StateChanged
 			.ObserveOn(RxApp.MainThreadScheduler)
 			.Subscribe(_ => RaiseAllStateProperties())
@@ -151,7 +156,8 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		}
 		catch (Exception ex)
 		{
-			Log.Warning(ex, "Unexpected error while handling PLC recipe conflict");
+			Log.Warning("Unexpected error while handling PLC recipe conflict: {Message}", ex.Message);
+			MessagePanel.AddError("Failed to resolve PLC recipe conflict — sync disabled", "PLC");
 		}
 	}
 

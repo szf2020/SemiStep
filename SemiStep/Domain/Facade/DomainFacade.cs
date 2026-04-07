@@ -103,7 +103,7 @@ public sealed class DomainFacade : IDisposable
 
 		_connectionStateChangedRelay = state =>
 		{
-			ConnectionStateChanged?.Invoke();
+			ConnectionStateChanged?.Invoke(state);
 
 			if (state == PlcConnectionState.Disconnected && _isSyncEnabled)
 			{
@@ -335,7 +335,7 @@ public sealed class DomainFacade : IDisposable
 
 	public string? LastConnectionError { get; private set; }
 
-	public event Action? ConnectionStateChanged;
+	public event Action<PlcConnectionState>? ConnectionStateChanged;
 	public event Action<Recipe, Recipe>? PlcRecipeConflictDetected;
 
 	public async Task<Result> EnableSync(PlcConfiguration config)
