@@ -1,4 +1,8 @@
-﻿using S7.Protocol;
+﻿using System.Linq;
+
+using FluentResults;
+
+using S7.Protocol;
 
 using Serilog;
 
@@ -194,6 +198,11 @@ internal sealed class PlcSyncCoordinator(
 			catch (OperationCanceledException)
 			{
 			}
+			catch (Exception ex)
+			{
+				Log.Error(ex, "Unhandled exception in sync task");
+				Status = PlcSyncStatus.Failed;
+			}
 		}, ct);
 	}
 
@@ -219,53 +228,58 @@ internal sealed class PlcSyncCoordinator(
 			return;
 		}
 
-		try
+		var activeResult = await transactionExecutor.IsRecipeActiveAsync(ct);
+		if (activeResult.IsFailed)
 		{
-			var isRecipeActive = await transactionExecutor.IsRecipeActiveAsync(ct);
-			if (isRecipeActive)
-			{
-				Status = PlcSyncStatus.Failed;
-				LastError = "Recipe is being executed on PLC";
-				Log.Warning("Sync blocked: recipe is being executed on PLC");
+			var isDisconnected = activeResult.Errors.OfType<NotConnectedError>().Any();
+			Status = PlcSyncStatus.Failed;
+			LastError = isDisconnected
+				? "Not connected to PLC"
+				: activeResult.Errors[0].Message;
 
-				return;
+			if (isDisconnected)
+			{
+				Log.Warning("Sync blocked: not connected to PLC");
 			}
 
-			Status = PlcSyncStatus.Syncing;
-			LastError = null;
-
-			await transactionExecutor.WriteRecipeWithRetryAsync(snapshotToSync, ct);
-
-			LastSyncTime = DateTimeOffset.UtcNow;
-			Status = PlcSyncStatus.Synced;
-			LastError = null;
+			return;
 		}
-		catch (PlcNotConnectedException)
+
+		if (activeResult.Value)
 		{
 			Status = PlcSyncStatus.Failed;
-			LastError = "Not connected to PLC";
+			LastError = "Recipe is being executed on PLC";
+			Log.Warning("Sync blocked: recipe is being executed on PLC");
+
+			return;
 		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
+
+		Status = PlcSyncStatus.Syncing;
+		LastError = null;
+
+		var writeResult = await transactionExecutor.WriteRecipeWithRetryAsync(snapshotToSync, ct);
+		if (writeResult.IsFailed)
 		{
 			Status = PlcSyncStatus.Failed;
-			LastError = ex.Message;
-			Log.Error(ex, "Unexpected error during sync");
-		}
-		finally
-		{
-			Recipe? nextSnapshot;
-			lock (_lock)
+			LastError = writeResult.Errors[0].Message;
+			if (!writeResult.Errors.OfType<NotConnectedError>().Any())
 			{
-				nextSnapshot = _pendingSnapshot;
+				Log.Error("Sync failed: {Message}", writeResult.Errors[0].Message);
 			}
 
-			if (nextSnapshot is not null && !_disposed)
+			return;
+		}
+
+		LastSyncTime = DateTimeOffset.UtcNow;
+		Status = PlcSyncStatus.Synced;
+		LastError = null;
+
+		lock (_lock)
+		{
+			if (_pendingSnapshot is not null && !_disposed)
 			{
 				Log.Debug("Changes occurred during sync, starting new debounce");
-				lock (_lock)
-				{
-					StartDebounce();
-				}
+				StartDebounce();
 			}
 		}
 	}

@@ -355,7 +355,7 @@ public sealed class DomainFacade : IDisposable
 		{
 			_isSyncEnabled = false;
 			LastConnectionError = ex.Message;
-			Log.Warning(ex, "PLC connection failed during sync enable");
+			Log.Warning("PLC connection failed: {Message}", ex.Message);
 			return Result.Fail(ex.Message);
 		}
 
@@ -373,7 +373,7 @@ public sealed class DomainFacade : IDisposable
 		}
 		catch (Exception ex)
 		{
-			Log.Warning(ex, "Error while disconnecting PLC during sync disable");
+			Log.Warning("Error while disconnecting from PLC: {Message}", ex.Message);
 		}
 	}
 

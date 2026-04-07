@@ -2,6 +2,9 @@
 
 using FluentAssertions;
 
+using FluentResults;
+
+using S7.Protocol;
 using S7.Serialization;
 using S7.Sync;
 
@@ -24,28 +27,18 @@ public sealed class PlcTransactionExecutorTests
 {
 	// Layout where CapacityOffset=0 (4 bytes) and CurrentSizeOffset=4 (4 bytes), so the
 	// 8-byte header leaves enough room for ReadUInt32BigEndian at both offsets.
-	private static DataDbLayout BuildTestIntLayout()
+	private static DataDbLayout BuildTestDataDbLayout(int dbNumber)
 	{
-		return new(DbNumber: 3, CapacityOffset: 0, CurrentSizeOffset: 4, DataStartOffset: 8);
-	}
-
-	private static DataDbLayout BuildTestFloatLayout()
-	{
-		return new(DbNumber: 4, CapacityOffset: 0, CurrentSizeOffset: 4, DataStartOffset: 8);
-	}
-
-	private static DataDbLayout BuildTestStringLayout()
-	{
-		return new(DbNumber: 5, CapacityOffset: 0, CurrentSizeOffset: 4, DataStartOffset: 8);
+		return new(DbNumber: dbNumber, CapacityOffset: 0, CurrentSizeOffset: 4, DataStartOffset: 8);
 	}
 
 	private static PlcConfiguration BuildTestConfiguration()
 	{
 		var layout = new PlcProtocolLayout(
 			ManagingDb: ManagingDbLayout.Default,
-			IntDb: BuildTestIntLayout(),
-			FloatDb: BuildTestFloatLayout(),
-			StringDb: BuildTestStringLayout(),
+			IntDb: BuildTestDataDbLayout(3),
+			FloatDb: BuildTestDataDbLayout(4),
+			StringDb: BuildTestDataDbLayout(5),
 			ExecutionDb: ExecutionDbLayout.Default);
 
 		return new PlcConfiguration(
@@ -67,7 +60,7 @@ public sealed class PlcTransactionExecutorTests
 		return new ConfigRegistry(config);
 	}
 
-	private static (PlcTransactionExecutor Executor, FakeS7Transport Transport) BuildExecutor()
+	private static (PlcTransactionExecutor executor, FakeS7Transport transport) BuildExecutor()
 	{
 		var transport = new FakeS7Transport();
 		var converter = new RecipeConverter(BuildEmptyConfigRegistry());
@@ -234,10 +227,12 @@ public sealed class PlcTransactionExecutorTests
 		transport.SetReadResponseForDb(layout.FloatDb.DbNumber, (_, count) => new byte[count]);
 		transport.SetReadResponseForDb(layout.StringDb.DbNumber, (_, count) => new byte[count]);
 
-		var act = async () => await executor.WriteRecipeWithRetryAsync(Recipe.Empty);
+		var result = await executor.WriteRecipeWithRetryAsync(Recipe.Empty);
 
-		await act.Should().ThrowAsync<PlcWriteVerificationException>(
-			"after exhausting all retry attempts a PlcWriteVerificationException must be thrown");
+		result.IsFailed.Should().BeTrue(
+			"after exhausting all retry attempts the result must be failed");
+		result.Errors.Should().ContainSingle(e =>
+			e.Message.Contains("verification failed", StringComparison.OrdinalIgnoreCase));
 	}
 
 	[Fact]
@@ -246,7 +241,7 @@ public sealed class PlcTransactionExecutorTests
 		var (executor, transport) = BuildExecutor();
 		var layout = BuildTestConfiguration().Layout;
 
-		const int MaxRetryAttempts = 3;
+		var maxRetryAttempts = PlcProtocolSettings.Default.MaxRetryAttempts;
 
 		// Mismatch: read-back claims 1 int element, but write was 0.
 		var mismatchHeader = BuildArrayHeaderBytes(1);
@@ -260,30 +255,25 @@ public sealed class PlcTransactionExecutorTests
 		transport.SetReadResponseForDb(layout.FloatDb.DbNumber, (_, count) => new byte[count]);
 		transport.SetReadResponseForDb(layout.StringDb.DbNumber, (_, count) => new byte[count]);
 
-		try
-		{
-			await executor.WriteRecipeWithRetryAsync(Recipe.Empty);
-		}
-		catch (PlcWriteVerificationException)
-		{
-		}
+		await executor.WriteRecipeWithRetryAsync(Recipe.Empty);
 
 		var intHeaderReads = transport.ReadLog
 			.Count(r => r.DbNumber == layout.IntDb.DbNumber && r.Count == 8);
 
-		intHeaderReads.Should().Be(MaxRetryAttempts,
+		intHeaderReads.Should().Be(maxRetryAttempts,
 			"int header should be read once per retry attempt during verification");
 	}
 
 	[Fact]
-	public async Task WriteRecipeWithRetryAsync_NotConnected_ThrowsPlcNotConnectedException()
+	public async Task WriteRecipeWithRetryAsync_NotConnected_ReturnsFailedResultWithNotConnectedError()
 	{
 		var (executor, transport) = BuildExecutor();
 		transport.SetConnected(false);
 
-		var act = async () => await executor.WriteRecipeWithRetryAsync(Recipe.Empty);
+		var result = await executor.WriteRecipeWithRetryAsync(Recipe.Empty);
 
-		await act.Should().ThrowAsync<Exception>()
-			.Where(ex => ex.GetType().Name == "PlcNotConnectedException");
+		result.IsFailed.Should().BeTrue("writing to a disconnected PLC must return a failed result");
+		result.HasError<NotConnectedError>().Should().BeTrue(
+			"the failure reason must be a NotConnectedError");
 	}
 }

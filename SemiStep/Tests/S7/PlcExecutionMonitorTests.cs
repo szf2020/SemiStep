@@ -3,7 +3,6 @@
 using FluentAssertions;
 
 using S7;
-using S7.Protocol;
 using S7.Serialization;
 using S7.Sync;
 
@@ -57,12 +56,12 @@ public sealed class PlcExecutionMonitorTests
 	/// that returns a controllable execution state on every poll tick.
 	/// </summary>
 	private static (PlcExecutionMonitor Monitor, FakeExecutionTransport Transport) BuildMonitor(
-		PlcExecutionState? executionStateToReturn = null)
+		PlcExecutionInfo? executionStateToReturn = null)
 	{
 		var configuration = BuildTestConfiguration();
 		var transport = new FakeExecutionTransport(
 			configuration.Layout,
-			executionStateToReturn ?? new PlcExecutionState(
+			executionStateToReturn ?? new PlcExecutionInfo(
 				RecipeActive: false,
 				ActualLine: 0,
 				StepCurrentTime: 0f,
@@ -107,7 +106,7 @@ public sealed class PlcExecutionMonitorTests
 	[Fact]
 	public async Task Start_PublishesExecutionStateFromPoll()
 	{
-		var expectedState = new PlcExecutionState(
+		var expectedState = new PlcExecutionInfo(
 			RecipeActive: true,
 			ActualLine: 3,
 			StepCurrentTime: 1.5f,
@@ -136,7 +135,7 @@ public sealed class PlcExecutionMonitorTests
 	public async Task Start_ThenStop_LastPublishedValueIsEmpty()
 	{
 		var (monitor, _) = BuildMonitor(
-			new PlcExecutionState(
+			new PlcExecutionInfo(
 				RecipeActive: true,
 				ActualLine: 1,
 				StepCurrentTime: 0f,
@@ -184,7 +183,7 @@ public sealed class PlcExecutionMonitorTests
 	[Fact]
 	public async Task LastKnown_UpdatesAfterPoll()
 	{
-		var executionState = new PlcExecutionState(
+		var executionState = new PlcExecutionInfo(
 			RecipeActive: true,
 			ActualLine: 5,
 			StepCurrentTime: 2.0f,

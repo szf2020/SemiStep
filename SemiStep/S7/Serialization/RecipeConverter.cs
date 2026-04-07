@@ -1,5 +1,7 @@
 ﻿using System.Collections.Immutable;
 
+using FluentResults;
+
 using TypesShared.Config;
 using TypesShared.Core;
 using TypesShared.Plc;
@@ -8,11 +10,11 @@ namespace S7.Serialization;
 
 internal sealed class RecipeConverter(ConfigRegistry configRegistry)
 {
-	public PlcRecipeData FromRecipe(Recipe recipe)
+	public Result<PlcRecipeData> FromRecipe(Recipe recipe)
 	{
 		if (recipe.StepCount == 0)
 		{
-			return PlcRecipeData.Empty;
+			return Result.Ok(PlcRecipeData.Empty);
 		}
 
 		var intValues = new List<int>();
@@ -21,21 +23,25 @@ internal sealed class RecipeConverter(ConfigRegistry configRegistry)
 
 		foreach (var step in recipe.Steps)
 		{
-			SerialiseStep(step, intValues, floatValues, stringValues);
+			var stepResult = SerialiseStep(step, intValues, floatValues, stringValues);
+			if (stepResult.IsFailed)
+			{
+				return stepResult.ToResult<PlcRecipeData>();
+			}
 		}
 
-		return new PlcRecipeData(
+		return Result.Ok(new PlcRecipeData(
 			IntValues: intValues.ToArray(),
 			FloatValues: floatValues.ToArray(),
 			StringValues: stringValues.ToArray(),
-			StepCount: recipe.StepCount);
+			StepCount: recipe.StepCount));
 	}
 
-	public Recipe ToRecipe(PlcRecipeData data)
+	public Result<Recipe> ToRecipe(PlcRecipeData data)
 	{
 		if (data.StepCount == 0)
 		{
-			return Recipe.Empty;
+			return Result.Ok(Recipe.Empty);
 		}
 
 		var intIndex = 0;
@@ -46,13 +52,19 @@ internal sealed class RecipeConverter(ConfigRegistry configRegistry)
 
 		for (var stepIndex = 0; stepIndex < data.StepCount; stepIndex++)
 		{
-			steps.Add(DeserialiseStep(stepIndex, data, ref intIndex, ref floatIndex, ref stringIndex));
+			var stepResult = DeserialiseStep(stepIndex, data, ref intIndex, ref floatIndex, ref stringIndex);
+			if (stepResult.IsFailed)
+			{
+				return stepResult.ToResult<Recipe>();
+			}
+
+			steps.Add(stepResult.Value);
 		}
 
-		return new Recipe(steps.ToImmutableList());
+		return Result.Ok(new Recipe(steps.ToImmutableList()));
 	}
 
-	private void SerialiseStep(
+	private Result SerialiseStep(
 		Step step,
 		List<int> intValues,
 		List<float> floatValues,
@@ -60,16 +72,26 @@ internal sealed class RecipeConverter(ConfigRegistry configRegistry)
 	{
 		intValues.Add(step.ActionKey);
 
-		var action = ResolveAction(step.ActionKey);
+		var actionResult = ResolveAction(step.ActionKey);
+		if (actionResult.IsFailed)
+		{
+			return actionResult.ToResult();
+		}
 
-		foreach (var propertyDef in action.Properties)
+		foreach (var propertyDef in actionResult.Value.Properties)
 		{
 			step.Properties.TryGetValue(new PropertyId(propertyDef.Key), out var value);
-			SerialiseProperty(propertyDef, value, intValues, floatValues, stringValues);
+			var propertyResult = SerialiseProperty(propertyDef, value, intValues, floatValues, stringValues);
+			if (propertyResult.IsFailed)
+			{
+				return propertyResult;
+			}
 		}
+
+		return Result.Ok();
 	}
 
-	private Step DeserialiseStep(
+	private Result<Step> DeserialiseStep(
 		int stepIndex,
 		PlcRecipeData data,
 		ref int intIndex,
@@ -78,37 +100,53 @@ internal sealed class RecipeConverter(ConfigRegistry configRegistry)
 	{
 		if (intIndex >= data.IntValues.Length)
 		{
-			throw new InvalidOperationException(
+			return Result.Fail(
 				$"Insufficient int values at step {stepIndex}: expected ActionKey but reached end of array");
 		}
 
 		var actionKey = data.IntValues[intIndex++];
-		var action = ResolveAction(actionKey);
+		var actionResult = ResolveAction(actionKey);
+		if (actionResult.IsFailed)
+		{
+			return actionResult.ToResult<Step>();
+		}
 
 		var properties = ImmutableDictionary.CreateBuilder<PropertyId, PropertyValue>();
 
-		foreach (var propertyDef in action.Properties)
+		foreach (var propertyDef in actionResult.Value.Properties)
 		{
-			var value = DeserialiseProperty(propertyDef, stepIndex, data, ref intIndex, ref floatIndex, ref stringIndex);
-			properties.Add(new PropertyId(propertyDef.Key), value);
+			var propertyResult = DeserialiseProperty(
+				propertyDef, stepIndex, data, ref intIndex, ref floatIndex, ref stringIndex);
+			if (propertyResult.IsFailed)
+			{
+				return propertyResult.ToResult<Step>();
+			}
+
+			properties.Add(new PropertyId(propertyDef.Key), propertyResult.Value);
 		}
 
-		return new Step(actionKey, properties.ToImmutable());
+		return Result.Ok(new Step(actionKey, properties.ToImmutable()));
 	}
 
-	private void SerialiseProperty(
+	private Result SerialiseProperty(
 		ActionPropertyDefinition propertyDef,
 		PropertyValue? value,
 		List<int> intValues,
 		List<float> floatValues,
 		List<string> stringValues)
 	{
-		var propertyType = ResolvePropertyType(propertyDef);
+		var propertyTypeResult = ResolvePropertyType(propertyDef);
+		if (propertyTypeResult.IsFailed)
+		{
+			return propertyTypeResult.ToResult();
+		}
+
+		var propertyType = propertyTypeResult.Value;
 
 		if (value is null)
 		{
 			AppendDefaultValue(propertyType, intValues, floatValues, stringValues);
-			return;
+			return Result.Ok();
 		}
 
 		switch (propertyType)
@@ -123,9 +161,11 @@ internal sealed class RecipeConverter(ConfigRegistry configRegistry)
 				stringValues.Add(value.AsString());
 				break;
 		}
+
+		return Result.Ok();
 	}
 
-	private PropertyValue DeserialiseProperty(
+	private Result<PropertyValue> DeserialiseProperty(
 		ActionPropertyDefinition propertyDef,
 		int stepIndex,
 		PlcRecipeData data,
@@ -133,61 +173,64 @@ internal sealed class RecipeConverter(ConfigRegistry configRegistry)
 		ref int floatIndex,
 		ref int stringIndex)
 	{
-		var propertyType = ResolvePropertyType(propertyDef);
+		var propertyTypeResult = ResolvePropertyType(propertyDef);
+		if (propertyTypeResult.IsFailed)
+		{
+			return propertyTypeResult.ToResult<PropertyValue>();
+		}
 
-		switch (propertyType)
+		switch (propertyTypeResult.Value)
 		{
 			case PropertyType.Int:
 				if (intIndex >= data.IntValues.Length)
 				{
-					throw new InvalidOperationException(
+					return Result.Fail(
 						$"Insufficient int values at step {stepIndex}, column '{propertyDef.Key}'");
 				}
-				return PropertyValue.FromInt(data.IntValues[intIndex++]);
+				return Result.Ok(PropertyValue.FromInt(data.IntValues[intIndex++]));
 
 			case PropertyType.Float:
 				if (floatIndex >= data.FloatValues.Length)
 				{
-					throw new InvalidOperationException(
+					return Result.Fail(
 						$"Insufficient float values at step {stepIndex}, column '{propertyDef.Key}'");
 				}
-				return PropertyValue.FromFloat(data.FloatValues[floatIndex++]);
+				return Result.Ok(PropertyValue.FromFloat(data.FloatValues[floatIndex++]));
 
 			case PropertyType.String:
 				if (stringIndex >= data.StringValues.Length)
 				{
-					throw new InvalidOperationException(
+					return Result.Fail(
 						$"Insufficient string values at step {stepIndex}, column '{propertyDef.Key}'");
 				}
-				return PropertyValue.FromString(data.StringValues[stringIndex++]);
+				return Result.Ok(PropertyValue.FromString(data.StringValues[stringIndex++]));
 
 			default:
-				throw new InvalidOperationException($"Unknown property type: {propertyType}");
+				return Result.Fail($"Unknown property type: {propertyTypeResult.Value}");
 		}
 	}
 
-	private PropertyType ResolvePropertyType(ActionPropertyDefinition propertyDef)
+	private Result<PropertyType> ResolvePropertyType(ActionPropertyDefinition propertyDef)
 	{
 		var propertyDefResult = configRegistry.GetProperty(propertyDef.PropertyTypeId);
 		if (propertyDefResult.IsFailed)
 		{
-			throw new InvalidOperationException(
+			return Result.Fail(
 				$"Property type '{propertyDef.PropertyTypeId}' not found in configuration registry");
 		}
 
-		return PropertyTypeMapping.FromSystemType(propertyDefResult.Value.SystemType);
+		return Result.Ok(PropertyTypeMapping.FromSystemType(propertyDefResult.Value.SystemType));
 	}
 
-	private ActionDefinition ResolveAction(int actionKey)
+	private Result<ActionDefinition> ResolveAction(int actionKey)
 	{
 		var actionResult = configRegistry.GetAction(actionKey);
 		if (actionResult.IsFailed)
 		{
-			throw new InvalidOperationException(
-				$"Action with key {actionKey} not found in configuration registry");
+			return Result.Fail($"Action with key {actionKey} not found in configuration registry");
 		}
 
-		return actionResult.Value;
+		return Result.Ok(actionResult.Value);
 	}
 
 	private static void AppendDefaultValue(

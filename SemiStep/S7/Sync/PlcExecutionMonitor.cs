@@ -1,4 +1,7 @@
-﻿using System.Reactive.Subjects;
+﻿using System.Linq;
+using System.Reactive.Subjects;
+
+using FluentResults;
 
 using S7.Protocol;
 
@@ -95,37 +98,32 @@ internal sealed class PlcExecutionMonitor(
 			try
 			{
 				await Task.Delay(protocolSettings.PollingIntervalMs, ct);
+				var result = await transactionExecutor.ReadExecutionStateAsync(ct);
 
-				var state = await transactionExecutor.ReadExecutionStateAsync(ct);
+				if (result.IsFailed)
+				{
+					if (result.Errors.OfType<NotConnectedError>().Any())
+					{
+						Log.Debug("Execution monitor stopping: PLC not connected");
 
-				var info = new PlcExecutionInfo(
-					RecipeActive: state.RecipeActive,
-					ActualLine: state.ActualLine,
-					StepCurrentTime: state.StepCurrentTime,
-					ForLoopCount1: state.ForLoopCount1,
-					ForLoopCount2: state.ForLoopCount2,
-					ForLoopCount3: state.ForLoopCount3);
+						if (!(_pollCts?.IsCancellationRequested ?? true))
+						{
+							onConnectionLost();
+						}
+					}
+					else
+					{
+						Log.Warning("Execution monitor poll error: {Message}", result.Errors[0].Message);
+					}
 
-				PublishAndTrack(info);
+					return;
+				}
+
+				PublishAndTrack(result.Value);
 			}
 			catch (OperationCanceledException)
 			{
 				return;
-			}
-			catch (PlcNotConnectedException)
-			{
-				Log.Debug("Execution monitor stopping: PLC not connected");
-
-				if (!(_pollCts?.IsCancellationRequested ?? true))
-				{
-					onConnectionLost();
-				}
-
-				return;
-			}
-			catch (Exception ex)
-			{
-				Log.Warning(ex, "Unexpected error in execution monitor poll loop");
 			}
 		}
 	}

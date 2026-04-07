@@ -77,10 +77,10 @@ public sealed class ManagingAreaCodecTests
 
 		var bytes = codec.EncodePcData(data);
 
-		bytes[2].Should().Be(0);
-		bytes[3].Should().Be(0);
-		bytes[4].Should().Be(0);
-		bytes[5].Should().Be(0);
+		bytes[DefaultLayout.RecipeLinesOffset].Should().Be(0);
+		bytes[DefaultLayout.RecipeLinesOffset + 1].Should().Be(0);
+		bytes[DefaultLayout.RecipeLinesOffset + 2].Should().Be(0);
+		bytes[DefaultLayout.RecipeLinesOffset + 3].Should().Be(0);
 	}
 
 	[Fact]
@@ -90,9 +90,10 @@ public sealed class ManagingAreaCodecTests
 		var bytes = new byte[DefaultLayout.TotalSize];
 		bytes[DefaultLayout.CommittedOffset] = 0x01;
 
-		var state = codec.Decode(bytes);
+		var result = codec.Decode(bytes);
 
-		state.Committed.Should().BeTrue();
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Committed.Should().BeTrue();
 	}
 
 	[Fact]
@@ -102,9 +103,10 @@ public sealed class ManagingAreaCodecTests
 		var bytes = new byte[DefaultLayout.TotalSize];
 		bytes[DefaultLayout.CommittedOffset] = 0x00;
 
-		var state = codec.Decode(bytes);
+		var result = codec.Decode(bytes);
 
-		state.Committed.Should().BeFalse();
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Committed.Should().BeFalse();
 	}
 
 	[Fact]
@@ -115,9 +117,10 @@ public sealed class ManagingAreaCodecTests
 		const int ExpectedLines = 99;
 		BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(DefaultLayout.RecipeLinesOffset), ExpectedLines);
 
-		var state = codec.Decode(bytes);
+		var result = codec.Decode(bytes);
 
-		state.RecipeLines.Should().Be(ExpectedLines);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.RecipeLines.Should().Be(ExpectedLines);
 	}
 
 	[Fact]
@@ -126,22 +129,23 @@ public sealed class ManagingAreaCodecTests
 		var codec = BuildCodec();
 		var bytes = new byte[DefaultLayout.TotalSize];
 
-		var state = codec.Decode(bytes);
+		var result = codec.Decode(bytes);
 
-		state.Committed.Should().BeFalse();
-		state.RecipeLines.Should().Be(0);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Committed.Should().BeFalse();
+		result.Value.RecipeLines.Should().Be(0);
 	}
 
 	[Fact]
-	public void Decode_TooShortData_ThrowsArgumentException()
+	public void Decode_TooShortData_ReturnsFailedResult()
 	{
 		var codec = BuildCodec();
 		var shortBytes = new byte[3];
 
-		var act = () => codec.Decode(shortBytes);
+		var result = codec.Decode(shortBytes);
 
-		act.Should().Throw<ArgumentException>()
-			.WithMessage("*length*");
+		result.IsFailed.Should().BeTrue();
+		result.Errors[0].Message.Should().Contain("length");
 	}
 
 	[Fact]
@@ -152,10 +156,11 @@ public sealed class ManagingAreaCodecTests
 		var pcData = new ManagingAreaPcData(Committed: true, RecipeLines: Lines);
 
 		var bytes = codec.EncodePcData(pcData);
-		var state = codec.Decode(bytes);
+		var result = codec.Decode(bytes);
 
-		state.Committed.Should().BeTrue();
-		state.RecipeLines.Should().Be(Lines);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Committed.Should().BeTrue();
+		result.Value.RecipeLines.Should().Be(Lines);
 	}
 
 	[Fact]
@@ -166,9 +171,10 @@ public sealed class ManagingAreaCodecTests
 		var pcData = new ManagingAreaPcData(Committed: false, RecipeLines: Lines);
 
 		var bytes = codec.EncodePcData(pcData);
-		var state = codec.Decode(bytes);
+		var result = codec.Decode(bytes);
 
-		state.Committed.Should().BeFalse();
-		state.RecipeLines.Should().Be(Lines);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Committed.Should().BeFalse();
+		result.Value.RecipeLines.Should().Be(Lines);
 	}
 }
