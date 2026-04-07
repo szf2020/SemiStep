@@ -10,17 +10,7 @@ max_retries_attempts: 3
 polling_interval_ms: 100
 writing_timeout_ms: 5000
 commit_timeout_ms: 5000
-
-header_db_number: 1
-magic_number_offset: 0
-word_order_offset: 2
-protocol_version_offset: 4
-managing_db_number_offset: 6
-int_db_number_offset: 8
-float_db_number_offset: 10
-string_db_number_offset: 12
-execution_db_number_offset: 14
-header_db_total_size: 16
+keep_alive_interval_ms: 5000
 
 managing_db_number: 2
 committed_offset: 0
@@ -29,18 +19,18 @@ managing_db_total_size: 6
 
 int_db_number: 3
 int_db_total_capacity_offset: 0
-int_db_current_size_offset: 2
-int_db_data_offset: 4
+int_db_current_size_offset: 4
+int_db_data_offset: 8
 
 float_db_number: 4
 float_db_total_capacity_offset: 0
-float_db_current_size_offset: 2
-float_db_data_offset: 4
+float_db_current_size_offset: 4
+float_db_data_offset: 8
 
 string_db_number: 5
 string_db_total_capacity_offset: 0
-string_db_current_size_offset: 2
-string_db_data_offset: 4
+string_db_current_size_offset: 4
+string_db_data_offset: 8
 
 execution_db_number: 6
 recipe_active_offset: 0
