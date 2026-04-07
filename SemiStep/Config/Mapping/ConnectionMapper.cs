@@ -48,13 +48,13 @@ internal static class ConnectionMapper
 			MaxRetryAttempts: dto.MaxRetriesAttempts ?? defaults.MaxRetryAttempts,
 			PollingIntervalMs: dto.PollingIntervalMs ?? defaults.PollingIntervalMs,
 			WritingTimeoutMs: dto.WritingTimeoutMs ?? defaults.WritingTimeoutMs,
-			CommitTimeoutMs: dto.CommitTimeoutMs ?? defaults.CommitTimeoutMs);
+			CommitTimeoutMs: dto.CommitTimeoutMs ?? defaults.CommitTimeoutMs,
+			KeepAliveIntervalMs: dto.KeepAliveIntervalMs ?? defaults.KeepAliveIntervalMs);
 	}
 
 	private static PlcProtocolLayout MapLayout(ConnectionDto dto)
 	{
 		return new PlcProtocolLayout(
-			HeaderDb: MapHeaderDb(dto),
 			ManagingDb: MapManagingDb(dto),
 			IntDb: MapDataDb(dto.IntDbNumber, dto.IntDbTotalCapacityOffset, dto.IntDbCurrentSizeOffset,
 				dto.IntDbDataOffset, DataDbLayout.DefaultInt),
@@ -65,43 +65,15 @@ internal static class ConnectionMapper
 			ExecutionDb: MapExecutionDb(dto));
 	}
 
-	private static HeaderDbLayout MapHeaderDb(ConnectionDto dto)
-	{
-		var defaults = HeaderDbLayout.Default;
-
-		return new HeaderDbLayout(
-			DbNumber: dto.HeaderDbNumber ?? defaults.DbNumber,
-			MagicNumberOffset: dto.MagicNumberOffset ?? defaults.MagicNumberOffset,
-			WordOrderOffset: dto.WordOrderOffset ?? defaults.WordOrderOffset,
-			ProtocolVersionOffset: dto.ProtocolVersionOffset ?? defaults.ProtocolVersionOffset,
-			ManagingDbNumberOffset: dto.ManagingDbNumberOffset ?? defaults.ManagingDbNumberOffset,
-			IntDbNumberOffset: dto.IntDbNumberOffset ?? defaults.IntDbNumberOffset,
-			FloatDbNumberOffset: dto.FloatDbNumberOffset ?? defaults.FloatDbNumberOffset,
-			StringDbNumberOffset: dto.StringDbNumberOffset ?? defaults.StringDbNumberOffset,
-			ExecutionDbNumberOffset: dto.ExecutionDbNumberOffset ?? defaults.ExecutionDbNumberOffset,
-			TotalSize: dto.HeaderDbTotalSize ?? defaults.TotalSize);
-	}
-
 	private static ManagingDbLayout MapManagingDb(ConnectionDto dto)
 	{
 		var defaults = ManagingDbLayout.Default;
 
 		return new ManagingDbLayout(
 			DbNumber: dto.ManagingDbNumber ?? defaults.DbNumber,
-			PcStatusOffset: dto.PcStatusOffset ?? defaults.PcStatusOffset,
-			PcTransactionIdOffset: dto.PcTransactionIdOffset ?? defaults.PcTransactionIdOffset,
-			PcChecksumIntOffset: dto.PcChecksumIntOffset ?? defaults.PcChecksumIntOffset,
-			PcChecksumFloatOffset: dto.PcChecksumFloatOffset ?? defaults.PcChecksumFloatOffset,
-			PcChecksumStringOffset: dto.PcChecksumStringOffset ?? defaults.PcChecksumStringOffset,
-			PcRecipeLinesOffset: dto.PcRecipeLinesOffset ?? defaults.PcRecipeLinesOffset,
-			PlcStatusOffset: dto.PlcStatusOffset ?? defaults.PlcStatusOffset,
-			PlcErrorOffset: dto.PlcErrorOffset ?? defaults.PlcErrorOffset,
-			PlcStoredIdOffset: dto.PlcStoredIdOffset ?? defaults.PlcStoredIdOffset,
-			PlcChecksumIntOffset: dto.PlcChecksumIntOffset ?? defaults.PlcChecksumIntOffset,
-			PlcChecksumFloatOffset: dto.PlcChecksumFloatOffset ?? defaults.PlcChecksumFloatOffset,
-			PlcChecksumStringOffset: dto.PlcChecksumStringOffset ?? defaults.PlcChecksumStringOffset,
-			TotalSize: dto.ManagingDbTotalSize ?? defaults.TotalSize,
-			PcDataSize: dto.ManagingPcDataSize ?? defaults.PcDataSize);
+			CommittedOffset: dto.CommittedOffset ?? defaults.CommittedOffset,
+			RecipeLinesOffset: dto.RecipeLinesOffset ?? defaults.RecipeLinesOffset,
+			TotalSize: dto.ManagingDbTotalSize ?? defaults.TotalSize);
 	}
 
 	private static DataDbLayout MapDataDb(

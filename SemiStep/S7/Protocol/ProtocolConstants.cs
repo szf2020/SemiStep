@@ -2,8 +2,6 @@
 
 internal static class ProtocolConstants
 {
-	public const ushort ProtocolVersion = 1;
-
 	public const int IntElementSize = 4;
 	public const int FloatElementSize = 4;
 	public const int WStringMaxChars = 32;

@@ -5,6 +5,7 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
 using Tests.Core.Helpers;
+using Tests.Helpers;
 
 using TypesShared.Config;
 
@@ -34,7 +35,10 @@ public sealed class RecipeGridViewModelTests : IAsyncLifetime
 		_configRegistry = services.GetRequiredService<ConfigRegistry>();
 		_panel = new MessagePanelViewModel();
 		var queryService = new RecipeQueryService(_facade, _configRegistry);
-		_coordinator = new RecipeMutationCoordinator(_facade, queryService, _panel);
+		var appConfiguration = services.GetRequiredService<AppConfiguration>();
+		var syncService = new StubPlcSyncService();
+		_coordinator = new RecipeMutationCoordinator(_facade, appConfiguration, queryService, _panel, syncService);
+		_coordinator.Initialize();
 		_grid = new RecipeGridViewModel(_coordinator, _configRegistry, _panel);
 		_grid.Initialize();
 	}

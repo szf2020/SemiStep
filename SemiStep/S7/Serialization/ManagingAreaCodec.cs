@@ -6,51 +6,51 @@ using TypesShared.Plc.Memory;
 
 namespace S7.Serialization;
 
-internal sealed class ManagingAreaCodec(ManagingDbLayout layout)
+internal sealed class ManagingAreaCodec
 {
-	public ManagingAreaState Decode(byte[] data)
+	private readonly ManagingDbLayout _layout;
+
+	public ManagingAreaCodec(ManagingDbLayout layout)
 	{
-		if (data.Length < layout.TotalSize)
+		if (layout.TotalSize < layout.RecipeLinesOffset + sizeof(int))
 		{
 			throw new ArgumentException(
-				$"Data length {data.Length} is less than expected {layout.TotalSize}");
+				$"ManagingDbLayout.TotalSize ({layout.TotalSize}) must be at least " +
+				$"RecipeLinesOffset ({layout.RecipeLinesOffset}) + 4 bytes",
+				nameof(layout));
 		}
 
-		return new ManagingAreaState(
-			PcStatus: (PcStatus)BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(layout.PcStatusOffset)),
-			PcTransactionId:
-			BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(layout.PcTransactionIdOffset)),
-			PcChecksumInt: BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(layout.PcChecksumIntOffset)),
-			PcChecksumFloat:
-			BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(layout.PcChecksumFloatOffset)),
-			PcChecksumString: BinaryPrimitives.ReadUInt32BigEndian(
-				data.AsSpan(layout.PcChecksumStringOffset)),
-			PcRecipeLines: BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(layout.PcRecipeLinesOffset)),
-			PlcStatus: (PlcSyncStatus)BinaryPrimitives.ReadUInt16BigEndian(
-				data.AsSpan(layout.PlcStatusOffset)),
-			PlcError: (PlcSyncError)BinaryPrimitives.ReadUInt16BigEndian(
-				data.AsSpan(layout.PlcErrorOffset)),
-			PlcStoredId: BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(layout.PlcStoredIdOffset)),
-			PlcChecksumInt: BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(layout.PlcChecksumIntOffset)),
-			PlcChecksumFloat: BinaryPrimitives.ReadUInt32BigEndian(
-				data.AsSpan(layout.PlcChecksumFloatOffset)),
-			PlcChecksumString: BinaryPrimitives.ReadUInt32BigEndian(
-				data.AsSpan(layout.PlcChecksumStringOffset)));
+		if (layout.TotalSize <= layout.CommittedOffset)
+		{
+			throw new ArgumentException(
+				$"ManagingDbLayout.TotalSize ({layout.TotalSize}) must be greater than " +
+				$"CommittedOffset ({layout.CommittedOffset})",
+				nameof(layout));
+		}
+
+		_layout = layout;
+	}
+
+	public ManagingAreaState Decode(byte[] data)
+	{
+		if (data.Length < _layout.TotalSize)
+		{
+			throw new ArgumentException(
+				$"Data length {data.Length} is less than expected {_layout.TotalSize}");
+		}
+
+		var committed = data[_layout.CommittedOffset] != 0;
+		var recipeLines = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(_layout.RecipeLinesOffset));
+
+		return new ManagingAreaState(committed, recipeLines);
 	}
 
 	public byte[] EncodePcData(ManagingAreaPcData data)
 	{
-		var bytes = new byte[layout.PcDataSize];
+		var bytes = new byte[_layout.TotalSize];
 
-		BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(layout.PcStatusOffset), (ushort)data.Status);
-		BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(layout.PcTransactionIdOffset),
-			data.TransactionId);
-		BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(layout.PcChecksumIntOffset), data.ChecksumInt);
-		BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(layout.PcChecksumFloatOffset),
-			data.ChecksumFloat);
-		BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(layout.PcChecksumStringOffset),
-			data.ChecksumString);
-		BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(layout.PcRecipeLinesOffset), data.RecipeLines);
+		bytes[_layout.CommittedOffset] = data.Committed ? (byte)0x01 : (byte)0x00;
+		BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(_layout.RecipeLinesOffset), data.RecipeLines);
 
 		return bytes;
 	}

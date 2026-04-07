@@ -3,7 +3,6 @@
 namespace TypesShared.Plc;
 
 public sealed record PlcProtocolLayout(
-	HeaderDbLayout HeaderDb,
 	ManagingDbLayout ManagingDb,
 	DataDbLayout IntDb,
 	DataDbLayout FloatDb,
@@ -11,7 +10,6 @@ public sealed record PlcProtocolLayout(
 	ExecutionDbLayout ExecutionDb)
 {
 	public static PlcProtocolLayout Default => new(
-		HeaderDb: HeaderDbLayout.Default,
 		ManagingDb: ManagingDbLayout.Default,
 		IntDb: DataDbLayout.DefaultInt,
 		FloatDb: DataDbLayout.DefaultFloat,

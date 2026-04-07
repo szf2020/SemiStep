@@ -1,10 +1,14 @@
-﻿using System.Reactive.Subjects;
+﻿using System.Reactive;
+using System.Reactive.Subjects;
 
 using Domain.Facade;
 
 using FluentResults;
 
+using TypesShared.Config;
 using TypesShared.Core;
+using TypesShared.Domain;
+using TypesShared.Plc;
 
 using UI.MessageService;
 
@@ -12,12 +16,21 @@ namespace UI.Coordinator;
 
 public sealed class RecipeMutationCoordinator(
 	DomainFacade domainFacade,
+	AppConfiguration appConfiguration,
 	RecipeQueryService queryService,
-	MessagePanelViewModel messagePanel) : IDisposable
+	MessagePanelViewModel messagePanel,
+	IPlcSyncService syncService) : IDisposable
 {
 	private readonly Subject<MutationSignal> _stateChanged = new();
+	private readonly Subject<(Recipe Local, Recipe Plc)> _plcRecipeConflictDetected = new();
+	private readonly Subject<Unit> _connectionStateChanged = new();
+	private Action? _connectionStateChangedRelay;
+	private Action<PlcSyncStatus>? _statusChangedRelay;
+	private Action<string?>? _errorChangedRelay;
 
 	public IObservable<MutationSignal> StateChanged => _stateChanged;
+	public IObservable<(Recipe Local, Recipe Plc)> PlcRecipeConflictDetected => _plcRecipeConflictDetected;
+	public IObservable<Unit> ConnectionStateChanged => _connectionStateChanged;
 
 	public int? SuggestedSelection { get; private set; }
 
@@ -30,11 +43,50 @@ public sealed class RecipeMutationCoordinator(
 	public bool CanRedo => queryService.CanRedo;
 	public bool IsConnected => queryService.IsConnected;
 
+	public IObservable<PlcExecutionInfo> ExecutionState => queryService.ExecutionState;
+	public bool IsRecipeActive => queryService.IsRecipeActive;
+	public bool IsSyncEnabled => queryService.IsSyncEnabled;
+
 	public RecipeQueryService QueryService => queryService;
+
+	public RecipeMutationCoordinator Initialize()
+	{
+		domainFacade.PlcRecipeConflictDetected += OnPlcRecipeConflictDetected;
+
+		_connectionStateChangedRelay = () => _connectionStateChanged.OnNext(Unit.Default);
+		domainFacade.ConnectionStateChanged += _connectionStateChangedRelay;
+
+		_statusChangedRelay = _ => _connectionStateChanged.OnNext(Unit.Default);
+		syncService.StatusChanged += _statusChangedRelay;
+
+		_errorChangedRelay = _ => _connectionStateChanged.OnNext(Unit.Default);
+		syncService.ErrorChanged += _errorChangedRelay;
+
+		return this;
+	}
 
 	public void Dispose()
 	{
+		domainFacade.PlcRecipeConflictDetected -= OnPlcRecipeConflictDetected;
+
+		if (_connectionStateChangedRelay is not null)
+		{
+			domainFacade.ConnectionStateChanged -= _connectionStateChangedRelay;
+		}
+
+		if (_statusChangedRelay is not null)
+		{
+			syncService.StatusChanged -= _statusChangedRelay;
+		}
+
+		if (_errorChangedRelay is not null)
+		{
+			syncService.ErrorChanged -= _errorChangedRelay;
+		}
+
 		_stateChanged.Dispose();
+		_plcRecipeConflictDetected.Dispose();
+		_connectionStateChanged.Dispose();
 	}
 
 	public int? ConsumeSuggestedSelection()
@@ -43,6 +95,43 @@ public sealed class RecipeMutationCoordinator(
 		SuggestedSelection = null;
 
 		return value;
+	}
+
+	public async Task<Result> EnableSync()
+	{
+		return await domainFacade.EnableSync(appConfiguration.PlcConfiguration);
+	}
+
+	public async Task DisableSync()
+	{
+		await domainFacade.DisableSync();
+	}
+
+	public async Task<Result> LoadRecipeFromPlcAsync()
+	{
+		var result = await domainFacade.LoadRecipeFromPlcAsync();
+
+		if (!result.IsFailed)
+		{
+			messagePanel.Clear();
+		}
+
+		RefreshMessagePanel(result);
+
+		if (result.IsFailed)
+		{
+			return result;
+		}
+
+		SuggestedSelection = null;
+		_stateChanged.OnNext(new MutationSignal.RecipeReplaced());
+
+		return result;
+	}
+
+	public void ResolveConflict(bool keepLocal)
+	{
+		domainFacade.ResolveConflict(keepLocal);
 	}
 
 	public void AppendStep(int actionId)
@@ -209,6 +298,11 @@ public sealed class RecipeMutationCoordinator(
 		await domainFacade.SaveRecipeAsync(filePath);
 		SuggestedSelection = null;
 		_stateChanged.OnNext(new MutationSignal.MetadataChanged());
+	}
+
+	private void OnPlcRecipeConflictDetected(Recipe local, Recipe plc)
+	{
+		_plcRecipeConflictDetected.OnNext((local, plc));
 	}
 
 	private void RefreshMessagePanel(Result mutationResult)

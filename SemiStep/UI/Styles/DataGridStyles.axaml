@@ -64,4 +64,17 @@
         <Setter Property="IsVisible" Value="False" />
     </Style>
 
+    <!-- ============================================== -->
+    <!-- Execution state: current and past step row     -->
+    <!-- highlighting via CellPresenter pseudo-classes  -->
+    <!-- ============================================== -->
+
+    <Style Selector="controls|CellPresenter:step-current">
+        <Setter Property="Background" Value="{DynamicResource CurrentStepBrush}" />
+    </Style>
+
+    <Style Selector="controls|CellPresenter:step-past">
+        <Setter Property="Background" Value="{DynamicResource PastStepBrush}" />
+    </Style>
+
 </Styles>

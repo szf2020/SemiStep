@@ -8,6 +8,7 @@ using ReactiveUI;
 
 using TypesShared.Config;
 using TypesShared.Core;
+using TypesShared.Plc;
 
 using UI.Coordinator;
 using UI.MessageService;
@@ -17,12 +18,15 @@ namespace UI.RecipeGrid;
 public class RecipeGridViewModel : ReactiveObject, IDisposable
 {
 	private readonly ObservableAsPropertyHelper<bool> _canDeleteStep;
+	private readonly ObservableAsPropertyHelper<bool> _isReadOnly;
 	private readonly RecipeMutationCoordinator _coordinator;
 	private readonly CompositeDisposable _disposables = new();
 	private readonly MessagePanelViewModel _messagePanel;
 
 	private int _selectedRowIndex = -1;
 	private IReadOnlyList<int> _selectedRowIndices = [];
+	private bool _lastRecipeActive;
+	private int _lastActualLine = -1;
 
 	public RecipeGridViewModel(
 		RecipeMutationCoordinator coordinator,
@@ -41,6 +45,17 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 			.ToProperty(this, x => x.CanDeleteStep)
 			.DisposeWith(_disposables);
 
+		_isReadOnly = coordinator.ExecutionState
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Select(info => info.RecipeActive)
+			.ToProperty(this, x => x.IsReadOnly)
+			.DisposeWith(_disposables);
+
+		coordinator.ExecutionState
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(OnExecutionStateChanged)
+			.DisposeWith(_disposables);
+
 		coordinator.StateChanged.Subscribe(OnStateChange).DisposeWith(_disposables);
 	}
 
@@ -49,6 +64,8 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 	public ObservableCollection<RecipeRowViewModel> RecipeRows { get; }
 
 	public bool CanDeleteStep => _canDeleteStep.Value;
+
+	public bool IsReadOnly => _isReadOnly.Value;
 
 	public int SelectedRowIndex
 	{
@@ -72,6 +89,55 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 	public void Initialize()
 	{
 		FullRebuild(_coordinator.CurrentRecipe);
+	}
+
+	private void OnExecutionStateChanged(PlcExecutionInfo info)
+	{
+		var activeChanged = info.RecipeActive != _lastRecipeActive;
+		var lineChanged = info.ActualLine != _lastActualLine;
+
+		if (!activeChanged && !lineChanged)
+		{
+			return;
+		}
+
+		if (!info.RecipeActive)
+		{
+			if (_lastRecipeActive)
+			{
+				ClearAllStepHighlights();
+			}
+
+			_lastRecipeActive = false;
+			_lastActualLine = -1;
+
+			return;
+		}
+
+		var previousLine = _lastActualLine;
+		_lastRecipeActive = true;
+		_lastActualLine = info.ActualLine;
+
+		if (previousLine >= 0 && previousLine < RecipeRows.Count && previousLine != info.ActualLine)
+		{
+			RecipeRows[previousLine].IsCurrentStep = false;
+			RecipeRows[previousLine].IsPastStep = previousLine < info.ActualLine;
+		}
+
+		if (info.ActualLine >= 0 && info.ActualLine < RecipeRows.Count)
+		{
+			RecipeRows[info.ActualLine].IsCurrentStep = true;
+			RecipeRows[info.ActualLine].IsPastStep = false;
+		}
+	}
+
+	private void ClearAllStepHighlights()
+	{
+		foreach (var row in RecipeRows)
+		{
+			row.IsCurrentStep = false;
+			row.IsPastStep = false;
+		}
 	}
 
 	private void OnStateChange(MutationSignal signal)
@@ -268,6 +334,9 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 
 	private void FullRebuild(Recipe recipe)
 	{
+		_lastRecipeActive = false;
+		_lastActualLine = -1;
+
 		DisposeAllRows();
 		RecipeRows.Clear();
 

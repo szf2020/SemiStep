@@ -104,6 +104,7 @@ public sealed class RecipeMutationCoordinatorLoadRecipeTests
 			.AddCsv()
 			.AddSingleton<IClipboardService, StubClipboardService>()
 			.AddSingleton<IS7Service, StubIs7Service>()
+			.AddSingleton<IPlcSyncService, StubPlcSyncService>()
 			.BuildServiceProvider();
 
 		var facade = services.GetRequiredService<DomainFacade>();
@@ -112,7 +113,9 @@ public sealed class RecipeMutationCoordinatorLoadRecipeTests
 		var configRegistry = services.GetRequiredService<ConfigRegistry>();
 		var panel = new MessagePanelViewModel();
 		var queryService = new RecipeQueryService(facade, configRegistry);
-		var coordinator = new RecipeMutationCoordinator(facade, queryService, panel);
+		var appConfiguration = services.GetRequiredService<AppConfiguration>();
+		var syncService = services.GetRequiredService<IPlcSyncService>();
+		var coordinator = new RecipeMutationCoordinator(facade, appConfiguration, queryService, panel, syncService);
 
 		return (coordinator, panel);
 	}

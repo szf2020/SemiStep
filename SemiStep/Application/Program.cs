@@ -20,6 +20,7 @@ using S7;
 using Serilog;
 
 using UI;
+using UI.Coordinator;
 
 namespace Application;
 
@@ -74,6 +75,9 @@ public static class Program
 	{
 		var domainFacade = provider.GetRequiredService<DomainFacade>();
 		domainFacade.Initialize();
+
+		var coordinator = provider.GetRequiredService<RecipeMutationCoordinator>();
+		coordinator.Initialize();
 	}
 
 	private static void CreateLogger(string logFilePath)

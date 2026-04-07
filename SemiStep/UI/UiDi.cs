@@ -6,6 +6,7 @@ using UI.Clipboard;
 using UI.Coordinator;
 using UI.MainWindow;
 using UI.MessageService;
+using UI.Plc;
 using UI.RecipeFile;
 using UI.RecipeGrid;
 
@@ -24,6 +25,7 @@ public static class UiDi
 		services.AddSingleton<ClipboardViewModel>();
 		services.AddSingleton<RecipeFileViewModel>();
 		services.AddSingleton<ColumnBuilder>();
+		services.AddSingleton<PlcMonitorViewModel>();
 		services.AddSingleton<MainWindowViewModel>();
 
 		return services;

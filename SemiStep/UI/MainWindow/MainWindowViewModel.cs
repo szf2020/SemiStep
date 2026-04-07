@@ -2,11 +2,19 @@
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 
+using Avalonia.Controls;
+
 using ReactiveUI;
+
+using Serilog;
+
+using TypesShared.Core;
+using TypesShared.Plc;
 
 using UI.Clipboard;
 using UI.Coordinator;
 using UI.MessageService;
+using UI.Plc;
 using UI.RecipeFile;
 using UI.RecipeGrid;
 using UI.ShutdownService;
@@ -25,7 +33,8 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		ClipboardViewModel clipboard,
 		RecipeFileViewModel recipeFile,
 		MessagePanelViewModel messagePanel,
-		ColumnBuilder columnBuilder)
+		ColumnBuilder columnBuilder,
+		PlcMonitorViewModel plcMonitor)
 	{
 		_coordinator = coordinator;
 		RecipeGrid = recipeGrid;
@@ -34,14 +43,28 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		RecipeFile = recipeFile;
 		MessagePanel = messagePanel;
 		ColumnBuilder = columnBuilder;
+		PlcMonitor = plcMonitor;
 
 		ExitCommand = ReactiveCommand.Create(ExecuteExit);
+		ToggleSyncCommand = ReactiveCommand.CreateFromTask(ExecuteToggleSyncAsync);
 
 		_coordinator.StateChanged
 			.ObserveOn(RxApp.MainThreadScheduler)
 			.Subscribe(_ => RaiseAllStateProperties())
 			.DisposeWith(_disposables);
+
+		_coordinator.ConnectionStateChanged
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(_ => RaiseConnectionStateProperties())
+			.DisposeWith(_disposables);
+
+		_coordinator.PlcRecipeConflictDetected
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(conflict => _ = HandleConflictAsync(conflict.Local, conflict.Plc))
+			.DisposeWith(_disposables);
 	}
+
+	public Window? MainWindow { get; set; }
 
 	public RecipeGridViewModel RecipeGrid { get; }
 
@@ -55,7 +78,11 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 
 	public ColumnBuilder ColumnBuilder { get; }
 
+	public PlcMonitorViewModel PlcMonitor { get; }
+
 	public ReactiveCommand<Unit, Unit> ExitCommand { get; }
+
+	public ReactiveCommand<Unit, Unit> ToggleSyncCommand { get; }
 
 	public bool IsConnectedToPlc => _coordinator.IsConnected;
 
@@ -69,8 +96,17 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 
 	public string StatusText => IsDirty ? "Modified" : "Saved";
 
+	public bool IsSyncEnabled => _coordinator.IsSyncEnabled;
+
+	public string PlcSyncStatusText => MapSyncStatus(_coordinator.QueryService.SyncStatus);
+
+	public string? PlcSyncErrorText => _coordinator.QueryService.SyncLastError;
+
+	public string LastSyncTimeText => FormatLastSyncTime(_coordinator.QueryService.LastSyncTime);
+
 	public void Dispose()
 	{
+		PlcMonitor.Dispose();
 		_disposables.Dispose();
 		GC.SuppressFinalize(this);
 	}
@@ -86,6 +122,39 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		DesktopShutdownService.Shutdown();
 	}
 
+	private async Task ExecuteToggleSyncAsync()
+	{
+		if (_coordinator.IsSyncEnabled)
+		{
+			await _coordinator.DisableSync();
+		}
+		else
+		{
+			await _coordinator.EnableSync();
+		}
+
+		RaiseConnectionStateProperties();
+	}
+
+	private async Task HandleConflictAsync(Recipe local, Recipe plc)
+	{
+		if (MainWindow is null)
+		{
+			return;
+		}
+
+		try
+		{
+			var dialog = new PlcConflictDialog();
+			await dialog.ShowDialog(MainWindow);
+			_coordinator.ResolveConflict(dialog.KeepLocal);
+		}
+		catch (Exception ex)
+		{
+			Log.Warning(ex, "Unexpected error while handling PLC recipe conflict");
+		}
+	}
+
 	private void RaiseAllStateProperties()
 	{
 		this.RaisePropertyChanged(nameof(WindowTitle));
@@ -93,6 +162,43 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		this.RaisePropertyChanged(nameof(CanUndo));
 		this.RaisePropertyChanged(nameof(CanRedo));
 		this.RaisePropertyChanged(nameof(StatusText));
+		RaiseConnectionStateProperties();
+	}
+
+	private void RaiseConnectionStateProperties()
+	{
+		this.RaisePropertyChanged(nameof(IsConnectedToPlc));
+		this.RaisePropertyChanged(nameof(ConnectionStatus));
+		this.RaisePropertyChanged(nameof(IsSyncEnabled));
+		this.RaisePropertyChanged(nameof(PlcSyncStatusText));
+		this.RaisePropertyChanged(nameof(PlcSyncErrorText));
+		this.RaisePropertyChanged(nameof(LastSyncTimeText));
+	}
+
+	private static string MapSyncStatus(PlcSyncStatus status)
+	{
+		return status switch
+		{
+			PlcSyncStatus.Idle => "Idle",
+			PlcSyncStatus.Syncing => "Syncing...",
+			PlcSyncStatus.Synced => "Synced",
+			PlcSyncStatus.OutOfSync => "Out of sync",
+			PlcSyncStatus.Failed => "Failed",
+			PlcSyncStatus.Disconnected => "Disconnected",
+			_ => status.ToString()
+		};
+	}
+
+	private static string FormatLastSyncTime(DateTimeOffset? lastSyncTime)
+	{
+		if (lastSyncTime is null)
+		{
+			return "Never";
+		}
+
+		var elapsed = (DateTimeOffset.UtcNow - lastSyncTime.Value).TotalSeconds;
+
+		return $"{elapsed:0.0} s ago";
 	}
 
 	private string BuildWindowTitle()

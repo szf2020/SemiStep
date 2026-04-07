@@ -33,6 +33,7 @@ internal static class CsvTestHelper
 			.AddSingleton<ICsvService, StubCsvService>()
 			.AddSingleton<IClipboardService, StubClipboardService>()
 			.AddSingleton<IS7Service, StubIs7Service>()
+			.AddSingleton<IPlcSyncService, StubPlcSyncService>()
 			.AddSingleton<CsvRowConverter>()
 			.AddSingleton<CsvFileSerializer>()
 			.AddSingleton<ClipboardSerializer>()
