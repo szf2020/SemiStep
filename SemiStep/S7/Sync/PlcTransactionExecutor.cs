@@ -238,9 +238,11 @@ internal sealed class PlcTransactionExecutor
 	// Floats are serialised to raw IEEE 754 bytes, written to the PLC, and read back without
 	// any arithmetic transformation. The round-trip is byte-exact, so bit-exact equality is
 	// the correct comparison here — not an epsilon-based approximation.
+	// BitConverter.SingleToInt32Bits is used rather than == to correctly handle NaN payloads
+	// and distinguish +0 from -0 (different IEEE-754 bit patterns).
 	private static bool CompareFloats_ExpectedBytesEqual(float actual, float expected)
 	{
-		return actual == expected;
+		return BitConverter.SingleToInt32Bits(actual) == BitConverter.SingleToInt32Bits(expected);
 	}
 
 	private async Task WriteManagingAreaAsync(ManagingAreaPcData data, CancellationToken ct)

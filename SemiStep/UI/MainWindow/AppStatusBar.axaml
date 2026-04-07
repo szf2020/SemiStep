@@ -155,7 +155,7 @@
                                FontSize="12"
                                Foreground="{DynamicResource SecondaryForegroundBrush}"
                                VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding PlcMonitor.LineTimeLeft}"
+                    <TextBlock Text="{Binding PlcMonitor.StepElapsedTime}"
                                FontSize="12"
                                VerticalAlignment="Center" />
                 </StackPanel>

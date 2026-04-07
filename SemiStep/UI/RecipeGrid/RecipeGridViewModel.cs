@@ -25,6 +25,8 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 
 	private int _selectedRowIndex = -1;
 	private IReadOnlyList<int> _selectedRowIndices = [];
+	private bool _lastRecipeActive;
+	private int _lastActualLine = -1;
 
 	public RecipeGridViewModel(
 		RecipeMutationCoordinator coordinator,
@@ -91,18 +93,50 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 
 	private void OnExecutionStateChanged(PlcExecutionInfo info)
 	{
-		for (var i = 0; i < RecipeRows.Count; i++)
+		var activeChanged = info.RecipeActive != _lastRecipeActive;
+		var lineChanged = info.ActualLine != _lastActualLine;
+
+		if (!activeChanged && !lineChanged)
 		{
-			if (info.RecipeActive)
+			return;
+		}
+
+		if (!info.RecipeActive)
+		{
+			if (_lastRecipeActive)
 			{
-				RecipeRows[i].IsCurrentStep = i == info.ActualLine;
-				RecipeRows[i].IsPastStep = i < info.ActualLine;
+				ClearAllStepHighlights();
 			}
-			else
-			{
-				RecipeRows[i].IsCurrentStep = false;
-				RecipeRows[i].IsPastStep = false;
-			}
+
+			_lastRecipeActive = false;
+			_lastActualLine = -1;
+
+			return;
+		}
+
+		var previousLine = _lastActualLine;
+		_lastRecipeActive = true;
+		_lastActualLine = info.ActualLine;
+
+		if (previousLine >= 0 && previousLine < RecipeRows.Count && previousLine != info.ActualLine)
+		{
+			RecipeRows[previousLine].IsCurrentStep = false;
+			RecipeRows[previousLine].IsPastStep = previousLine < info.ActualLine;
+		}
+
+		if (info.ActualLine >= 0 && info.ActualLine < RecipeRows.Count)
+		{
+			RecipeRows[info.ActualLine].IsCurrentStep = true;
+			RecipeRows[info.ActualLine].IsPastStep = false;
+		}
+	}
+
+	private void ClearAllStepHighlights()
+	{
+		foreach (var row in RecipeRows)
+		{
+			row.IsCurrentStep = false;
+			row.IsPastStep = false;
 		}
 	}
 
@@ -300,6 +334,9 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 
 	private void FullRebuild(Recipe recipe)
 	{
+		_lastRecipeActive = false;
+		_lastActualLine = -1;
+
 		DisposeAllRows();
 		RecipeRows.Clear();
 

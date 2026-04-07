@@ -15,7 +15,7 @@ public sealed class PlcMonitorViewModel : ReactiveObject, IDisposable
 
 	private bool _isRecipeActive;
 	private int _actualLine;
-	private string _lineTimeLeft = "0.0 s";
+	private string _stepElapsedTime = "0.0 s";
 	private int _forLoopCount1;
 	private int _forLoopCount2;
 	private int _forLoopCount3;
@@ -40,10 +40,10 @@ public sealed class PlcMonitorViewModel : ReactiveObject, IDisposable
 		private set => this.RaiseAndSetIfChanged(ref _actualLine, value);
 	}
 
-	public string LineTimeLeft
+	public string StepElapsedTime
 	{
-		get => _lineTimeLeft;
-		private set => this.RaiseAndSetIfChanged(ref _lineTimeLeft, value);
+		get => _stepElapsedTime;
+		private set => this.RaiseAndSetIfChanged(ref _stepElapsedTime, value);
 	}
 
 	public int ForLoopCount1
@@ -74,7 +74,7 @@ public sealed class PlcMonitorViewModel : ReactiveObject, IDisposable
 	{
 		IsRecipeActive = info.RecipeActive;
 		ActualLine = info.ActualLine;
-		LineTimeLeft = $"{info.StepCurrentTime:0.0} s";
+		StepElapsedTime = $"{info.StepCurrentTime:0.0} s";
 		ForLoopCount1 = info.ForLoopCount1;
 		ForLoopCount2 = info.ForLoopCount2;
 		ForLoopCount3 = info.ForLoopCount3;

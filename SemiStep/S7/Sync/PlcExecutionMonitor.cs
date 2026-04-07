@@ -41,9 +41,12 @@ internal sealed class PlcExecutionMonitor(
 		var taskToWait = _pollTask;
 		_pollTask = null;
 
-		// Wait for the poll loop to terminate before nulling the task, so that a
-		// subsequent Start() cannot start a second concurrent loop.
-		taskToWait?.Wait(TimeSpan.FromSeconds(5));
+		// Skip the wait if Stop() is being called from within the poll loop itself
+		// (e.g. via onConnectionLost callback), to avoid deadlock.
+		if (taskToWait is not null && taskToWait.Id != Task.CurrentId)
+		{
+			taskToWait.Wait(TimeSpan.FromSeconds(5));
+		}
 
 		PublishAndTrack(PlcExecutionInfo.Empty);
 	}
