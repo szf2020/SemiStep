@@ -31,21 +31,7 @@ internal sealed class PlcLifecycleManager(
 
 	public void Initialize()
 	{
-		_connectionStateHandler = state =>
-		{
-			if (state == PlcConnectionState.Disconnected && _isSyncEnabled)
-			{
-				syncService.Reset();
-			}
-			else if (state == PlcConnectionState.Connected && _isSyncEnabled)
-			{
-				_ = PerformReconnectReconciliationAsync().ContinueWith(
-					t => Log.Error(t.Exception, "Unhandled error in reconnect reconciliation"),
-					TaskContinuationOptions.OnlyOnFaulted);
-			}
-
-			syncService.UpdateConnectionState(state);
-		};
+		_connectionStateHandler = OnConnectionStateChanged;
 		connectionService.StateChanged += _connectionStateHandler;
 	}
 
@@ -117,6 +103,22 @@ internal sealed class PlcLifecycleManager(
 				LoadPlcRecipeIntoState(_pendingPlcRecipe);
 				_pendingPlcRecipe = null;
 			}
+		}
+	}
+
+	private void OnConnectionStateChanged(PlcConnectionState state)
+	{
+		syncService.UpdateConnectionState(state);
+
+		if (state == PlcConnectionState.Disconnected && _isSyncEnabled)
+		{
+			syncService.Reset();
+		}
+		else if (state == PlcConnectionState.Connected && _isSyncEnabled)
+		{
+			_ = PerformReconnectReconciliationAsync().ContinueWith(
+				t => Log.Error(t.Exception, "Unhandled error in reconnect reconciliation"),
+				TaskContinuationOptions.OnlyOnFaulted);
 		}
 	}
 
