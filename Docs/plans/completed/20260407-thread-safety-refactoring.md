@@ -49,6 +49,7 @@ used in `ClipboardViewModel` and `RecipeFileViewModel`.
 **`Log.Warning(ex, ...)` violation:** Change to `Log.Warning(ex.Message)` in `MainWindowViewModel`.
 
 **Alternatives rejected:**
+
 - Marshalling at the coordinator level (making coordinator UI-thread-aware) — violates the
   architecture: `RecipeMutationCoordinator` is a UI-layer class but `DomainFacade` is not; the
   coordinator should not know about schedulers.
@@ -59,13 +60,13 @@ used in `ClipboardViewModel` and `RecipeFileViewModel`.
 
 ### Modified Files
 
-| File | Change |
-|------|---------|
-| `SemiStep/Application/Program.cs` | `[STAThread]` + `void Main()` + `Task.Run` for async startup |
-| `SemiStep/UI/RecipeGrid/RecipeGridViewModel.cs` | Add `ObserveOn(RxApp.MainThreadScheduler)` to `StateChanged` subscription (line 59) |
-| `SemiStep/UI/RecipeFile/RecipeFileViewModel.cs` | Wrap `MessagePanel` calls after async coordinator awaits with `Dispatcher.UIThread.Post` or `InvokeAsync` |
+| File                                            | Change                                                                                                        |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `SemiStep/Application/Program.cs`               | `[STAThread]` + `void Main()` + `Task.Run` for async startup                                                  |
+| `SemiStep/UI/RecipeGrid/RecipeGridViewModel.cs` | Add `ObserveOn(RxApp.MainThreadScheduler)` to `StateChanged` subscription (line 59)                           |
+| `SemiStep/UI/RecipeFile/RecipeFileViewModel.cs` | Wrap `MessagePanel` calls after async coordinator awaits with `Dispatcher.UIThread.Post` or `InvokeAsync`     |
 | `SemiStep/UI/MainWindow/MainWindowViewModel.cs` | Add `ToggleSyncCommand.ThrownExceptions` subscription; fix `Log.Warning(ex, ...)` → `Log.Warning(ex.Message)` |
-| `SemiStep/Domain/Facade/DomainFacade.cs` | Add `CancellationToken` to `PerformReconnectReconciliationAsync`; wire it through `EnableSync`/`DisableSync` |
+| `SemiStep/Domain/Facade/DomainFacade.cs`        | Add `CancellationToken` to `PerformReconnectReconciliationAsync`; wire it through `EnableSync`/`DisableSync`  |
 
 ## Tasks
 
@@ -78,6 +79,7 @@ used in `ClipboardViewModel` and `RecipeFileViewModel`.
 ### Task 2: Fix STA entry point in Program.cs
 
 **Files:**
+
 - Modify: `SemiStep/Application/Program.cs`
 
 - [x] Add `[STAThread]` attribute to `Main`
@@ -90,6 +92,7 @@ used in `ClipboardViewModel` and `RecipeFileViewModel`.
 ### Task 3: Fix missing ObserveOn in RecipeGridViewModel
 
 **Files:**
+
 - Modify: `SemiStep/UI/RecipeGrid/RecipeGridViewModel.cs`
 
 - [x] Change line 59 from:
@@ -108,6 +111,7 @@ used in `ClipboardViewModel` and `RecipeFileViewModel`.
 ### Task 4: Fix MessagePanel cross-thread mutation in RecipeFileViewModel
 
 **Files:**
+
 - Modify: `SemiStep/UI/RecipeFile/RecipeFileViewModel.cs`
 
 The issue: after `await _coordinator.LoadRecipeAsync(...)` or `await _coordinator.SaveRecipeAsync(...)`,
@@ -116,12 +120,13 @@ that appear after those awaits mutate `ObservableCollection<MessageEntry>` from 
 
 - [x] Add `using Avalonia.Threading;` directive
 - [x] Wrap `_messagePanel.AddInfo(...)` and `_messagePanel.AddError(...)` calls that appear after
-  async awaits in `SaveToFileAsync` and `LoadRecipeAsync` with `Dispatcher.UIThread.Post(() => { ... })`
+      async awaits in `SaveToFileAsync` and `LoadRecipeAsync` with `Dispatcher.UIThread.Post(() => { ... })`
 - [x] Verify: the calls inside `ThrownExceptions` subscribers are already `ObserveOn`'d (lines 36–48) and do not need changes
 
 ### Task 5: Add ToggleSyncCommand ThrownExceptions subscription in MainWindowViewModel
 
 **Files:**
+
 - Modify: `SemiStep/UI/MainWindow/MainWindowViewModel.cs`
 
 - [x] Add to the constructor (after the existing subscriptions):
@@ -136,6 +141,7 @@ that appear after those awaits mutate `ObservableCollection<MessageEntry>` from 
 ### Task 6: Add CancellationToken to reconciliation in DomainFacade
 
 **Files:**
+
 - Modify: `SemiStep/Domain/Facade/DomainFacade.cs`
 
 - [x] Add a `CancellationTokenSource? _reconciliationCts` field
@@ -149,9 +155,9 @@ that appear after those awaits mutate `ObservableCollection<MessageEntry>` from 
 
 **Files:** (none)
 
-- [ ] Run build: `dotnet build SemiStep/Application/Application.csproj`
-- [ ] Run full test suite: `dotnet test SemiStep/Tests/Tests.csproj`
-- [ ] All pass
+- [x] Run build: `dotnet build SemiStep/Application/Application.csproj`
+- [x] Run full test suite: `dotnet test SemiStep/Tests/Tests.csproj`
+- [x] All pass
 
 ## Open Questions
 
@@ -161,14 +167,14 @@ that appear after those awaits mutate `ObservableCollection<MessageEntry>` from 
 
 For traceability, here is the complete severity ranking of every finding from the audit:
 
-| Severity | Location | Issue |
-|---|---|---|
-| **Confirmed race** | `RecipeGridViewModel.cs:59` | `StateChanged.Subscribe` without `ObserveOn` — `ObservableCollection` mutated from pool thread on file load/save |
-| **Confirmed race** | `RecipeFileViewModel.cs:104,129,133` | `_messagePanel.AddInfo/AddError` after async awaits run on pool thread, mutating `ObservableCollection<MessageEntry>` |
-| **Confirmed bug** | `Program.cs:32` | `async Task Main()` without `[STAThread]` — COM clipboard calls fail with `CO_E_NOTINITIALIZED` |
-| **Latent bug** | `DomainFacade.cs:114,452` | `PerformReconnectReconciliationAsync` has no cancellation token — stale reconciliation can overwrite recipe after `DisableSync` |
-| **Silent failure** | `MainWindowViewModel.cs:49` | `ToggleSyncCommand` has no `ThrownExceptions` subscription |
-| **Convention** | `MainWindowViewModel.cs:154` | `Log.Warning(ex, ...)` — exception object passed to `Log.Warning`, violates project convention |
-| **Fragile** | `S7Service.cs:151` | `_ = StopKeepAlive()` discards task — safe only because all exceptions are caught inside the loop |
-| **Fragile** | `PlcExecutionMonitor.cs:54,91` | `Subject<T>.OnNext` called from two possible threads (poll loop + `Stop()` caller) without a lock — race mitigated by cancellation ordering but not formally excluded |
-| **Info** | `IS7Service.cs:12`, `IPlcSyncService.cs:18` | Observable/event interfaces document no threading guarantees |
+| Severity           | Location                                    | Issue                                                                                                                                                                 |
+| ------------------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Confirmed race** | `RecipeGridViewModel.cs:59`                 | `StateChanged.Subscribe` without `ObserveOn` — `ObservableCollection` mutated from pool thread on file load/save                                                      |
+| **Confirmed race** | `RecipeFileViewModel.cs:104,129,133`        | `_messagePanel.AddInfo/AddError` after async awaits run on pool thread, mutating `ObservableCollection<MessageEntry>`                                                 |
+| **Confirmed bug**  | `Program.cs:32`                             | `async Task Main()` without `[STAThread]` — COM clipboard calls fail with `CO_E_NOTINITIALIZED`                                                                       |
+| **Latent bug**     | `DomainFacade.cs:114,452`                   | `PerformReconnectReconciliationAsync` has no cancellation token — stale reconciliation can overwrite recipe after `DisableSync`                                       |
+| **Silent failure** | `MainWindowViewModel.cs:49`                 | `ToggleSyncCommand` has no `ThrownExceptions` subscription                                                                                                            |
+| **Convention**     | `MainWindowViewModel.cs:154`                | `Log.Warning(ex, ...)` — exception object passed to `Log.Warning`, violates project convention                                                                        |
+| **Fragile**        | `S7Service.cs:151`                          | `_ = StopKeepAlive()` discards task — safe only because all exceptions are caught inside the loop                                                                     |
+| **Fragile**        | `PlcExecutionMonitor.cs:54,91`              | `Subject<T>.OnNext` called from two possible threads (poll loop + `Stop()` caller) without a lock — race mitigated by cancellation ordering but not formally excluded |
+| **Info**           | `IS7Service.cs:12`, `IPlcSyncService.cs:18` | Observable/event interfaces document no threading guarantees                                                                                                          |

@@ -396,12 +396,3 @@ FodyWeavers.xsd
 
 # nuke
 .nuke/
-
-# LLM
-.opencode/
-.claude/
-
-AGENTS.md
-CLAUDE.md
-
-Docs/plans

@@ -62,6 +62,7 @@ public static void Main()
 ```
 
 Key points:
+
 - `[STAThread]` + `void Main()` -- ensures the calling thread is STA, which Avalonia's Win32
   backend requires for COM/clipboard.
 - `RxApp.MainThreadScheduler = AvaloniaScheduler.Instance` as the first statement -- ensures
@@ -97,6 +98,7 @@ fragile -- a single future caller that fires `_stateChanged.OnNext` from a backg
 will break it silently. Adding `.ObserveOn(RxApp.MainThreadScheduler)` is cheap insurance.
 
 **Alternatives rejected:**
+
 - Keeping `async Task Main()` and adding `Thread.CurrentThread.SetApartmentState(ApartmentState.STA)`
   -- does not work; .NET ignores `SetApartmentState` on the main thread after it has already
   started. The `[STAThread]` attribute must be present at entry.
@@ -107,87 +109,91 @@ will break it silently. Adding `.ObserveOn(RxApp.MainThreadScheduler)` is cheap 
 
 ### Modified Files
 
-| File | Change |
-|------|--------|
-| `SemiStep/Application/Program.cs` | `[STAThread]` + `void Main()` + `RxApp.MainThreadScheduler` first + `Task.Run` for async startup |
-| `SemiStep/UI/App.axaml.cs` | Remove `RxApp.MainThreadScheduler` if present (already done in uncommitted changes) |
+| File                                                   | Change                                                                                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SemiStep/Application/Program.cs`                      | `[STAThread]` + `void Main()` + `RxApp.MainThreadScheduler` first + `Task.Run` for async startup                                            |
+| `SemiStep/UI/App.axaml.cs`                             | Remove `RxApp.MainThreadScheduler` if present (already done in uncommitted changes)                                                         |
 | `SemiStep/UI/Coordinator/RecipeMutationCoordinator.cs` | Wrap entire body of `OnConnectionStateChanged` and `OnSyncStatusChanged` in single `Dispatcher.UIThread.Post`; fix `_syncErrorChangedRelay` |
-| `SemiStep/UI/RecipeGrid/RecipeGridViewModel.cs` | Add `.ObserveOn(RxApp.MainThreadScheduler)` to `StateChanged` subscription as safety net |
+| `SemiStep/UI/RecipeGrid/RecipeGridViewModel.cs`        | Add `.ObserveOn(RxApp.MainThreadScheduler)` to `StateChanged` subscription as safety net                                                    |
 
 ## Tasks
 
 ### Task 1: Fix Program.cs entry point (STA + scheduler + async startup)
 
 **Files:**
+
 - Modify: `SemiStep/Application/Program.cs`
 
-- [ ] Add `[STAThread]` attribute to `Main`
-- [ ] Change signature from `public static async Task Main()` to `public static void Main()`
-- [ ] Keep `RxApp.MainThreadScheduler = AvaloniaScheduler.Instance;` as the first statement
+- [x] Add `[STAThread]` attribute to `Main`
+- [x] Change signature from `public static async Task Main()` to `public static void Main()`
+- [x] Keep `RxApp.MainThreadScheduler = AvaloniaScheduler.Instance;` as the first statement
       (already present in uncommitted changes)
-- [ ] Keep `CreateLogger(LogFilePath)` immediately after
-- [ ] Extract async startup (config load, DI build, `InitializeServices`) into
+- [x] Keep `CreateLogger(LogFilePath)` immediately after
+- [x] Extract async startup (config load, DI build, `InitializeServices`) into
       `private static async Task<(IServiceProvider? Provider, IReadOnlyList<string>? Errors)> StartupAsync()`
-- [ ] In `Main`, call `var outcome = Task.Run(StartupAsync).GetAwaiter().GetResult();` to run
+- [x] In `Main`, call `var outcome = Task.Run(StartupAsync).GetAwaiter().GetResult();` to run
       async startup on a pool thread without STA sync context
-- [ ] After `Task.Run` completes, on the STA thread: if `outcome.Errors` is not null, call
+- [x] After `Task.Run` completes, on the STA thread: if `outcome.Errors` is not null, call
       `App.RunErrorWindow(outcome.Errors)`; else call `App.Run(outcome.Provider)`
-- [ ] Move `Log.CloseAndFlushAsync()` into a `finally` block, called as
+- [x] Move `Log.CloseAndFlushAsync()` into a `finally` block, called as
       `Log.CloseAndFlushAsync().GetAwaiter().GetResult()`
-- [ ] Keep the existing `using` directives for `ReactiveUI` and `Avalonia.ReactiveUI`
+- [x] Keep the existing `using` directives for `ReactiveUI` and `Avalonia.ReactiveUI`
 
 ### Task 2: Verify App.axaml.cs has no scheduler assignment
 
 **Files:**
+
 - Modify: `SemiStep/UI/App.axaml.cs` (if needed)
 
-- [ ] Confirm `RxApp.MainThreadScheduler = AvaloniaScheduler.Instance` is NOT in `App.Run()`
+- [x] Confirm `RxApp.MainThreadScheduler = AvaloniaScheduler.Instance` is NOT in `App.Run()`
       (already removed in uncommitted changes)
-- [ ] Confirm `using ReactiveUI;` is removed if no longer needed
-- [ ] No other changes needed
+- [x] Confirm `using ReactiveUI;` is removed if no longer needed
+- [x] No other changes needed
 
 ### Task 3: Unify dispatch model in RecipeMutationCoordinator
 
 **Files:**
+
 - Modify: `SemiStep/UI/Coordinator/RecipeMutationCoordinator.cs`
 
-- [ ] `OnConnectionStateChanged`: wrap the **entire** method body in a single
+- [x] `OnConnectionStateChanged`: wrap the **entire** method body in a single
       `Dispatcher.UIThread.Post(() => { ... })`. Inside the lambda:
       `NotifyConnectionStateChanged()` first, then the `switch` with `messagePanel.AddInfo`/
       `messagePanel.AddError`. Capture `appConfiguration.PlcConfiguration.Connection.IpAddress`
       outside the lambda (or read it inside -- it is a config value, thread-safe)
-- [ ] `OnSyncStatusChanged`: same pattern -- wrap entire body in single `Dispatcher.UIThread.Post`.
+- [x] `OnSyncStatusChanged`: same pattern -- wrap entire body in single `Dispatcher.UIThread.Post`.
       Capture `syncService.LastError` **before** the `Post` (it may change on the background
       thread between the event firing and the lambda executing)
-- [ ] `_syncErrorChangedRelay` in `Initialize()`: confirm it dispatches via
+- [x] `_syncErrorChangedRelay` in `Initialize()`: confirm it dispatches via
       `Dispatcher.UIThread.Post(NotifyConnectionStateChanged)` (already correct in uncommitted
       changes)
-- [ ] `OnPlcRecipeConflictDetected`: confirm it wraps in `Dispatcher.UIThread.Post` (already
+- [x] `OnPlcRecipeConflictDetected`: confirm it wraps in `Dispatcher.UIThread.Post` (already
       correct, no change)
-- [ ] `EnableSync`: `messagePanel.AddError` call is fine as direct call (runs on UI thread
+- [x] `EnableSync`: `messagePanel.AddError` call is fine as direct call (runs on UI thread
       since it is inside an async method invoked from a UI-thread command) -- no change needed
-- [ ] Remove `_subjectLock` field and its usages -- no longer needed since all `Subject.OnNext`
+- [x] Remove `_subjectLock` field and its usages -- no longer needed since all `Subject.OnNext`
       calls are serialised on the UI thread
 
 ### Task 4: Add ObserveOn safety net to RecipeGridViewModel.StateChanged
 
 **Files:**
+
 - Modify: `SemiStep/UI/RecipeGrid/RecipeGridViewModel.cs`
 
-- [ ] Change line 59 from:
+- [x] Change line 59 from:
       `coordinator.StateChanged.Subscribe(OnStateChange).DisposeWith(_disposables);`
       to:
       `coordinator.StateChanged.ObserveOn(RxApp.MainThreadScheduler).Subscribe(OnStateChange).DisposeWith(_disposables);`
-- [ ] Verify consistency with `ExecutionState` subscriptions above (lines 48-57) which already
+- [x] Verify consistency with `ExecutionState` subscriptions above (lines 48-57) which already
       use `.ObserveOn(RxApp.MainThreadScheduler)`
 
 ### Task 5: Build and Test
 
 **Files:** (none)
 
-- [ ] Run build: `dotnet build SemiStep/Application/Application.csproj`
-- [ ] Run tests: `dotnet test SemiStep/Tests/Tests.csproj`
-- [ ] All pass
+- [x] Run build: `dotnet build SemiStep/Application/Application.csproj`
+- [x] Run tests: `dotnet test SemiStep/Tests/Tests.csproj`
+- [x] All pass
 
 ## Open Questions
 

@@ -51,21 +51,21 @@ properties from the snapshot directly, without re-pulling from `RecipeQueryServi
 
 ### New Files
 
-| File | Purpose |
-| ---- | ------- |
+| File                                             | Purpose                                              |
+| ------------------------------------------------ | ---------------------------------------------------- |
 | `SemiStep/TypesShared/Plc/PlcSessionSnapshot.cs` | Immutable record DTO for PLC connection + sync state |
 
 ### Modified Files
 
-| File | Change |
-| ---- | ------ |
-| `SemiStep/TypesShared/Domain/IPlcSyncService.cs` | Remove `LastError` property and `ErrorChanged` event |
-| `SemiStep/S7/Sync/PlcSyncCoordinator.cs` | Remove `LastError` field/setter/`ErrorChanged` firing; add `PublishSnapshot()` called from `Status` setter and all `LastError` assignment sites; expose `IObservable<Result<PlcSessionSnapshot>> PlcState` |
-| `SemiStep/Domain/Facade/DomainFacade.cs` | Subscribe to both `S7Service.StateChanged` and `PlcSyncCoordinator.PlcState`; assemble `Result<PlcSessionSnapshot>` in `PublishPlcSnapshot()`; expose `IObservable<Result<PlcSessionSnapshot>> PlcState`; remove `SyncLastError` and `ConnectionStateChanged` event; keep remaining delegated properties |
+| File                                                   | Change                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SemiStep/TypesShared/Domain/IPlcSyncService.cs`       | Remove `LastError` property and `ErrorChanged` event                                                                                                                                                                                                                                                                                          |
+| `SemiStep/S7/Sync/PlcSyncCoordinator.cs`               | Remove `LastError` field/setter/`ErrorChanged` firing; add `PublishSnapshot()` called from `Status` setter and all `LastError` assignment sites; expose `IObservable<Result<PlcSessionSnapshot>> PlcState`                                                                                                                                    |
+| `SemiStep/Domain/Facade/DomainFacade.cs`               | Subscribe to both `S7Service.StateChanged` and `PlcSyncCoordinator.PlcState`; assemble `Result<PlcSessionSnapshot>` in `PublishPlcSnapshot()`; expose `IObservable<Result<PlcSessionSnapshot>> PlcState`; remove `SyncLastError` and `ConnectionStateChanged` event; keep remaining delegated properties                                      |
 | `SemiStep/UI/Coordinator/RecipeMutationCoordinator.cs` | Remove `_connectionStateChanged Subject<Unit>`, `_syncErrorChangedRelay`, `OnConnectionStateChanged`, `OnSyncStatusChanged`; add `OnPlcStateChanged(Result<PlcSessionSnapshot>)`; update `RefreshMessagePanel` to accept combined reasons from both recipe and PLC results; expose `PlcStateChanged: IObservable<Result<PlcSessionSnapshot>>` |
-| `SemiStep/UI/Coordinator/RecipeQueryService.cs` | Remove `SyncLastError` delegated property |
-| `SemiStep/UI/MainWindow/MainWindowViewModel.cs` | Replace `ConnectionStateChanged` subscription with `PlcStateChanged`; raise connection properties from snapshot; remove `PlcSyncErrorText` property and `RaiseConnectionStateProperties` call for it |
-| `SemiStep/UI/MainWindow/AppStatusBar.axaml` | Remove `PlcSyncErrorText` `TextBlock` element |
+| `SemiStep/UI/Coordinator/RecipeQueryService.cs`        | Remove `SyncLastError` delegated property                                                                                                                                                                                                                                                                                                     |
+| `SemiStep/UI/MainWindow/MainWindowViewModel.cs`        | Replace `ConnectionStateChanged` subscription with `PlcStateChanged`; raise connection properties from snapshot; remove `PlcSyncErrorText` property and `RaiseConnectionStateProperties` call for it                                                                                                                                          |
+| `SemiStep/UI/MainWindow/AppStatusBar.axaml`            | Remove `PlcSyncErrorText` `TextBlock` element                                                                                                                                                                                                                                                                                                 |
 
 ### Deleted Files
 
@@ -114,6 +114,7 @@ _(none)_
 - [x] Dispose `_subject` in `Dispose()` if `PlcSyncCoordinator` implements `IDisposable` (check and add if needed)
 
 > **Note on error semantics in PublishSnapshot:**
+>
 > - `PlcSyncStatus.Failed` → `Result.Fail(new Error(errorMessage ?? "Sync failed"))`
 > - `PlcSyncStatus.Disconnected` when `_isSyncEnabled` → `Result.Fail(new Error("PLC connection lost"))`
 > - All other statuses → `Result.Ok(snapshot)`
@@ -202,6 +203,6 @@ _(none)_
 
 **Files:** (none)
 
-- [ ] Run build: `dotnet build SemiStep/Application/Application.csproj`
-- [ ] Run tests: `dotnet test SemiStep/Tests/Tests.csproj`
-- [ ] All pass
+- [x] Run build: `dotnet build SemiStep/Application/Application.csproj`
+- [x] Run tests: `dotnet test SemiStep/Tests/Tests.csproj`
+- [x] All pass

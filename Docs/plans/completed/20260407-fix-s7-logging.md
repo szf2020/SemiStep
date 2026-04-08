@@ -27,56 +27,60 @@ All changes are inside the `S7` project; no public contracts change.
 
 ### Modified Files
 
-| File | Change |
-|------|--------|
-| `SemiStep/S7/Sync/PlcExecutionMonitor.cs` | Continue poll loop on non-connection errors instead of returning |
-| `SemiStep/S7/Sync/PlcSyncCoordinator.cs` | Add missing `Log.Warning` for generic `activeResult` failure |
-| `SemiStep/S7/Sync/PlcTransactionExecutor.cs` | Add `Log.Warning(ex, ...)` at all exception catch sites |
-| `SemiStep/S7/Facade/S7Service.cs` | Guard `result.Errors[0]` with count check |
+| File                                         | Change                                                           |
+| -------------------------------------------- | ---------------------------------------------------------------- |
+| `SemiStep/S7/Sync/PlcExecutionMonitor.cs`    | Continue poll loop on non-connection errors instead of returning |
+| `SemiStep/S7/Sync/PlcSyncCoordinator.cs`     | Add missing `Log.Warning` for generic `activeResult` failure     |
+| `SemiStep/S7/Sync/PlcTransactionExecutor.cs` | Add `Log.Warning(ex, ...)` at all exception catch sites          |
+| `SemiStep/S7/Facade/S7Service.cs`            | Guard `result.Errors[0]` with count check                        |
 
 ## Tasks
 
 ### Task 1: Fix PlcExecutionMonitor — poll loop must not exit on transient errors
 
 **Files:**
+
 - Modify: `SemiStep/S7/Sync/PlcExecutionMonitor.cs`
 
-- [ ] In `PollLoopAsync`, when `result.IsFailed` and the error is **not** `NotConnectedError`:
-  log `Log.Warning(...)` and `continue` the loop (not `return`).
-- [ ] The `NotConnectedError` branch must still `return` (stop the loop and call `onConnectionLost`).
+- [x] In `PollLoopAsync`, when `result.IsFailed` and the error is **not** `NotConnectedError`:
+      log `Log.Warning(...)` and `continue` the loop (not `return`).
+- [x] The `NotConnectedError` branch must still `return` (stop the loop and call `onConnectionLost`).
 
 ### Task 2: Fix PlcSyncCoordinator — log missing for generic activeResult failure
 
 **Files:**
+
 - Modify: `SemiStep/S7/Sync/PlcSyncCoordinator.cs`
 
-- [ ] In `ExecuteSyncAsync`, in the `activeResult.IsFailed` block, add
-  `Log.Warning("Sync blocked: {Message}", activeResult.Errors[0].Message)` (or equivalent)
-  for the non-disconnected branch.
+- [x] In `ExecuteSyncAsync`, in the `activeResult.IsFailed` block, add
+      `Log.Warning("Sync blocked: {Message}", activeResult.Errors[0].Message)` (or equivalent)
+      for the non-disconnected branch.
 
 ### Task 3: Fix PlcTransactionExecutor — log exceptions at catch sites
 
 **Files:**
+
 - Modify: `SemiStep/S7/Sync/PlcTransactionExecutor.cs`
 
-- [ ] `ReadRecipeDataAsync` catch block: add `Log.Warning(ex, "Failed to read recipe data from PLC")`.
-- [ ] `WriteRecipeDataAsync` catch block: add `Log.Warning(ex, "Failed to write recipe data to PLC")`.
-- [ ] `WriteManagingAreaAsync` catch block: add `Log.Warning(ex, "Failed to write managing area to PLC")`.
-- [ ] `ReadAndDecodeAsync` catch block: add `Log.Warning(ex, "Failed to read and decode PLC data")`.
+- [x] `ReadRecipeDataAsync` catch block: add `Log.Warning(ex, "Failed to read recipe data from PLC")`.
+- [x] `WriteRecipeDataAsync` catch block: add `Log.Warning(ex, "Failed to write recipe data to PLC")`.
+- [x] `WriteManagingAreaAsync` catch block: add `Log.Warning(ex, "Failed to write managing area to PLC")`.
+- [x] `ReadAndDecodeAsync` catch block: add `Log.Warning(ex, "Failed to read and decode PLC data")`.
 
 ### Task 4: Fix S7Service — guard Errors[0] access
 
 **Files:**
+
 - Modify: `SemiStep/S7/Facade/S7Service.cs`
 
-- [ ] In `ReadManagingAreaAsync`, replace bare `result.Errors[0].Message` with a safe access
-  pattern (e.g. `result.Errors.FirstOrDefault()?.Message ?? "Unknown error"`).
-- [ ] In `ReadRecipeFromPlcAsync`, same guard.
+- [x] In `ReadManagingAreaAsync`, replace bare `result.Errors[0].Message` with a safe access
+      pattern (e.g. `result.Errors.FirstOrDefault()?.Message ?? "Unknown error"`).
+- [x] In `ReadRecipeFromPlcAsync`, same guard.
 
 ### Task 5: Build and Test
 
 **Files:** (none)
 
-- [ ] Run build: `dotnet build SemiStep/SemiStep.slnx`
-- [ ] Run tests: `dotnet test SemiStep/Tests/Tests.csproj --filter "Component=S7"`
-- [ ] All pass
+- [x] Run build: `dotnet build SemiStep/SemiStep.slnx`
+- [x] Run tests: `dotnet test SemiStep/Tests/Tests.csproj --filter "Component=S7"`
+- [x] All pass

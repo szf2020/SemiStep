@@ -38,32 +38,33 @@ level, and fixes a latent `OperationCanceledException` crash risk in two `S7Serv
 
 ### New Files
 
-| File | Purpose |
-|------|---------|
+| File                                        | Purpose                                                           |
+| ------------------------------------------- | ----------------------------------------------------------------- |
 | `SemiStep/S7/Protocol/NotConnectedError.cs` | Typed FluentResults `Error` subclass for "not connected" failures |
 
 ### Modified Files
 
-| File | Change |
-|------|--------|
+| File                                           | Change                                                                                             |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `SemiStep/S7/Serialization/RecipeConverter.cs` | `ToRecipe` → `Result<Recipe>`, `FromRecipe` → `Result<PlcRecipeData>`; throw sites → `Result.Fail` |
-| `SemiStep/S7/Sync/PlcTransactionExecutor.cs` | All public methods → `Result`/`Result<T>`; `EnsureConnected` → bool; remove internal log |
-| `SemiStep/S7/Facade/S7Service.cs` | Remove try/catch in two read methods; add OCE guards; WRN → message-only |
-| `SemiStep/S7/Sync/PlcSyncCoordinator.cs` | Remove exception catches; add Result failure checks |
-| `SemiStep/S7/Sync/PlcExecutionMonitor.cs` | Remove exception catch; add Result failure check with `NotConnectedError` |
+| `SemiStep/S7/Sync/PlcTransactionExecutor.cs`   | All public methods → `Result`/`Result<T>`; `EnsureConnected` → bool; remove internal log           |
+| `SemiStep/S7/Facade/S7Service.cs`              | Remove try/catch in two read methods; add OCE guards; WRN → message-only                           |
+| `SemiStep/S7/Sync/PlcSyncCoordinator.cs`       | Remove exception catches; add Result failure checks                                                |
+| `SemiStep/S7/Sync/PlcExecutionMonitor.cs`      | Remove exception catch; add Result failure check with `NotConnectedError`                          |
 
 ### Deleted Files
 
-| File | Reason |
-|------|--------|
-| `SemiStep/S7/Protocol/PlcNotConnectedException.cs` | Replaced by `NotConnectedError` and Result propagation |
-| `SemiStep/S7/Sync/PlcWriteVerificationException.cs` | Never caught by type; write failure now a Result |
+| File                                                | Reason                                                 |
+| --------------------------------------------------- | ------------------------------------------------------ |
+| `SemiStep/S7/Protocol/PlcNotConnectedException.cs`  | Replaced by `NotConnectedError` and Result propagation |
+| `SemiStep/S7/Sync/PlcWriteVerificationException.cs` | Never caught by type; write failure now a Result       |
 
 ## Tasks
 
 ### Task 1: Add NotConnectedError
 
 **Files:**
+
 - Create: `SemiStep/S7/Protocol/NotConnectedError.cs`
 
 - [x] Create `internal sealed class NotConnectedError : Error` in `S7.Protocol` namespace
@@ -74,6 +75,7 @@ level, and fixes a latent `OperationCanceledException` crash risk in two `S7Serv
 ### Task 2: Refactor RecipeConverter
 
 **Files:**
+
 - Modify: `SemiStep/S7/Serialization/RecipeConverter.cs`
 
 - [x] Change `FromRecipe(Recipe recipe)` signature to `Result<PlcRecipeData>`
@@ -90,6 +92,7 @@ level, and fixes a latent `OperationCanceledException` crash risk in two `S7Serv
 ### Task 3: Refactor PlcTransactionExecutor
 
 **Files:**
+
 - Modify: `SemiStep/S7/Sync/PlcTransactionExecutor.cs`
 
 - [x] Change `EnsureConnected()` from `void` (throws) to `bool` (returns false when not connected)
@@ -108,6 +111,7 @@ level, and fixes a latent `OperationCanceledException` crash risk in two `S7Serv
 ### Task 4: Refactor S7Service
 
 **Files:**
+
 - Modify: `SemiStep/S7/Facade/S7Service.cs`
 
 - [x] `ReadManagingAreaAsync`: remove `try/catch`; propagate `Result` from `transactionExecutor.ReadManagingAreaAsync` directly; add `when (ex is not OperationCanceledException)` guard if any catch remains; log `WRN` as message-only on failure
@@ -122,6 +126,7 @@ level, and fixes a latent `OperationCanceledException` crash risk in two `S7Serv
 ### Task 5: Refactor PlcSyncCoordinator
 
 **Files:**
+
 - Modify: `SemiStep/S7/Sync/PlcSyncCoordinator.cs`
 
 - [x] In `ExecuteSyncAsync`: replace `catch (PlcNotConnectedException)` with `Result.IsFailed` check on `IsRecipeActiveAsync` result; map `NotConnectedError` to `PlcSyncStatus.Failed` and `LastError = "Not connected to PLC"`
@@ -133,6 +138,7 @@ level, and fixes a latent `OperationCanceledException` crash risk in two `S7Serv
 ### Task 6: Refactor PlcExecutionMonitor
 
 **Files:**
+
 - Modify: `SemiStep/S7/Sync/PlcExecutionMonitor.cs`
 
 - [x] In `PollLoopAsync`: replace `catch (PlcNotConnectedException)` with `result.IsFailed` check after `ReadExecutionStateAsync`
@@ -145,13 +151,14 @@ level, and fixes a latent `OperationCanceledException` crash risk in two `S7Serv
 ### Task 7: Delete obsolete exception classes
 
 **Files:**
+
 - Delete: `SemiStep/S7/Protocol/PlcNotConnectedException.cs`
 - Delete: `SemiStep/S7/Sync/PlcWriteVerificationException.cs`
 
-- [ ] Update `PlcTransactionExecutorTests.cs`: rewrite 3 affected tests to assert on `Result.IsFailed` instead of thrown exceptions
-- [ ] Verify no remaining references to `PlcNotConnectedException` in the codebase
-- [ ] Verify no remaining references to `PlcWriteVerificationException` in the codebase
-- [ ] Delete both files
+- [x] Update `PlcTransactionExecutorTests.cs`: rewrite 3 affected tests to assert on `Result.IsFailed` instead of thrown exceptions
+- [x] Verify no remaining references to `PlcNotConnectedException` in the codebase
+- [x] Verify no remaining references to `PlcWriteVerificationException` in the codebase
+- [x] Delete both files
 
 ---
 
@@ -159,6 +166,6 @@ level, and fixes a latent `OperationCanceledException` crash risk in two `S7Serv
 
 **Files:** (none)
 
-- [ ] Run build: `dotnet build SemiStep/Application/Application.csproj`
-- [ ] Run tests: `dotnet test SemiStep/Tests/Tests.csproj`
-- [ ] All 272 tests pass, 0 build errors
+- [x] Run build: `dotnet build SemiStep/Application/Application.csproj`
+- [x] Run tests: `dotnet test SemiStep/Tests/Tests.csproj`
+- [x] All 272 tests pass, 0 build errors

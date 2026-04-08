@@ -54,6 +54,7 @@ are left in place — those fire `Subject.OnNext` into the Avalonia binding syst
 must remain on the UI thread independently of the messagePanel fix.
 
 **Alternatives rejected:**
+
 - `ObserveOn(RxApp.MainThreadScheduler)` applied to `ClearCommand.CanExecute` source: would
   require modifying ReactiveUI internals or wrapping the `WhenAnyValue` pipeline, fragile.
 - Making `MessagePanelViewModel` use `IScheduler` injection for testability: unnecessary
@@ -66,38 +67,40 @@ must remain on the UI thread independently of the messagePanel fix.
 
 ### Modified Files
 
-| File | Change |
-|------|--------|
-| `SemiStep/UI/MessageService/MessagePanelViewModel.cs` | All public mutating methods (`AddError`, `AddWarning`, `AddInfo`, `RefreshReasons`, `Clear`, private `ClearNonStructural`) dispatch via `Dispatcher.UIThread.CheckAccess()` / `Post` |
-| `SemiStep/UI/Coordinator/RecipeMutationCoordinator.cs` | Remove `Dispatcher.UIThread.Post` wrappers around `messagePanel.*` calls in async methods; keep `Post` wrappers for non-messagePanel subjects |
-| `SemiStep/UI/RecipeFile/RecipeFileViewModel.cs` | Remove `using Avalonia.Threading;`; remove `Dispatcher.UIThread.Post` wrappers; call `_messagePanel.Add*` directly |
-| `SemiStep/Tests/UI/MessagePanelViewModelTests.cs` | Add `Dispatcher.UIThread.RunJobs(null)` after mutating calls where the test asserts on `ErrorCount`, `WarningCount`, or `HasEntries` — because these are now set via `Post`, which is asynchronous |
+| File                                                   | Change                                                                                                                                                                                             |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SemiStep/UI/MessageService/MessagePanelViewModel.cs`  | All public mutating methods (`AddError`, `AddWarning`, `AddInfo`, `RefreshReasons`, `Clear`, private `ClearNonStructural`) dispatch via `Dispatcher.UIThread.CheckAccess()` / `Post`               |
+| `SemiStep/UI/Coordinator/RecipeMutationCoordinator.cs` | Remove `Dispatcher.UIThread.Post` wrappers around `messagePanel.*` calls in async methods; keep `Post` wrappers for non-messagePanel subjects                                                      |
+| `SemiStep/UI/RecipeFile/RecipeFileViewModel.cs`        | Remove `using Avalonia.Threading;`; remove `Dispatcher.UIThread.Post` wrappers; call `_messagePanel.Add*` directly                                                                                 |
+| `SemiStep/Tests/UI/MessagePanelViewModelTests.cs`      | Add `Dispatcher.UIThread.RunJobs(null)` after mutating calls where the test asserts on `ErrorCount`, `WarningCount`, or `HasEntries` — because these are now set via `Post`, which is asynchronous |
 
 ## Tasks
 
 ### Task 1: Make MessagePanelViewModel self-marshalling
 
 **Files:**
+
 - Modify: `SemiStep/UI/MessageService/MessagePanelViewModel.cs`
 
 - [x] Add `using Avalonia.Threading;` directive (System group first, then others)
 - [x] Extract a private helper `private void PostOnUiThread(Action action)` that checks
-  `Dispatcher.UIThread.CheckAccess()` and either calls `action()` directly or calls
-  `Dispatcher.UIThread.Post(action)`
+      `Dispatcher.UIThread.CheckAccess()` and either calls `action()` directly or calls
+      `Dispatcher.UIThread.Post(action)`
 - [x] Wrap the body of `AddError` with `PostOnUiThread(() => { ... })`
 - [x] Wrap the body of `AddWarning` with `PostOnUiThread(() => { ... })`
 - [x] Wrap the body of `AddInfo` with `PostOnUiThread(() => { ... })`
 - [x] Wrap the body of `Clear` with `PostOnUiThread(() => { ... })`
 - [x] Wrap the body of `RefreshReasons` with `PostOnUiThread(() => { ... })` — capture the
-  `reasons` list before posting (materialise with `.ToList()`) to avoid deferred enumeration
-  of a caller-owned collection
+      `reasons` list before posting (materialise with `.ToList()`) to avoid deferred enumeration
+      of a caller-owned collection
 - [x] Wrap the body of `ClearNonStructural` with `PostOnUiThread(() => { ... })`
 - [x] Verify `RecountAndNotify` is private and only called from within already-dispatched bodies
-  (no direct dispatch needed there)
+      (no direct dispatch needed there)
 
 ### Task 2: Remove redundant Dispatcher.UIThread.Post wrappers from RecipeFileViewModel
 
 **Files:**
+
 - Modify: `SemiStep/UI/RecipeFile/RecipeFileViewModel.cs`
 
 - [x] Remove `using Avalonia.Threading;` directive
@@ -109,6 +112,7 @@ must remain on the UI thread independently of the messagePanel fix.
 ### Task 3: Remove redundant Dispatcher.UIThread.Post wrappers from RecipeMutationCoordinator
 
 **Files:**
+
 - Modify: `SemiStep/UI/Coordinator/RecipeMutationCoordinator.cs`
 
 The coordinator's `LoadRecipeAsync` and `LoadRecipeFromPlcAsync` currently have no `Post`
@@ -122,14 +126,15 @@ unstaged diff on disk shows additional changes (connection state wiring, `OnConn
 - [x] In `LoadRecipeFromPlcAsync`: if a `Dispatcher.UIThread.Post(() => { messagePanel.Clear(); RefreshMessagePanel(...); })` block exists, unwrap it to direct calls
 - [x] In `LoadRecipeAsync`: same unwrapping
 - [x] Confirm that `OnConnectionStateChanged`, `OnSyncStatusChanged`, `OnPlcRecipeConflictDetected`
-  retain their `Dispatcher.UIThread.Post` wrappers (these protect `_plcRecipeConflictDetected.OnNext`
-  and are unrelated to the messagePanel change)
+      retain their `Dispatcher.UIThread.Post` wrappers (these protect `_plcRecipeConflictDetected.OnNext`
+      and are unrelated to the messagePanel change)
 - [x] Confirm `EnableSync`'s `Dispatcher.UIThread.Post(() => messagePanel.AddError(...))` is
-  also unwrapped to a direct call
+      also unwrapped to a direct call
 
 ### Task 4: Update MessagePanelViewModel tests
 
 **Files:**
+
 - Modify: `SemiStep/Tests/UI/MessagePanelViewModelTests.cs`
 
 Because `PostOnUiThread` uses `Dispatcher.UIThread.Post` when called off the UI thread, and
@@ -139,19 +144,19 @@ Avalonia's headless mode is required, or alternatively the tests can use
 `Dispatcher.UIThread.RunJobs(null)` after each mutating call.
 
 - [x] Check how existing `MessagePanelViewModelTests` are structured — do they use a headless
-  Avalonia fixture or plain instantiation?
+      Avalonia fixture or plain instantiation?
 - [x] If plain instantiation (no headless dispatcher): for each test that asserts on
-  `ErrorCount`, `WarningCount`, `HasEntries`, `Entries` after a mutating call, add
-  `Dispatcher.UIThread.RunJobs(null)` immediately after the mutating call and before the
-  assertion
+      `ErrorCount`, `WarningCount`, `HasEntries`, `Entries` after a mutating call, add
+      `Dispatcher.UIThread.RunJobs(null)` immediately after the mutating call and before the
+      assertion
 - [x] Verify that the `ClearCommand.Execute().Subscribe()` tests also flush (`RunJobs`) since
-  `ClearNonStructural` is now dispatched
+      `ClearNonStructural` is now dispatched
 - [x] Add `using Avalonia.Threading;` if not already present
 
 ### Task 5: Build and Test
 
 **Files:** (none)
 
-- [ ] Run build: `dotnet build SemiStep/Application/Application.csproj`
-- [ ] Run tests: `dotnet test SemiStep/Tests/Tests.csproj`
-- [ ] All pass
+- [x] Run build: `dotnet build SemiStep/Application/Application.csproj`
+- [x] Run tests: `dotnet test SemiStep/Tests/Tests.csproj`
+- [x] All pass
