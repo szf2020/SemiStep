@@ -100,6 +100,33 @@ public sealed class RecipeMutationCoordinatorLoadRecipeTests
 		}
 	}
 
+	[Fact]
+	public async Task LoadRecipeAsync_Success_WithWarnings_ShowsWarningsInPanel()
+	{
+		var (coordinator, panel) = await BuildCoordinatorWithCsvAsync();
+		var tempFilePath = Path.Combine(Path.GetTempPath(), $"{TempFilePrefix}.{Guid.NewGuid():N}.csv");
+
+		try
+		{
+			// Save the default empty recipe so we have a valid CSV file with no steps.
+			await coordinator.SaveRecipeAsync(tempFilePath);
+
+			// Load it back — an empty recipe triggers a "Recipe has no steps" warning from the analyzer.
+			var result = await coordinator.LoadRecipeAsync(tempFilePath);
+			Dispatcher.UIThread.RunJobs(null);
+
+			result.IsSuccess.Should().BeTrue("loading a valid CSV should succeed even when it has warnings");
+			panel.Entries.Should().Contain(e => e.IsWarning,
+				"the message panel must show the 'Recipe has no steps' warning after loading an empty recipe");
+		}
+		finally
+		{
+			coordinator.Dispose();
+			panel.Dispose();
+			File.Delete(tempFilePath);
+		}
+	}
+
 	private static async Task<(RecipeMutationCoordinator Coordinator, MessagePanelViewModel Panel)> BuildCoordinatorWithCsvAsync()
 	{
 		var configDir = TestConfigLocator.GetConfigDirectory("WithGroups");

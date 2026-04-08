@@ -17,6 +17,8 @@ internal sealed class PlcExecutionMonitor(
 	Action onConnectionLost)
 	: IDisposable
 {
+	private static readonly TimeSpan _stopTimeout = TimeSpan.FromSeconds(5);
+
 	private readonly Subject<PlcExecutionInfo> _subject = new();
 
 	private volatile PlcExecutionInfo _lastKnown = PlcExecutionInfo.Empty;
@@ -37,18 +39,13 @@ internal sealed class PlcExecutionMonitor(
 
 	public void Stop()
 	{
-		_pollCts?.Cancel();
-		_pollCts?.Dispose();
-		_pollCts = null;
-
-		var taskToWait = _pollTask;
-		_pollTask = null;
+		var taskToWait = CancelAndDetachPollTask();
 
 		// Skip the wait if Stop() is being called from within the poll loop itself
 		// (e.g. via onConnectionLost callback), to avoid deadlock.
 		if (taskToWait is not null && taskToWait.Id != Task.CurrentId)
 		{
-			taskToWait.Wait(TimeSpan.FromSeconds(5));
+			taskToWait.Wait(_stopTimeout);
 		}
 
 		PublishAndTrack(PlcExecutionInfo.Empty);
@@ -56,18 +53,13 @@ internal sealed class PlcExecutionMonitor(
 
 	public async Task StopAsync()
 	{
-		_pollCts?.Cancel();
-		_pollCts?.Dispose();
-		_pollCts = null;
-
-		var taskToWait = _pollTask;
-		_pollTask = null;
+		var taskToWait = CancelAndDetachPollTask();
 
 		if (taskToWait is not null)
 		{
 			try
 			{
-				await taskToWait.WaitAsync(TimeSpan.FromSeconds(5));
+				await taskToWait.WaitAsync(_stopTimeout);
 			}
 			catch (TimeoutException)
 			{
@@ -83,6 +75,18 @@ internal sealed class PlcExecutionMonitor(
 		Stop();
 		_subject.OnCompleted();
 		_subject.Dispose();
+	}
+
+	private Task? CancelAndDetachPollTask()
+	{
+		_pollCts?.Cancel();
+		_pollCts?.Dispose();
+		_pollCts = null;
+
+		var taskToWait = _pollTask;
+		_pollTask = null;
+
+		return taskToWait;
 	}
 
 	private void PublishAndTrack(PlcExecutionInfo info)
@@ -110,13 +114,12 @@ internal sealed class PlcExecutionMonitor(
 						{
 							onConnectionLost();
 						}
-					}
-					else
-					{
-						Log.Warning("Execution monitor poll error: {Message}", result.Errors[0].Message);
+
+						return;
 					}
 
-					return;
+					Log.Warning("Execution monitor poll error: {Message}", result.Errors[0].Message);
+					continue;
 				}
 
 				PublishAndTrack(result.Value);

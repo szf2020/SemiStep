@@ -28,7 +28,7 @@ internal sealed class PlcSyncExecutor(
 	private CancellationTokenSource? _debounceCts;
 	private Recipe? _pendingSnapshot;
 	private string? _pendingErrorMessage;
-	private bool _disposed;
+	private volatile bool _disposed;
 
 	public string? PendingErrorMessage
 	{
@@ -43,13 +43,13 @@ internal sealed class PlcSyncExecutor(
 
 	public void OnRecipeChanged(Recipe recipe)
 	{
-		if (_disposed)
-		{
-			return;
-		}
-
 		lock (stateLock)
 		{
+			if (_disposed)
+			{
+				return;
+			}
+
 			_pendingSnapshot = recipe;
 
 			if (_syncTask is not null && !_syncTask.IsCompleted)
@@ -110,11 +110,36 @@ internal sealed class PlcSyncExecutor(
 
 	public void Dispose()
 	{
-		_disposed = true;
+		Task? taskToWait;
 		lock (stateLock)
 		{
+			if (_disposed)
+			{
+				return;
+			}
+
+			_disposed = true;
 			_debounceCts?.Cancel();
 			_debounceCts?.Dispose();
+			_debounceCts = null;
+			taskToWait = _syncTask;
+			_syncTask = null;
+		}
+
+		if (taskToWait is not null)
+		{
+			try
+			{
+				taskToWait.Wait(TimeSpan.FromSeconds(5));
+			}
+			catch (AggregateException ex) when (ex.Flatten().InnerExceptions.All(e => e is OperationCanceledException))
+			{
+				// Expected on cancellation — ignore.
+			}
+			catch (AggregateException ex)
+			{
+				Log.Warning(ex, "Sync task did not complete cleanly during disposal");
+			}
 		}
 	}
 

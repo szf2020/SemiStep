@@ -18,7 +18,7 @@ internal sealed class PlcSyncCoordinator : IPlcSyncService, IDisposable
 	private readonly PlcSyncExecutor _executor;
 
 	private PlcConnectionState _connectionState = PlcConnectionState.Disconnected;
-	private bool _disposed;
+	private volatile bool _disposed;
 	private bool _isSyncEnabled;
 	private DateTimeOffset? _lastSyncTime;
 	private PlcSyncStatus _status = PlcSyncStatus.Idle;
@@ -119,12 +119,16 @@ internal sealed class PlcSyncCoordinator : IPlcSyncService, IDisposable
 
 	public void Dispose()
 	{
-		if (_disposed)
+		lock (_lock)
 		{
-			return;
+			if (_disposed)
+			{
+				return;
+			}
+
+			_disposed = true;
 		}
 
-		_disposed = true;
 		_executor.Dispose();
 		_subject.OnCompleted();
 		_subject.Dispose();
@@ -146,19 +150,26 @@ internal sealed class PlcSyncCoordinator : IPlcSyncService, IDisposable
 		PlcSyncStatus status;
 		bool isSyncEnabled;
 		string? errorMessage;
+		bool disposed;
 
 		lock (_lock)
 		{
+			disposed = _disposed;
 			status = _status;
 			isSyncEnabled = _isSyncEnabled;
 			errorMessage = _executor.PendingErrorMessage;
+		}
+
+		if (disposed)
+		{
+			return;
 		}
 
 		var snapshot = new PlcSessionSnapshot(connectionState, status, isSyncEnabled);
 
 		if (status == PlcSyncStatus.Failed)
 		{
-			_subject.OnNext(
+			TryPublish(
 				Result.Fail<PlcSessionSnapshot>(new Error(errorMessage ?? "Sync failed"))
 					.WithValue(snapshot));
 			return;
@@ -166,12 +177,20 @@ internal sealed class PlcSyncCoordinator : IPlcSyncService, IDisposable
 
 		if (status == PlcSyncStatus.Disconnected && isSyncEnabled)
 		{
-			_subject.OnNext(
+			TryPublish(
 				Result.Fail<PlcSessionSnapshot>(new Error("PLC connection lost"))
 					.WithValue(snapshot));
 			return;
 		}
 
-		_subject.OnNext(Result.Ok(snapshot));
+		TryPublish(Result.Ok(snapshot));
+	}
+
+	private void TryPublish(Result<PlcSessionSnapshot> result)
+	{
+		if (!_disposed)
+		{
+			_subject.OnNext(result);
+		}
 	}
 }

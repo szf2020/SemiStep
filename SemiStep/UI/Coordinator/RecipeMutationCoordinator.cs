@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using System.Reactive.Linq;
+﻿using System.Reactive.Linq;
 using System.Reactive.Subjects;
 
 using Domain.Facade;
@@ -17,12 +16,13 @@ using UI.MessageService;
 
 namespace UI.Coordinator;
 
-public sealed class RecipeMutationCoordinator(
-	DomainFacade domainFacade,
-	AppConfiguration appConfiguration,
-	RecipeQueryService queryService,
-	MessagePanelViewModel messagePanel) : IDisposable
+public sealed class RecipeMutationCoordinator : IDisposable
 {
+	private readonly DomainFacade _domainFacade;
+	private readonly AppConfiguration _appConfiguration;
+	private readonly RecipeQueryService _queryService;
+	private readonly MessagePanelViewModel _messagePanel;
+	private readonly RecipeStepCoordinator _stepCoordinator;
 	private readonly Subject<MutationSignal> _stateChanged = new();
 	private readonly Subject<(Recipe Local, Recipe Plc)> _plcRecipeConflictDetected = new();
 	private readonly Subject<Result<PlcSessionSnapshot>> _plcStateChanged = new();
@@ -32,26 +32,45 @@ public sealed class RecipeMutationCoordinator(
 	private bool _initialized;
 	private bool _disposed;
 
+	public RecipeMutationCoordinator(
+		DomainFacade domainFacade,
+		AppConfiguration appConfiguration,
+		RecipeQueryService queryService,
+		MessagePanelViewModel messagePanel)
+	{
+		_domainFacade = domainFacade;
+		_appConfiguration = appConfiguration;
+		_queryService = queryService;
+		_messagePanel = messagePanel;
+		_stepCoordinator = new RecipeStepCoordinator(
+			domainFacade,
+			() => _queryService.CurrentRecipe,
+			result => _lastRecipeResult = result,
+			index => SuggestedSelection = index,
+			signal => _stateChanged.OnNext(signal),
+			RebuildMessagePanel);
+	}
+
 	public IObservable<MutationSignal> StateChanged => _stateChanged;
 	public IObservable<(Recipe Local, Recipe Plc)> PlcRecipeConflictDetected => _plcRecipeConflictDetected;
 	public IObservable<Result<PlcSessionSnapshot>> PlcStateChanged => _plcStateChanged;
 
 	public int? SuggestedSelection { get; private set; }
 
-	public Recipe CurrentRecipe => queryService.CurrentRecipe;
+	public Recipe CurrentRecipe => _queryService.CurrentRecipe;
 
-	public RecipeSnapshot Snapshot => queryService.Snapshot;
+	public RecipeSnapshot Snapshot => _queryService.Snapshot;
 
-	public bool IsDirty => queryService.IsDirty;
-	public bool CanUndo => queryService.CanUndo;
-	public bool CanRedo => queryService.CanRedo;
-	public bool IsConnected => queryService.IsConnected;
+	public bool IsDirty => _queryService.IsDirty;
+	public bool CanUndo => _queryService.CanUndo;
+	public bool CanRedo => _queryService.CanRedo;
+	public bool IsConnected => _queryService.IsConnected;
 
-	public IObservable<PlcExecutionInfo> ExecutionState => queryService.ExecutionState;
-	public bool IsRecipeActive => queryService.IsRecipeActive;
-	public bool IsSyncEnabled => queryService.IsSyncEnabled;
+	public IObservable<PlcExecutionInfo> ExecutionState => _queryService.ExecutionState;
+	public bool IsRecipeActive => _queryService.IsRecipeActive;
+	public bool IsSyncEnabled => _queryService.IsSyncEnabled;
 
-	public RecipeQueryService QueryService => queryService;
+	public RecipeQueryService QueryService => _queryService;
 
 	public RecipeMutationCoordinator Initialize()
 	{
@@ -62,9 +81,9 @@ public sealed class RecipeMutationCoordinator(
 
 		_initialized = true;
 
-		domainFacade.PlcRecipeConflictDetected += OnPlcRecipeConflictDetected;
+		_domainFacade.PlcRecipeConflictDetected += OnPlcRecipeConflictDetected;
 
-		_plcStateSubscription = domainFacade.PlcState
+		_plcStateSubscription = _domainFacade.PlcState
 			.ObserveOn(RxApp.MainThreadScheduler)
 			.Subscribe(OnPlcStateChanged);
 
@@ -80,7 +99,7 @@ public sealed class RecipeMutationCoordinator(
 
 		_disposed = true;
 
-		domainFacade.PlcRecipeConflictDetected -= OnPlcRecipeConflictDetected;
+		_domainFacade.PlcRecipeConflictDetected -= OnPlcRecipeConflictDetected;
 
 		_plcStateSubscription?.Dispose();
 
@@ -99,24 +118,19 @@ public sealed class RecipeMutationCoordinator(
 
 	public Task<Result> EnableSync()
 	{
-		return domainFacade.EnableSync(appConfiguration.PlcConfiguration);
+		return _domainFacade.EnableSync(_appConfiguration.PlcConfiguration);
 	}
 
-	public async Task DisableSync()
+	public Task DisableSync()
 	{
-		await domainFacade.DisableSync();
+		return _domainFacade.DisableSync();
 	}
 
 	public async Task<Result> LoadRecipeFromPlcAsync()
 	{
-		var result = await domainFacade.LoadRecipeFromPlcAsync();
+		var result = await _domainFacade.LoadRecipeFromPlcAsync();
 
-		_lastRecipeResult = Result.Ok();
-
-		if (result.IsFailed)
-		{
-			_lastRecipeResult = result;
-		}
+		_lastRecipeResult = result;
 
 		RebuildMessagePanel();
 
@@ -133,166 +147,64 @@ public sealed class RecipeMutationCoordinator(
 
 	public void ResolveConflict(bool keepLocal)
 	{
-		domainFacade.ResolveConflict(keepLocal);
+		_domainFacade.ResolveConflict(keepLocal);
 	}
 
 	public void AppendStep(int actionId)
 	{
-		var result = domainFacade.AppendStep(actionId);
-		_lastRecipeResult = result;
-		RebuildMessagePanel();
-
-		if (result.IsFailed)
-		{
-			return;
-		}
-
-		SuggestedSelection = CurrentRecipe.StepCount - 1;
-		_stateChanged.OnNext(new MutationSignal.StepAppended(CurrentRecipe.StepCount - 1));
+		_stepCoordinator.AppendStep(actionId);
 	}
 
 	public void InsertStep(int index, int actionId)
 	{
-		var result = domainFacade.InsertStep(index, actionId);
-		_lastRecipeResult = result;
-		RebuildMessagePanel();
-
-		if (result.IsFailed)
-		{
-			return;
-		}
-
-		SuggestedSelection = index;
-		_stateChanged.OnNext(new MutationSignal.StepsInserted(index, 1));
+		_stepCoordinator.InsertStep(index, actionId);
 	}
 
 	public void RemoveStep(int index)
 	{
-		var result = domainFacade.RemoveStep(index);
-		_lastRecipeResult = result;
-		RebuildMessagePanel();
-
-		if (result.IsFailed)
-		{
-			return;
-		}
-
-		SuggestedSelection = CurrentRecipe.StepCount > 0
-			? Math.Min(index, CurrentRecipe.StepCount - 1)
-			: null;
-		_stateChanged.OnNext(new MutationSignal.StepRemoved(index));
+		_stepCoordinator.RemoveStep(index);
 	}
 
 	public void RemoveSteps(IReadOnlyList<int> indices)
 	{
-		var result = domainFacade.RemoveSteps(indices);
-		_lastRecipeResult = result;
-		RebuildMessagePanel();
-
-		if (result.IsFailed)
-		{
-			return;
-		}
-
-		SuggestedSelection = CurrentRecipe.StepCount > 0
-			? Math.Min(indices.Min(), CurrentRecipe.StepCount - 1)
-			: null;
-		_stateChanged.OnNext(new MutationSignal.StepsRemoved([.. indices]));
+		_stepCoordinator.RemoveSteps(indices);
 	}
 
 	public void InsertSteps(int startIndex, IReadOnlyList<Step> steps)
 	{
-		var result = domainFacade.InsertSteps(startIndex, steps);
-		_lastRecipeResult = result;
-		RebuildMessagePanel();
-
-		if (result.IsFailed)
-		{
-			return;
-		}
-
-		SuggestedSelection = startIndex;
-		_stateChanged.OnNext(new MutationSignal.StepsInserted(startIndex, steps.Count));
+		_stepCoordinator.InsertSteps(startIndex, steps);
 	}
 
 	public void ChangeStepAction(int stepIndex, int newActionId)
 	{
-		var result = domainFacade.ChangeStepAction(stepIndex, newActionId);
-		_lastRecipeResult = result;
-		RebuildMessagePanel();
-
-		if (result.IsFailed)
-		{
-			return;
-		}
-
-		SuggestedSelection = stepIndex;
-		_stateChanged.OnNext(new MutationSignal.StepActionChanged(stepIndex));
+		_stepCoordinator.ChangeStepAction(stepIndex, newActionId);
 	}
 
 	public void UpdateStepProperty(int stepIndex, string columnKey, string value)
 	{
-		var result = domainFacade.UpdateStepProperty(stepIndex, columnKey, value);
-		_lastRecipeResult = result;
-		RebuildMessagePanel();
-
-		if (result.IsFailed)
-		{
-			return;
-		}
-
-		_stateChanged.OnNext(new MutationSignal.PropertyUpdated(stepIndex));
+		_stepCoordinator.UpdateStepProperty(stepIndex, columnKey, value);
 	}
 
 	public void Undo()
 	{
-		var result = domainFacade.Undo();
-		_lastRecipeResult = result;
-		RebuildMessagePanel();
-
-		if (result.IsFailed)
-		{
-			return;
-		}
-
-		SuggestedSelection = null;
-		_stateChanged.OnNext(new MutationSignal.RecipeReplaced());
+		_stepCoordinator.Undo();
 	}
 
 	public void Redo()
 	{
-		var result = domainFacade.Redo();
-		_lastRecipeResult = result;
-		RebuildMessagePanel();
-
-		if (result.IsFailed)
-		{
-			return;
-		}
-
-		SuggestedSelection = null;
-		_stateChanged.OnNext(new MutationSignal.RecipeReplaced());
+		_stepCoordinator.Redo();
 	}
 
 	public void NewRecipe()
 	{
-		domainFacade.SetNewRecipe();
-		_lastRecipeResult = Result.Ok();
-		RebuildMessagePanel();
-		SuggestedSelection = null;
-		_stateChanged.OnNext(new MutationSignal.RecipeReplaced());
+		_stepCoordinator.NewRecipe();
 	}
 
 	public async Task<Result> LoadRecipeAsync(string filePath)
 	{
-		var result = await domainFacade.LoadRecipeAsync(filePath);
+		var result = await _domainFacade.LoadRecipeAsync(filePath);
 
-		_lastRecipeResult = Result.Ok();
-
-		if (result.IsFailed)
-		{
-			_lastRecipeResult = result;
-		}
+		_lastRecipeResult = result;
 
 		RebuildMessagePanel();
 
@@ -309,13 +221,18 @@ public sealed class RecipeMutationCoordinator(
 
 	public async Task SaveRecipeAsync(string filePath)
 	{
-		await domainFacade.SaveRecipeAsync(filePath);
+		await _domainFacade.SaveRecipeAsync(filePath);
 		SuggestedSelection = null;
 		_stateChanged.OnNext(new MutationSignal.MetadataChanged());
 	}
 
 	private void OnPlcStateChanged(Result<PlcSessionSnapshot> result)
 	{
+		if (_disposed)
+		{
+			return;
+		}
+
 		_lastPlcState = result;
 		_plcStateChanged.OnNext(result);
 		RebuildMessagePanel();
@@ -323,12 +240,19 @@ public sealed class RecipeMutationCoordinator(
 
 	private void OnPlcRecipeConflictDetected(Recipe local, Recipe plc)
 	{
-		Avalonia.Threading.Dispatcher.UIThread.Post(() => _plcRecipeConflictDetected.OnNext((local, plc)));
+		Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+		{
+			if (_disposed)
+			{
+				return;
+			}
+			_plcRecipeConflictDetected.OnNext((local, plc));
+		});
 	}
 
 	private void RebuildMessagePanel()
 	{
 		var combinedReasons = _lastRecipeResult.Reasons.Concat(_lastPlcState.Reasons);
-		messagePanel.RefreshReasons(combinedReasons);
+		_messagePanel.RefreshReasons(combinedReasons);
 	}
 }
