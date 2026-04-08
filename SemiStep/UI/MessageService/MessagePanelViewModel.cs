@@ -3,6 +3,8 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 
+using Avalonia.Threading;
+
 using FluentResults;
 
 using ReactiveUI;
@@ -133,47 +135,86 @@ public class MessagePanelViewModel : ReactiveObject, IDisposable
 
 	public void AddError(string message, string source)
 	{
-		Entries.Add(new MessageEntry(MessageSeverity.Error, message, source, DateTime.Now));
-		RecountAndNotify();
+		PostOnUiThread(() =>
+		{
+			Entries.Add(new MessageEntry(MessageSeverity.Error, message, source, DateTime.Now));
+			RecountAndNotify();
+		});
+	}
+
+	public void AddWarning(string message, string source)
+	{
+		PostOnUiThread(() =>
+		{
+			Entries.Add(new MessageEntry(MessageSeverity.Warning, message, source, DateTime.Now));
+			RecountAndNotify();
+		});
 	}
 
 	public void AddInfo(string message, string source)
 	{
-		Entries.Add(new MessageEntry(MessageSeverity.Info, message, source, DateTime.Now));
-		RecountAndNotify();
+		PostOnUiThread(() =>
+		{
+			Entries.Add(new MessageEntry(MessageSeverity.Info, message, source, DateTime.Now));
+			RecountAndNotify();
+		});
 	}
 
+	// Only IError and Warning subtypes are rendered; other IReason subtypes (plain Success) are intentionally ignored.
 	public void RefreshReasons(IEnumerable<IReason> reasons)
 	{
-		RemoveByPredicate(entry => entry.IsStructural);
-
-		foreach (var error in reasons.OfType<IError>())
+		ArgumentNullException.ThrowIfNull(reasons);
+		var reasonList = reasons.ToList();
+		PostOnUiThread(() =>
 		{
-			Entries.Add(new MessageEntry(MessageSeverity.Error, error.Message, MessageEntry.StructuralSource,
-				DateTime.Now));
-		}
+			RemoveByPredicate(entry => entry.IsStructural);
 
-		foreach (var warning in reasons.OfType<Warning>())
-		{
-			Entries.Add(new MessageEntry(MessageSeverity.Warning, warning.Message, MessageEntry.StructuralSource,
-				DateTime.Now));
-		}
+			foreach (var error in reasonList.OfType<IError>())
+			{
+				Entries.Add(new MessageEntry(MessageSeverity.Error, error.Message, MessageEntry.StructuralSource,
+					DateTime.Now));
+			}
 
-		RecountAndNotify();
+			foreach (var warning in reasonList.OfType<Warning>())
+			{
+				Entries.Add(new MessageEntry(MessageSeverity.Warning, warning.Message, MessageEntry.StructuralSource,
+					DateTime.Now));
+			}
+
+			RecountAndNotify();
+		});
 	}
 
 	public void Clear()
 	{
-		Entries.Clear();
-		ErrorCount = 0;
-		WarningCount = 0;
-		HasEntries = false;
+		PostOnUiThread(() =>
+		{
+			Entries.Clear();
+			ErrorCount = 0;
+			WarningCount = 0;
+			HasEntries = false;
+		});
 	}
 
 	private void ClearNonStructural()
 	{
-		RemoveByPredicate(entry => !entry.IsStructural);
-		RecountAndNotify();
+		PostOnUiThread(() =>
+		{
+			RemoveByPredicate(entry => !entry.IsStructural);
+			RecountAndNotify();
+		});
+	}
+
+	private void PostOnUiThread(Action action)
+	{
+		if (Dispatcher.UIThread.CheckAccess())
+		{
+			action();
+		}
+		else
+		{
+			Dispatcher.UIThread.Post(action);
+		}
 	}
 
 	private void RemoveByPredicate(Func<MessageEntry, bool> predicate)

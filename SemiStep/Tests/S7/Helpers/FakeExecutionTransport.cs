@@ -1,5 +1,4 @@
 ﻿using S7;
-using S7.Protocol;
 
 using TypesShared.Plc;
 using TypesShared.Plc.Memory;
@@ -7,16 +6,16 @@ using TypesShared.Plc.Memory;
 namespace Tests.S7.Helpers;
 
 /// <summary>
-/// A transport that returns a configurable <see cref="PlcExecutionState"/> encoded as bytes
+/// A transport that returns a configurable <see cref="PlcExecutionInfo"/> encoded as bytes
 /// for execution DB reads, and returns empty arrays for all other DBs.
 /// </summary>
 internal sealed class FakeExecutionTransport : IS7Transport
 {
 	private readonly PlcProtocolLayout _layout;
-	private readonly PlcExecutionState _executionState;
+	private readonly PlcExecutionInfo _executionState;
 	private int _executionReadCount;
 
-	public FakeExecutionTransport(PlcProtocolLayout layout, PlcExecutionState executionState)
+	public FakeExecutionTransport(PlcProtocolLayout layout, PlcExecutionInfo executionState)
 	{
 		_layout = layout;
 		_executionState = executionState;

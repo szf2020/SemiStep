@@ -2,6 +2,8 @@
 
 using FluentAssertions;
 
+using FluentResults;
+
 using S7.Serialization;
 using S7.Sync;
 
@@ -88,29 +90,32 @@ public sealed class PlcSyncCoordinatorTests
 	}
 
 	[Fact]
-	public void NotifyRecipeChanged_IsValidFalse_FiresStatusChangedEvent()
+	public void NotifyRecipeChanged_IsValidFalse_EmitsOutOfSyncSnapshot()
 	{
 		var (coordinator, _, _) = Build();
-		PlcSyncStatus? receivedStatus = null;
-		coordinator.StatusChanged += status => receivedStatus = status;
+		Result<PlcSessionSnapshot>? received = null;
+		using var sub = coordinator.PlcState.Skip(1).Take(1).Subscribe(s => received = s);
 
 		coordinator.NotifyRecipeChanged(Recipe.Empty, isValid: false);
 
-		receivedStatus.Should().Be(PlcSyncStatus.OutOfSync);
+		received.Should().NotBeNull();
+		received!.Value.SyncStatus.Should().Be(PlcSyncStatus.OutOfSync);
 	}
 
 	[Fact]
-	public void NotifyRecipeChanged_IsValidFalse_StatusChangedMultipleTimes_OnlyFiresWhenValueChanges()
+	public void NotifyRecipeChanged_IsValidFalse_StatusChangedMultipleTimes_OnlyEmitsWhenValueChanges()
 	{
 		var (coordinator, _, _) = Build();
-		var receivedStatuses = new List<PlcSyncStatus>();
-		coordinator.StatusChanged += status => receivedStatuses.Add(status);
+		var snapshots = new List<Result<PlcSessionSnapshot>>();
+
+		// Skip the initial state emitted on subscription.
+		using var sub = coordinator.PlcState.Skip(1).Subscribe(snapshots.Add);
 
 		coordinator.NotifyRecipeChanged(Recipe.Empty, isValid: false);
 		coordinator.NotifyRecipeChanged(Recipe.Empty, isValid: false);
 
-		receivedStatuses.Should().HaveCount(1,
-			"StatusChanged must not fire when the status value has not changed");
+		snapshots.Should().HaveCount(1,
+			"PlcState must not emit a new snapshot when the status value has not changed");
 	}
 
 	[Fact]

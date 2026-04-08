@@ -34,94 +34,108 @@ internal sealed class PlcTransactionExecutor
 		_managingCodec = new ManagingAreaCodec(_layout.ManagingDb);
 	}
 
-	public async Task<bool> IsRecipeActiveAsync(CancellationToken ct = default)
+	public async Task<Result<bool>> IsRecipeActiveAsync(CancellationToken ct = default)
 	{
-		EnsureConnected();
+		var result = await ReadExecutionStateAsync(ct);
+		return result.Map(info => info.RecipeActive);
+	}
 
-		var bytes = await _transport.ReadBytesAsync(
+	public Task<Result<PlcExecutionInfo>> ReadExecutionStateAsync(CancellationToken ct = default)
+	{
+		return ReadAndDecodeAsync(
 			_layout.ExecutionDb.DbNumber,
-			0,
 			_layout.ExecutionDb.TotalSize,
+			_executionCodec.Decode,
 			ct);
-
-		var state = _executionCodec.Decode(bytes);
-
-		return state.RecipeActive;
 	}
 
-	public async Task<PlcExecutionState> ReadExecutionStateAsync(CancellationToken ct = default)
+	public async Task<Result<PlcRecipeData>> ReadRecipeDataAsync(CancellationToken ct = default)
 	{
-		EnsureConnected();
+		if (!_transport.IsConnected)
+		{
+			return Result.Fail(new NotConnectedError("Not connected to PLC"));
+		}
 
-		var bytes = await _transport.ReadBytesAsync(
-			_layout.ExecutionDb.DbNumber,
-			0,
-			_layout.ExecutionDb.TotalSize,
-			ct);
+		try
+		{
+			var intHeaderBytes = await _transport.ReadBytesAsync(
+				_layout.IntDb.DbNumber,
+				0,
+				_layout.IntDb.DataStartOffset,
+				ct);
+			var intCount = ArrayCodec.ReadArrayCurrentSize(intHeaderBytes, _layout.IntDb);
 
-		return _executionCodec.Decode(bytes);
+			var floatHeaderBytes = await _transport.ReadBytesAsync(
+				_layout.FloatDb.DbNumber,
+				0,
+				_layout.FloatDb.DataStartOffset,
+				ct);
+			var floatCount = ArrayCodec.ReadArrayCurrentSize(floatHeaderBytes, _layout.FloatDb);
+
+			var stringHeaderBytes = await _transport.ReadBytesAsync(
+				_layout.StringDb.DbNumber,
+				0,
+				_layout.StringDb.DataStartOffset,
+				ct);
+			var stringCount = ArrayCodec.ReadArrayCurrentSize(stringHeaderBytes, _layout.StringDb);
+
+			var intDataSize = _layout.IntDb.DataStartOffset + intCount * ProtocolConstants.IntElementSize;
+			var floatDataSize = _layout.FloatDb.DataStartOffset + floatCount * ProtocolConstants.FloatElementSize;
+			var stringDataSize = _layout.StringDb.DataStartOffset + stringCount * ProtocolConstants.WStringElementSize;
+
+			var intData = await _transport.ReadBytesAsync(_layout.IntDb.DbNumber, 0, intDataSize, ct);
+			var floatData = await _transport.ReadBytesAsync(_layout.FloatDb.DbNumber, 0, floatDataSize, ct);
+			var stringData = await _transport.ReadBytesAsync(_layout.StringDb.DbNumber, 0, stringDataSize, ct);
+
+			var intValues = _arrayCodec.DecodeIntArray(intData, intCount);
+			var floatValues = _arrayCodec.DecodeFloatArray(floatData, floatCount);
+			var stringValues = _arrayCodec.DecodeStringArray(stringData, stringCount);
+
+			return Result.Ok(new PlcRecipeData(intValues, floatValues, stringValues, StepCount: intCount));
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			return Result.Fail(ex.Message);
+		}
 	}
 
-	public async Task<PlcRecipeData> ReadRecipeDataAsync(CancellationToken ct = default)
+	public async Task<Result> WriteRecipeWithRetryAsync(Recipe recipe, CancellationToken ct = default)
 	{
-		EnsureConnected();
+		if (!_transport.IsConnected)
+		{
+			return Result.Fail(new NotConnectedError("Not connected to PLC"));
+		}
 
-		var intHeaderBytes = await _transport.ReadBytesAsync(
-			_layout.IntDb.DbNumber,
-			0,
-			_layout.IntDb.DataStartOffset,
-			ct);
-		var intCount = ArrayCodec.ReadArrayCurrentSize(intHeaderBytes, _layout.IntDb);
+		var dataResult = _converter.FromRecipe(recipe);
+		if (dataResult.IsFailed)
+		{
+			return dataResult.ToResult();
+		}
 
-		var floatHeaderBytes = await _transport.ReadBytesAsync(
-			_layout.FloatDb.DbNumber,
-			0,
-			_layout.FloatDb.DataStartOffset,
-			ct);
-		var floatCount = ArrayCodec.ReadArrayCurrentSize(floatHeaderBytes, _layout.FloatDb);
-
-		var stringHeaderBytes = await _transport.ReadBytesAsync(
-			_layout.StringDb.DbNumber,
-			0,
-			_layout.StringDb.DataStartOffset,
-			ct);
-		var stringCount = ArrayCodec.ReadArrayCurrentSize(stringHeaderBytes, _layout.StringDb);
-
-		var intDataSize = _layout.IntDb.DataStartOffset + intCount * ProtocolConstants.IntElementSize;
-		var floatDataSize = _layout.FloatDb.DataStartOffset + floatCount * ProtocolConstants.FloatElementSize;
-		var stringDataSize = _layout.StringDb.DataStartOffset + stringCount * ProtocolConstants.WStringElementSize;
-
-		var intData = await _transport.ReadBytesAsync(_layout.IntDb.DbNumber, 0, intDataSize, ct);
-		var floatData = await _transport.ReadBytesAsync(_layout.FloatDb.DbNumber, 0, floatDataSize, ct);
-		var stringData = await _transport.ReadBytesAsync(_layout.StringDb.DbNumber, 0, stringDataSize, ct);
-
-		var intValues = _arrayCodec.DecodeIntArray(intData, intCount);
-		var floatValues = _arrayCodec.DecodeFloatArray(floatData, floatCount);
-		var stringValues = _arrayCodec.DecodeStringArray(stringData, stringCount);
-
-		var stepCount = intCount;
-
-		return new PlcRecipeData(intValues, floatValues, stringValues, stepCount);
-	}
-
-	public async Task WriteRecipeWithRetryAsync(Recipe recipe, CancellationToken ct = default)
-	{
-		var recipeData = _converter.FromRecipe(recipe);
+		var recipeData = dataResult.Value;
 
 		for (var attempt = 1; attempt <= _protocolSettings.MaxRetryAttempts; attempt++)
 		{
-			await WriteRecipeDataAsync(recipeData, ct);
+			var writeResult = await WriteRecipeDataAsync(recipeData, ct);
+			if (writeResult.IsFailed)
+			{
+				return writeResult;
+			}
 
-			var verified = await VerifyWriteAsync(recipeData, ct);
+			var verifyResult = await VerifyWriteAsync(recipeData, ct);
+			if (verifyResult.IsFailed)
+			{
+				return verifyResult.ToResult();
+			}
 
-			if (verified)
+			if (verifyResult.Value)
 			{
 				Log.Information(
 					"Recipe synced to PLC successfully ({StepCount} steps, attempt {Attempt})",
 					recipe.StepCount,
 					attempt);
 
-				return;
+				return Result.Ok();
 			}
 
 			Log.Warning(
@@ -130,132 +144,117 @@ internal sealed class PlcTransactionExecutor
 				_protocolSettings.MaxRetryAttempts);
 		}
 
-		throw new PlcWriteVerificationException(
+		return Result.Fail(
 			$"Recipe write verification failed after {_protocolSettings.MaxRetryAttempts} attempts");
 	}
 
-	public async Task<ManagingAreaState> ReadManagingAreaAsync(CancellationToken ct = default)
+	public Task<Result<PlcManagingAreaState>> ReadManagingAreaAsync(CancellationToken ct = default)
 	{
-		EnsureConnected();
-
-		var bytes = await _transport.ReadBytesAsync(
+		return ReadAndDecodeAsync(
 			_layout.ManagingDb.DbNumber,
-			0,
 			_layout.ManagingDb.TotalSize,
+			_managingCodec.Decode,
 			ct);
-
-		return _managingCodec.Decode(bytes);
 	}
 
 	public async Task<Result<Recipe>> ReadRecipeFromPlcAsync(CancellationToken ct = default)
 	{
-		var managingAreaState = await ReadManagingAreaAsync(ct);
+		var managingAreaResult = await ReadManagingAreaAsync(ct);
+		if (managingAreaResult.IsFailed)
+		{
+			return managingAreaResult.ToResult<Recipe>();
+		}
 
-		if (!managingAreaState.Committed)
+		if (!managingAreaResult.Value.Committed)
 		{
 			return Result.Fail("Recipe not committed on PLC");
 		}
 
-		var recipeData = await ReadRecipeDataAsync(ct);
+		var recipeDataResult = await ReadRecipeDataAsync(ct);
+		if (recipeDataResult.IsFailed)
+		{
+			return recipeDataResult.ToResult<Recipe>();
+		}
 
-		try
-		{
-			var recipe = _converter.ToRecipe(recipeData);
-			return Result.Ok(recipe);
-		}
-		catch (Exception ex)
-		{
-			Log.Warning(ex, "Failed to convert PLC recipe data to Recipe");
-			return Result.Fail($"Failed to convert PLC data to recipe: {ex.Message}");
-		}
+		return _converter.ToRecipe(recipeDataResult.Value);
 	}
 
-	private async Task WriteRecipeDataAsync(PlcRecipeData data, CancellationToken ct)
-	{
-		EnsureConnected();
-
-		await WriteManagingAreaAsync(new ManagingAreaPcData(Committed: false, RecipeLines: 0), ct);
-
-		var intBytes = _arrayCodec.EncodeIntArray(data.IntValues);
-		var floatBytes = _arrayCodec.EncodeFloatArray(data.FloatValues);
-		var stringBytes = _arrayCodec.EncodeStringArray(data.StringValues);
-
-		await _transport.WriteBytesAsync(_layout.IntDb.DbNumber, 0, intBytes, ct);
-		await _transport.WriteBytesAsync(_layout.FloatDb.DbNumber, 0, floatBytes, ct);
-		await _transport.WriteBytesAsync(_layout.StringDb.DbNumber, 0, stringBytes, ct);
-
-		await WriteManagingAreaAsync(new ManagingAreaPcData(Committed: false, RecipeLines: data.StepCount), ct);
-
-		await WriteManagingAreaAsync(new ManagingAreaPcData(Committed: true, RecipeLines: data.StepCount), ct);
-	}
-
-	private async Task<bool> VerifyWriteAsync(PlcRecipeData expected, CancellationToken ct)
-	{
-		var actual = await ReadRecipeDataAsync(ct);
-
-		if (actual.IntValues.Length != expected.IntValues.Length)
-		{
-			return false;
-		}
-
-		if (actual.FloatValues.Length != expected.FloatValues.Length)
-		{
-			return false;
-		}
-
-		if (actual.StringValues.Length != expected.StringValues.Length)
-		{
-			return false;
-		}
-
-		for (var i = 0; i < expected.IntValues.Length; i++)
-		{
-			if (actual.IntValues[i] != expected.IntValues[i])
-			{
-				return false;
-			}
-		}
-
-		for (var i = 0; i < expected.FloatValues.Length; i++)
-		{
-			if (!CompareFloats_ExpectedBytesEqual(actual.FloatValues[i], expected.FloatValues[i]))
-			{
-				return false;
-			}
-		}
-
-		for (var i = 0; i < expected.StringValues.Length; i++)
-		{
-			if (actual.StringValues[i] != expected.StringValues[i])
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	// Floats are serialised to raw IEEE 754 bytes, written to the PLC, and read back without
-	// any arithmetic transformation. The round-trip is byte-exact, so bit-exact equality is
-	// the correct comparison here — not an epsilon-based approximation.
-	// BitConverter.SingleToInt32Bits is used rather than == to correctly handle NaN payloads
-	// and distinguish +0 from -0 (different IEEE-754 bit patterns).
-	private static bool CompareFloats_ExpectedBytesEqual(float actual, float expected)
-	{
-		return BitConverter.SingleToInt32Bits(actual) == BitConverter.SingleToInt32Bits(expected);
-	}
-
-	private async Task WriteManagingAreaAsync(ManagingAreaPcData data, CancellationToken ct)
-	{
-		var bytes = _managingCodec.EncodePcData(data);
-		await _transport.WriteBytesAsync(_layout.ManagingDb.DbNumber, 0, bytes, ct);
-	}
-
-	private void EnsureConnected()
+	private async Task<Result<T>> ReadAndDecodeAsync<T>(
+		int dbNumber, int size, Func<byte[], Result<T>> decode, CancellationToken ct)
 	{
 		if (!_transport.IsConnected)
 		{
-			throw new PlcNotConnectedException("Not connected to PLC");
+			return Result.Fail(new NotConnectedError("Not connected to PLC"));
+		}
+
+		try
+		{
+			var bytes = await _transport.ReadBytesAsync(dbNumber, 0, size, ct);
+			return decode(bytes);
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			return Result.Fail(ex.Message);
+		}
+	}
+
+	private async Task<Result> WriteRecipeDataAsync(PlcRecipeData data, CancellationToken ct)
+	{
+		try
+		{
+			var writeManagingResult = await WriteManagingAreaAsync(
+				new ManagingAreaPcData(Committed: false, RecipeLines: 0), ct);
+			if (writeManagingResult.IsFailed)
+			{
+				return writeManagingResult;
+			}
+
+			var intBytes = _arrayCodec.EncodeIntArray(data.IntValues);
+			var floatBytes = _arrayCodec.EncodeFloatArray(data.FloatValues);
+			var stringBytes = _arrayCodec.EncodeStringArray(data.StringValues);
+
+			await _transport.WriteBytesAsync(_layout.IntDb.DbNumber, 0, intBytes, ct);
+			await _transport.WriteBytesAsync(_layout.FloatDb.DbNumber, 0, floatBytes, ct);
+			await _transport.WriteBytesAsync(_layout.StringDb.DbNumber, 0, stringBytes, ct);
+
+			var writeLinesResult = await WriteManagingAreaAsync(
+				new ManagingAreaPcData(Committed: false, RecipeLines: data.StepCount), ct);
+			if (writeLinesResult.IsFailed)
+			{
+				return writeLinesResult;
+			}
+
+			return await WriteManagingAreaAsync(
+				new ManagingAreaPcData(Committed: true, RecipeLines: data.StepCount), ct);
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			return Result.Fail(ex.Message);
+		}
+	}
+
+	private async Task<Result<bool>> VerifyWriteAsync(PlcRecipeData expected, CancellationToken ct)
+	{
+		var actualResult = await ReadRecipeDataAsync(ct);
+		if (actualResult.IsFailed)
+		{
+			return actualResult.ToResult<bool>();
+		}
+
+		return Result.Ok(PlcRecipeDataComparer.DataMatchesExpected(actualResult.Value, expected));
+	}
+
+	private async Task<Result> WriteManagingAreaAsync(ManagingAreaPcData data, CancellationToken ct)
+	{
+		try
+		{
+			var bytes = _managingCodec.EncodePcData(data);
+			await _transport.WriteBytesAsync(_layout.ManagingDb.DbNumber, 0, bytes, ct);
+			return Result.Ok();
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			return Result.Fail(ex.Message);
 		}
 	}
 }

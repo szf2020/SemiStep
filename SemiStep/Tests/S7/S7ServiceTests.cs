@@ -99,7 +99,7 @@ public sealed class S7ServiceTests
 
 		await service.ConnectAsync(PlcConnectionSettings.Default);
 
-		// Transport now reports IsConnected = false, causing PlcNotConnectedException on the next poll.
+		// Transport now reports IsConnected = false, causing NotConnectedError on the next poll.
 		driver.SetConnected(false);
 
 		await Task.Delay(200);

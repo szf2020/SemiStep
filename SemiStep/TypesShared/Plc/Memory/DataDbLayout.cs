@@ -9,18 +9,18 @@ public sealed record DataDbLayout(
 	public static DataDbLayout DefaultInt => new(
 		DbNumber: 3,
 		CapacityOffset: 0,
-		CurrentSizeOffset: 2,
-		DataStartOffset: 4);
+		CurrentSizeOffset: 4,
+		DataStartOffset: 8);
 
 	public static DataDbLayout DefaultFloat => new(
 		DbNumber: 4,
 		CapacityOffset: 0,
-		CurrentSizeOffset: 2,
-		DataStartOffset: 4);
+		CurrentSizeOffset: 4,
+		DataStartOffset: 8);
 
 	public static DataDbLayout DefaultString => new(
 		DbNumber: 5,
 		CapacityOffset: 0,
-		CurrentSizeOffset: 2,
-		DataStartOffset: 4);
+		CurrentSizeOffset: 4,
+		DataStartOffset: 8);
 }

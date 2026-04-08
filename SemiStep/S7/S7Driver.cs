@@ -20,11 +20,10 @@ internal sealed class S7Driver : IS7Driver
 
 	public async Task ConnectAsync(PlcConnectionSettings settings, CancellationToken ct = default)
 	{
-		var endpoint = $"{settings.IpAddress}:{settings.Port}";
-
 		_plc = new Plc(
 			CpuType.S71500,
-			endpoint,
+			settings.IpAddress,
+			settings.Port,
 			(short)settings.Rack,
 			(short)settings.Slot);
 

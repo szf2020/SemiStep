@@ -1,4 +1,7 @@
-﻿using System.Reactive.Subjects;
+﻿using System.Linq;
+using System.Reactive.Subjects;
+
+using FluentResults;
 
 using S7.Protocol;
 
@@ -14,6 +17,8 @@ internal sealed class PlcExecutionMonitor(
 	Action onConnectionLost)
 	: IDisposable
 {
+	private static readonly TimeSpan _stopTimeout = TimeSpan.FromSeconds(5);
+
 	private readonly Subject<PlcExecutionInfo> _subject = new();
 
 	private volatile PlcExecutionInfo _lastKnown = PlcExecutionInfo.Empty;
@@ -34,18 +39,13 @@ internal sealed class PlcExecutionMonitor(
 
 	public void Stop()
 	{
-		_pollCts?.Cancel();
-		_pollCts?.Dispose();
-		_pollCts = null;
-
-		var taskToWait = _pollTask;
-		_pollTask = null;
+		var taskToWait = CancelAndDetachPollTask();
 
 		// Skip the wait if Stop() is being called from within the poll loop itself
 		// (e.g. via onConnectionLost callback), to avoid deadlock.
 		if (taskToWait is not null && taskToWait.Id != Task.CurrentId)
 		{
-			taskToWait.Wait(TimeSpan.FromSeconds(5));
+			taskToWait.Wait(_stopTimeout);
 		}
 
 		PublishAndTrack(PlcExecutionInfo.Empty);
@@ -53,18 +53,13 @@ internal sealed class PlcExecutionMonitor(
 
 	public async Task StopAsync()
 	{
-		_pollCts?.Cancel();
-		_pollCts?.Dispose();
-		_pollCts = null;
-
-		var taskToWait = _pollTask;
-		_pollTask = null;
+		var taskToWait = CancelAndDetachPollTask();
 
 		if (taskToWait is not null)
 		{
 			try
 			{
-				await taskToWait.WaitAsync(TimeSpan.FromSeconds(5));
+				await taskToWait.WaitAsync(_stopTimeout);
 			}
 			catch (TimeoutException)
 			{
@@ -82,6 +77,18 @@ internal sealed class PlcExecutionMonitor(
 		_subject.Dispose();
 	}
 
+	private Task? CancelAndDetachPollTask()
+	{
+		_pollCts?.Cancel();
+		_pollCts?.Dispose();
+		_pollCts = null;
+
+		var taskToWait = _pollTask;
+		_pollTask = null;
+
+		return taskToWait;
+	}
+
 	private void PublishAndTrack(PlcExecutionInfo info)
 	{
 		_lastKnown = info;
@@ -95,37 +102,31 @@ internal sealed class PlcExecutionMonitor(
 			try
 			{
 				await Task.Delay(protocolSettings.PollingIntervalMs, ct);
+				var result = await transactionExecutor.ReadExecutionStateAsync(ct);
 
-				var state = await transactionExecutor.ReadExecutionStateAsync(ct);
+				if (result.IsFailed)
+				{
+					if (result.Errors.OfType<NotConnectedError>().Any())
+					{
+						Log.Debug("Execution monitor stopping: PLC not connected");
 
-				var info = new PlcExecutionInfo(
-					RecipeActive: state.RecipeActive,
-					ActualLine: state.ActualLine,
-					StepCurrentTime: state.StepCurrentTime,
-					ForLoopCount1: state.ForLoopCount1,
-					ForLoopCount2: state.ForLoopCount2,
-					ForLoopCount3: state.ForLoopCount3);
+						if (!(_pollCts?.IsCancellationRequested ?? true))
+						{
+							onConnectionLost();
+						}
 
-				PublishAndTrack(info);
+						return;
+					}
+
+					Log.Warning("Execution monitor poll error: {Message}", result.Errors[0].Message);
+					continue;
+				}
+
+				PublishAndTrack(result.Value);
 			}
 			catch (OperationCanceledException)
 			{
 				return;
-			}
-			catch (PlcNotConnectedException)
-			{
-				Log.Debug("Execution monitor stopping: PLC not connected");
-
-				if (!(_pollCts?.IsCancellationRequested ?? true))
-				{
-					onConnectionLost();
-				}
-
-				return;
-			}
-			catch (Exception ex)
-			{
-				Log.Warning(ex, "Unexpected error in execution monitor poll loop");
 			}
 		}
 	}

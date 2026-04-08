@@ -48,12 +48,17 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		ExitCommand = ReactiveCommand.Create(ExecuteExit);
 		ToggleSyncCommand = ReactiveCommand.CreateFromTask(ExecuteToggleSyncAsync);
 
+		ToggleSyncCommand.ThrownExceptions
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(ex => messagePanel.AddError($"Sync toggle failed: {ex.Message}", "PLC"))
+			.DisposeWith(_disposables);
+
 		_coordinator.StateChanged
 			.ObserveOn(RxApp.MainThreadScheduler)
 			.Subscribe(_ => RaiseAllStateProperties())
 			.DisposeWith(_disposables);
 
-		_coordinator.ConnectionStateChanged
+		_coordinator.PlcStateChanged
 			.ObserveOn(RxApp.MainThreadScheduler)
 			.Subscribe(_ => RaiseConnectionStateProperties())
 			.DisposeWith(_disposables);
@@ -61,6 +66,11 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		_coordinator.PlcRecipeConflictDetected
 			.ObserveOn(RxApp.MainThreadScheduler)
 			.Subscribe(conflict => _ = HandleConflictAsync(conflict.Local, conflict.Plc))
+			.DisposeWith(_disposables);
+
+		Observable.Interval(TimeSpan.FromSeconds(1))
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(_ => this.RaisePropertyChanged(nameof(LastSyncTimeText)))
 			.DisposeWith(_disposables);
 	}
 
@@ -100,8 +110,6 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 
 	public string PlcSyncStatusText => MapSyncStatus(_coordinator.QueryService.SyncStatus);
 
-	public string? PlcSyncErrorText => _coordinator.QueryService.SyncLastError;
-
 	public string LastSyncTimeText => FormatLastSyncTime(_coordinator.QueryService.LastSyncTime);
 
 	public void Dispose()
@@ -130,7 +138,12 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		}
 		else
 		{
-			await _coordinator.EnableSync();
+			var result = await _coordinator.EnableSync();
+
+			if (result.IsFailed)
+			{
+				MessagePanel.AddError(result.Errors[0].Message, "PLC");
+			}
 		}
 
 		RaiseConnectionStateProperties();
@@ -151,7 +164,8 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		}
 		catch (Exception ex)
 		{
-			Log.Warning(ex, "Unexpected error while handling PLC recipe conflict");
+			Log.Warning("Unexpected error while handling PLC recipe conflict: {Message}", ex.Message);
+			MessagePanel.AddError("Failed to resolve PLC recipe conflict — sync disabled", "PLC");
 		}
 	}
 
@@ -171,7 +185,6 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		this.RaisePropertyChanged(nameof(ConnectionStatus));
 		this.RaisePropertyChanged(nameof(IsSyncEnabled));
 		this.RaisePropertyChanged(nameof(PlcSyncStatusText));
-		this.RaisePropertyChanged(nameof(PlcSyncErrorText));
 		this.RaisePropertyChanged(nameof(LastSyncTimeText));
 	}
 

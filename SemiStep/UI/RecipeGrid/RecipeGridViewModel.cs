@@ -56,7 +56,10 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 			.Subscribe(OnExecutionStateChanged)
 			.DisposeWith(_disposables);
 
-		coordinator.StateChanged.Subscribe(OnStateChange).DisposeWith(_disposables);
+		coordinator.StateChanged
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(OnStateChange)
+			.DisposeWith(_disposables);
 	}
 
 	internal ConfigRegistry ConfigRegistry { get; }

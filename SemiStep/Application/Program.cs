@@ -20,7 +20,6 @@ using S7;
 using Serilog;
 
 using UI;
-using UI.Coordinator;
 
 namespace Application;
 
@@ -29,37 +28,27 @@ public static class Program
 	private const string ConfigDir = @"C:\DISTR\Config\Semistep";
 	private const string LogFilePath = @"C:\DISTR\Logs\semistep.log";
 
-	public static async Task Main()
+	[STAThread]
+	public static void Main()
 	{
 		CreateLogger(LogFilePath);
 
 		try
 		{
-			var result = await ConfigFacade.LoadAndValidateAsync(ConfigDir);
+			var outcome = Task.Run(StartupAsync).GetAwaiter().GetResult();
 
-			if (result.IsFailed)
+			if (outcome.Errors is not null)
 			{
-				var errors = result.Errors.Select(e => e.Message).ToList();
-				Log.Error("Application startup failed: configuration loading produced {ErrorCount} error(s)", errors.Count);
-				App.RunErrorWindow(errors);
-				return;
+				App.RunErrorWindow(outcome.Errors);
 			}
-
-			var services =
-				new ServiceCollection()
-					.AddSingleton(result.Value)
-					.AddRecipe()
-					.AddDomain()
-					.AddS7()
-					.AddCsv()
-					.AddClipboard()
-					.AddUi();
-
-			var provider = services.BuildServiceProvider();
-
-			InitializeServices(provider);
-
-			App.Run(provider);
+			else if (outcome.Provider is not null)
+			{
+				App.Run(outcome.Provider);
+			}
+			else
+			{
+				App.RunErrorWindow(["Application startup failed: unknown error"]);
+			}
 		}
 		catch (Exception ex)
 		{
@@ -67,17 +56,35 @@ public static class Program
 		}
 		finally
 		{
-			await Log.CloseAndFlushAsync();
+			Log.CloseAndFlushAsync().GetAwaiter().GetResult();
 		}
 	}
 
-	private static void InitializeServices(IServiceProvider provider)
+	private static async Task<(IServiceProvider? Provider, IReadOnlyList<string>? Errors)> StartupAsync()
 	{
-		var domainFacade = provider.GetRequiredService<DomainFacade>();
-		domainFacade.Initialize();
+		var result = await ConfigFacade.LoadAndValidateAsync(ConfigDir);
 
-		var coordinator = provider.GetRequiredService<RecipeMutationCoordinator>();
-		coordinator.Initialize();
+		if (result.IsFailed)
+		{
+			var errors = result.Errors.Select(e => e.Message).ToList();
+			Log.Error(
+				"Application startup failed: configuration loading produced {ErrorCount} error(s)",
+				errors.Count);
+
+			return (null, errors);
+		}
+
+		var services =
+			new ServiceCollection()
+				.AddSingleton(result.Value)
+				.AddRecipe()
+				.AddDomain()
+				.AddS7()
+				.AddCsv()
+				.AddClipboard()
+				.AddUi();
+
+		return (services.BuildServiceProvider(), null);
 	}
 
 	private static void CreateLogger(string logFilePath)
@@ -121,8 +128,9 @@ public static class Program
 
 			return true;
 		}
-		catch
+		catch (Exception ex)
 		{
+			Console.Error.WriteLine($"Failed to create log directory for '{filePath}': {ex.Message}. File logging is disabled.");
 			return false;
 		}
 	}

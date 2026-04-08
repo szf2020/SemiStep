@@ -3,10 +3,11 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.ReactiveUI;
 
+using Domain.Facade;
+
 using Microsoft.Extensions.DependencyInjection;
 
-using ReactiveUI;
-
+using UI.Coordinator;
 using UI.Dialogs;
 using UI.MainWindow;
 
@@ -60,14 +61,28 @@ public class App : Application
 	public static void Run(IServiceProvider serviceProvider)
 	{
 		ArgumentNullException.ThrowIfNull(serviceProvider);
-		RxApp.MainThreadScheduler = AvaloniaScheduler.Instance;
 		BuildAvaloniaApp()
+			.AfterSetup(_ =>
+				// UseReactiveUI() above has already registered AvaloniaScheduler as
+				// RxApp.MainThreadScheduler. Initialize services here — after the
+				// scheduler is set — so that ReactiveCommand singletons capture the
+				// correct scheduler at construction time.
+				InitializeServices(serviceProvider))
 			.AfterSetup(builder =>
 			{
 				var app = (App)builder.Instance!;
 				app._serviceProvider = serviceProvider;
 			})
 			.StartWithClassicDesktopLifetime([]);
+	}
+
+	private static void InitializeServices(IServiceProvider provider)
+	{
+		var domainFacade = provider.GetRequiredService<DomainFacade>();
+		domainFacade.Initialize();
+
+		var coordinator = provider.GetRequiredService<RecipeMutationCoordinator>();
+		coordinator.Initialize();
 	}
 
 	public static void RunErrorWindow(IReadOnlyList<string> errors)

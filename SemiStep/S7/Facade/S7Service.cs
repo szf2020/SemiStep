@@ -17,6 +17,9 @@ internal sealed class S7Service(
 	PlcConfiguration plcConfiguration)
 	: IS7Service
 {
+	private static readonly TimeSpan _reconnectInitialDelay = TimeSpan.FromSeconds(1);
+	private static readonly TimeSpan _reconnectMaxDelay = TimeSpan.FromSeconds(30);
+
 	private readonly Lock _stateLock = new();
 	private PlcConnectionState _state = PlcConnectionState.Disconnected;
 	private bool _autoReconnectEnabled;
@@ -112,29 +115,23 @@ internal sealed class S7Service(
 
 	public async Task<Result<PlcManagingAreaState>> ReadManagingAreaAsync(CancellationToken ct = default)
 	{
-		try
+		var result = await transactionExecutor.ReadManagingAreaAsync(ct);
+		if (result.IsFailed)
 		{
-			var state = await transactionExecutor.ReadManagingAreaAsync(ct);
-			return Result.Ok(new PlcManagingAreaState(state.Committed, state.RecipeLines));
+			Log.Warning("Failed to read managing area from PLC: {Reason}", result.Errors[0].Message);
+			return result.ToResult<PlcManagingAreaState>();
 		}
-		catch (Exception ex)
-		{
-			Log.Warning(ex, "Failed to read managing area from PLC");
-			return Result.Fail(ex.Message);
-		}
+		return result;
 	}
 
 	public async Task<Result<Recipe>> ReadRecipeFromPlcAsync(CancellationToken ct = default)
 	{
-		try
+		var result = await transactionExecutor.ReadRecipeFromPlcAsync(ct);
+		if (result.IsFailed)
 		{
-			return await transactionExecutor.ReadRecipeFromPlcAsync(ct);
+			Log.Warning("Failed to read recipe from PLC: {Reason}", result.Errors[0].Message);
 		}
-		catch (Exception ex)
-		{
-			Log.Warning(ex, "Failed to read recipe from PLC");
-			return Result.Fail(ex.Message);
-		}
+		return result;
 	}
 
 	internal void OnConnectionLost()
@@ -236,7 +233,7 @@ internal sealed class S7Service(
 			}
 			catch (Exception ex)
 			{
-				Log.Warning(ex, "Keep-alive probe failed, connection assumed lost");
+				Log.Warning("Keep-alive probe failed, connection assumed lost: {Message}", ex.Message);
 				OnConnectionLost();
 
 				return;
@@ -275,8 +272,7 @@ internal sealed class S7Service(
 
 	private async Task ReconnectLoopAsync(CancellationToken ct)
 	{
-		var delay = TimeSpan.FromSeconds(1);
-		var maxDelay = TimeSpan.FromSeconds(30);
+		var delay = _reconnectInitialDelay;
 
 		while (!ct.IsCancellationRequested && _autoReconnectEnabled)
 		{
@@ -298,8 +294,8 @@ internal sealed class S7Service(
 			}
 			catch (Exception ex)
 			{
-				Log.Warning(ex, "Reconnection attempt failed, retrying in {Delay}s", delay.TotalSeconds);
-				delay = TimeSpan.FromSeconds(Math.Min(delay.TotalSeconds * 2, maxDelay.TotalSeconds));
+				Log.Warning("Reconnection attempt failed, retrying in {Delay}s: {Message}", delay.TotalSeconds, ex.Message);
+				delay = TimeSpan.FromSeconds(Math.Min(delay.TotalSeconds * 2, _reconnectMaxDelay.TotalSeconds));
 			}
 		}
 	}
