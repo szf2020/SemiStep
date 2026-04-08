@@ -32,8 +32,7 @@ public sealed class UIFixture : IAsyncLifetime
 		MessagePanel = new MessagePanelViewModel();
 		QueryService = new RecipeQueryService(Facade, ConfigRegistry);
 		var appConfiguration = services.GetRequiredService<AppConfiguration>();
-		var syncService = new StubPlcSyncService();
-		Coordinator = new RecipeMutationCoordinator(Facade, appConfiguration, QueryService, MessagePanel, syncService);
+		Coordinator = new RecipeMutationCoordinator(Facade, appConfiguration, QueryService, MessagePanel);
 		Coordinator.Initialize();
 		Grid = new RecipeGridViewModel(Coordinator, ConfigRegistry, MessagePanel);
 		Grid.Initialize();

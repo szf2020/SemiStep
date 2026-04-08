@@ -1,4 +1,6 @@
-﻿using TypesShared.Core;
+﻿using FluentResults;
+
+using TypesShared.Core;
 using TypesShared.Plc;
 
 namespace TypesShared.Domain;
@@ -9,13 +11,13 @@ public interface IPlcSyncService
 
 	void Reset();
 
-	PlcSyncStatus Status { get; }
+	void SetSyncEnabled(bool value);
 
-	string? LastError { get; }
+	void UpdateConnectionState(PlcConnectionState state);
+
+	PlcSyncStatus Status { get; }
 
 	DateTimeOffset? LastSyncTime { get; }
 
-	event Action<PlcSyncStatus>? StatusChanged;
-
-	event Action<string?>? ErrorChanged;
+	IObservable<Result<PlcSessionSnapshot>> PlcState { get; }
 }

@@ -119,14 +119,6 @@
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource SecondaryForegroundBrush}" />
 
-                <!-- Sync error text (red, visible only when error present) -->
-                <TextBlock Text="{Binding PlcSyncErrorText}"
-                           FontSize="12"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource ErrorBrush}"
-                           IsVisible="{Binding PlcSyncErrorText,
-                                       Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-
                 <!-- Last sync time -->
                 <TextBlock FontSize="12"
                            VerticalAlignment="Center"

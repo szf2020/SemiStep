@@ -38,8 +38,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 		_panel = new MessagePanelViewModel();
 		var queryService = new RecipeQueryService(_facade, configRegistry);
 		var appConfiguration = services.GetRequiredService<AppConfiguration>();
-		var syncService = new StubPlcSyncService();
-		_coordinator = new RecipeMutationCoordinator(_facade, appConfiguration, queryService, _panel, syncService);
+		_coordinator = new RecipeMutationCoordinator(_facade, appConfiguration, queryService, _panel);
 		_coordinator.Initialize();
 	}
 
@@ -233,7 +232,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	public void NewRecipe_ClearsMessagePanel()
 	{
 		_facade.SetNewRecipe();
-		_panel.AddError("some error", "test");
+		_coordinator.AppendStep(9999);
 		Dispatcher.UIThread.RunJobs(null);
 
 		_coordinator.NewRecipe();

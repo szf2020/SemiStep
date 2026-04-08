@@ -1,7 +1,5 @@
 ﻿using System.Globalization;
 
-using Avalonia.ReactiveUI;
-
 using ClipBoard;
 
 using Config.Facade;
@@ -17,14 +15,11 @@ using FluentResults;
 
 using Microsoft.Extensions.DependencyInjection;
 
-using ReactiveUI;
-
 using S7;
 
 using Serilog;
 
 using UI;
-using UI.Coordinator;
 
 namespace Application;
 
@@ -36,10 +31,6 @@ public static class Program
 	[STAThread]
 	public static void Main()
 	{
-		// Must be set before any DI singleton is resolved: ReactiveCommand captures
-		// RxApp.MainThreadScheduler at construction time. If set after DI build,
-		// commands capture DefaultScheduler and CanExecute fires off the UI thread.
-		RxApp.MainThreadScheduler = AvaloniaScheduler.Instance;
 		CreateLogger(LogFilePath);
 
 		try
@@ -93,20 +84,7 @@ public static class Program
 				.AddClipboard()
 				.AddUi();
 
-		var provider = services.BuildServiceProvider();
-
-		InitializeServices(provider);
-
-		return (provider, null);
-	}
-
-	private static void InitializeServices(IServiceProvider provider)
-	{
-		var domainFacade = provider.GetRequiredService<DomainFacade>();
-		domainFacade.Initialize();
-
-		var coordinator = provider.GetRequiredService<RecipeMutationCoordinator>();
-		coordinator.Initialize();
+		return (services.BuildServiceProvider(), null);
 	}
 
 	private static void CreateLogger(string logFilePath)

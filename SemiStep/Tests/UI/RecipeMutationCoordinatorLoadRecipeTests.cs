@@ -31,6 +31,7 @@ namespace Tests.UI;
 [Trait("Category", "Integration")]
 public sealed class RecipeMutationCoordinatorLoadRecipeTests
 {
+	private const string TempFilePrefix = "SemiStep.CoordinatorTest";
 	[Fact]
 	public async Task LoadRecipeAsync_Success_ClearsMessagePanelBeforeAddingNewReasons()
 	{
@@ -38,7 +39,7 @@ public sealed class RecipeMutationCoordinatorLoadRecipeTests
 
 		try
 		{
-			panel.AddError("stale error", "Test");
+			await coordinator.LoadRecipeAsync("nonexistent/path/recipe.csv");
 			Dispatcher.UIThread.RunJobs(null);
 
 			await coordinator.LoadRecipeAsync(tempFilePath);
@@ -68,6 +69,7 @@ public sealed class RecipeMutationCoordinatorLoadRecipeTests
 			Dispatcher.UIThread.RunJobs(null);
 
 			panel.Entries.Should().ContainSingle(e => e.Source == "Test");
+			panel.Entries.Should().Contain(e => e.IsStructural && e.IsError);
 			panel.ErrorCount.Should().BeGreaterThan(0);
 		}
 		finally
@@ -120,19 +122,22 @@ public sealed class RecipeMutationCoordinatorLoadRecipeTests
 		var panel = new MessagePanelViewModel();
 		var queryService = new RecipeQueryService(facade, configRegistry);
 		var appConfiguration = services.GetRequiredService<AppConfiguration>();
-		var syncService = services.GetRequiredService<IPlcSyncService>();
-		var coordinator = new RecipeMutationCoordinator(facade, appConfiguration, queryService, panel, syncService);
+		var coordinator = new RecipeMutationCoordinator(facade, appConfiguration, queryService, panel);
+		coordinator.Initialize();
 
 		return (coordinator, panel);
 	}
 
-	private static async Task<(RecipeMutationCoordinator Coordinator, MessagePanelViewModel Panel, string TempFilePath)> BuildCoordinatorWithCsvAndSavedRecipeAsync()
+	private static async Task<(
+		RecipeMutationCoordinator Coordinator,
+		MessagePanelViewModel Panel,
+		string TempFilePath)> BuildCoordinatorWithCsvAndSavedRecipeAsync()
 	{
 		var (coordinator, panel) = await BuildCoordinatorWithCsvAsync();
 
 		coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 
-		var tempFilePath = Path.Combine(Path.GetTempPath(), $"SemiStep.CoordinatorTest.{Guid.NewGuid():N}.csv");
+		var tempFilePath = Path.Combine(Path.GetTempPath(), $"{TempFilePrefix}.{Guid.NewGuid():N}.csv");
 		await coordinator.SaveRecipeAsync(tempFilePath);
 
 		return (coordinator, panel, tempFilePath);

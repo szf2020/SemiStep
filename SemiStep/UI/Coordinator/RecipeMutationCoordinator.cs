@@ -1,12 +1,12 @@
 ﻿using System.Linq;
-using System.Reactive;
+using System.Reactive.Linq;
 using System.Reactive.Subjects;
-
-using Avalonia.Threading;
 
 using Domain.Facade;
 
 using FluentResults;
+
+using ReactiveUI;
 
 using TypesShared.Config;
 using TypesShared.Core;
@@ -21,18 +21,20 @@ public sealed class RecipeMutationCoordinator(
 	DomainFacade domainFacade,
 	AppConfiguration appConfiguration,
 	RecipeQueryService queryService,
-	MessagePanelViewModel messagePanel,
-	IPlcSyncService syncService) : IDisposable
+	MessagePanelViewModel messagePanel) : IDisposable
 {
 	private readonly Subject<MutationSignal> _stateChanged = new();
 	private readonly Subject<(Recipe Local, Recipe Plc)> _plcRecipeConflictDetected = new();
-	private readonly Subject<Unit> _connectionStateChanged = new();
-	private Action<string?>? _syncErrorChangedRelay;
+	private readonly Subject<Result<PlcSessionSnapshot>> _plcStateChanged = new();
+	private Result _lastRecipeResult = Result.Ok();
+	private Result<PlcSessionSnapshot> _lastPlcState = PlcSessionSnapshot.InitialState;
+	private IDisposable? _plcStateSubscription;
 	private bool _initialized;
+	private bool _disposed;
 
 	public IObservable<MutationSignal> StateChanged => _stateChanged;
 	public IObservable<(Recipe Local, Recipe Plc)> PlcRecipeConflictDetected => _plcRecipeConflictDetected;
-	public IObservable<Unit> ConnectionStateChanged => _connectionStateChanged;
+	public IObservable<Result<PlcSessionSnapshot>> PlcStateChanged => _plcStateChanged;
 
 	public int? SuggestedSelection { get; private set; }
 
@@ -61,29 +63,30 @@ public sealed class RecipeMutationCoordinator(
 		_initialized = true;
 
 		domainFacade.PlcRecipeConflictDetected += OnPlcRecipeConflictDetected;
-		domainFacade.ConnectionStateChanged += OnConnectionStateChanged;
-		syncService.StatusChanged += OnSyncStatusChanged;
 
-		_syncErrorChangedRelay = _ => Dispatcher.UIThread.Post(NotifyConnectionStateChanged);
-		syncService.ErrorChanged += _syncErrorChangedRelay;
+		_plcStateSubscription = domainFacade.PlcState
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(OnPlcStateChanged);
 
 		return this;
 	}
 
 	public void Dispose()
 	{
-		domainFacade.PlcRecipeConflictDetected -= OnPlcRecipeConflictDetected;
-		domainFacade.ConnectionStateChanged -= OnConnectionStateChanged;
-		syncService.StatusChanged -= OnSyncStatusChanged;
-
-		if (_syncErrorChangedRelay is not null)
+		if (_disposed)
 		{
-			syncService.ErrorChanged -= _syncErrorChangedRelay;
+			return;
 		}
+
+		_disposed = true;
+
+		domainFacade.PlcRecipeConflictDetected -= OnPlcRecipeConflictDetected;
+
+		_plcStateSubscription?.Dispose();
 
 		_stateChanged.Dispose();
 		_plcRecipeConflictDetected.Dispose();
-		_connectionStateChanged.Dispose();
+		_plcStateChanged.Dispose();
 	}
 
 	public int? ConsumeSuggestedSelection()
@@ -94,17 +97,9 @@ public sealed class RecipeMutationCoordinator(
 		return value;
 	}
 
-	public async Task<Result> EnableSync()
+	public Task<Result> EnableSync()
 	{
-		var result = await domainFacade.EnableSync(appConfiguration.PlcConfiguration);
-
-		if (result.IsFailed)
-		{
-			var errorMessage = string.Join("; ", result.Errors.Select(e => e.Message));
-			messagePanel.AddError($"Failed to enable sync: {errorMessage}", "PLC");
-		}
-
-		return result;
+		return domainFacade.EnableSync(appConfiguration.PlcConfiguration);
 	}
 
 	public async Task DisableSync()
@@ -116,12 +111,14 @@ public sealed class RecipeMutationCoordinator(
 	{
 		var result = await domainFacade.LoadRecipeFromPlcAsync();
 
-		if (!result.IsFailed)
+		_lastRecipeResult = Result.Ok();
+
+		if (result.IsFailed)
 		{
-			messagePanel.Clear();
+			_lastRecipeResult = result;
 		}
 
-		RefreshMessagePanel(result);
+		RebuildMessagePanel();
 
 		if (result.IsFailed)
 		{
@@ -142,7 +139,8 @@ public sealed class RecipeMutationCoordinator(
 	public void AppendStep(int actionId)
 	{
 		var result = domainFacade.AppendStep(actionId);
-		RefreshMessagePanel(result);
+		_lastRecipeResult = result;
+		RebuildMessagePanel();
 
 		if (result.IsFailed)
 		{
@@ -156,7 +154,8 @@ public sealed class RecipeMutationCoordinator(
 	public void InsertStep(int index, int actionId)
 	{
 		var result = domainFacade.InsertStep(index, actionId);
-		RefreshMessagePanel(result);
+		_lastRecipeResult = result;
+		RebuildMessagePanel();
 
 		if (result.IsFailed)
 		{
@@ -170,7 +169,8 @@ public sealed class RecipeMutationCoordinator(
 	public void RemoveStep(int index)
 	{
 		var result = domainFacade.RemoveStep(index);
-		RefreshMessagePanel(result);
+		_lastRecipeResult = result;
+		RebuildMessagePanel();
 
 		if (result.IsFailed)
 		{
@@ -186,7 +186,8 @@ public sealed class RecipeMutationCoordinator(
 	public void RemoveSteps(IReadOnlyList<int> indices)
 	{
 		var result = domainFacade.RemoveSteps(indices);
-		RefreshMessagePanel(result);
+		_lastRecipeResult = result;
+		RebuildMessagePanel();
 
 		if (result.IsFailed)
 		{
@@ -202,7 +203,8 @@ public sealed class RecipeMutationCoordinator(
 	public void InsertSteps(int startIndex, IReadOnlyList<Step> steps)
 	{
 		var result = domainFacade.InsertSteps(startIndex, steps);
-		RefreshMessagePanel(result);
+		_lastRecipeResult = result;
+		RebuildMessagePanel();
 
 		if (result.IsFailed)
 		{
@@ -216,7 +218,8 @@ public sealed class RecipeMutationCoordinator(
 	public void ChangeStepAction(int stepIndex, int newActionId)
 	{
 		var result = domainFacade.ChangeStepAction(stepIndex, newActionId);
-		RefreshMessagePanel(result);
+		_lastRecipeResult = result;
+		RebuildMessagePanel();
 
 		if (result.IsFailed)
 		{
@@ -230,7 +233,8 @@ public sealed class RecipeMutationCoordinator(
 	public void UpdateStepProperty(int stepIndex, string columnKey, string value)
 	{
 		var result = domainFacade.UpdateStepProperty(stepIndex, columnKey, value);
-		RefreshMessagePanel(result);
+		_lastRecipeResult = result;
+		RebuildMessagePanel();
 
 		if (result.IsFailed)
 		{
@@ -243,7 +247,8 @@ public sealed class RecipeMutationCoordinator(
 	public void Undo()
 	{
 		var result = domainFacade.Undo();
-		RefreshMessagePanel(result);
+		_lastRecipeResult = result;
+		RebuildMessagePanel();
 
 		if (result.IsFailed)
 		{
@@ -257,7 +262,8 @@ public sealed class RecipeMutationCoordinator(
 	public void Redo()
 	{
 		var result = domainFacade.Redo();
-		RefreshMessagePanel(result);
+		_lastRecipeResult = result;
+		RebuildMessagePanel();
 
 		if (result.IsFailed)
 		{
@@ -271,7 +277,8 @@ public sealed class RecipeMutationCoordinator(
 	public void NewRecipe()
 	{
 		domainFacade.SetNewRecipe();
-		messagePanel.Clear();
+		_lastRecipeResult = Result.Ok();
+		RebuildMessagePanel();
 		SuggestedSelection = null;
 		_stateChanged.OnNext(new MutationSignal.RecipeReplaced());
 	}
@@ -280,12 +287,14 @@ public sealed class RecipeMutationCoordinator(
 	{
 		var result = await domainFacade.LoadRecipeAsync(filePath);
 
-		if (!result.IsFailed)
+		_lastRecipeResult = Result.Ok();
+
+		if (result.IsFailed)
 		{
-			messagePanel.Clear();
+			_lastRecipeResult = result;
 		}
 
-		RefreshMessagePanel(result);
+		RebuildMessagePanel();
 
 		if (result.IsFailed)
 		{
@@ -305,62 +314,21 @@ public sealed class RecipeMutationCoordinator(
 		_stateChanged.OnNext(new MutationSignal.MetadataChanged());
 	}
 
-	private void OnConnectionStateChanged(PlcConnectionState state)
+	private void OnPlcStateChanged(Result<PlcSessionSnapshot> result)
 	{
-		var ipAddress = appConfiguration.PlcConfiguration.Connection.IpAddress;
-		var isSyncEnabled = queryService.IsSyncEnabled;
-
-		Dispatcher.UIThread.Post(() =>
-		{
-			NotifyConnectionStateChanged();
-
-			// Disconnection events are suppressed when sync is not user-enabled, as they
-			// are expected during normal startup and do not represent a loss of
-			// user-initiated sync.
-			switch (state)
-			{
-				case PlcConnectionState.Connected:
-					messagePanel.AddInfo($"Connected to PLC ({ipAddress})", "PLC");
-					break;
-				case PlcConnectionState.Disconnected when isSyncEnabled:
-					messagePanel.AddError("PLC connection lost", "PLC");
-					break;
-			}
-		});
-	}
-
-	private void OnSyncStatusChanged(PlcSyncStatus status)
-	{
-		var lastError = syncService.LastError;
-
-		Dispatcher.UIThread.Post(() =>
-		{
-			NotifyConnectionStateChanged();
-
-			switch (status)
-			{
-				case PlcSyncStatus.Synced:
-					messagePanel.AddInfo("Recipe synced to PLC", "PLC");
-					break;
-				case PlcSyncStatus.Failed:
-					messagePanel.AddError(lastError ?? "Sync failed", "PLC");
-					break;
-			}
-		});
+		_lastPlcState = result;
+		_plcStateChanged.OnNext(result);
+		RebuildMessagePanel();
 	}
 
 	private void OnPlcRecipeConflictDetected(Recipe local, Recipe plc)
 	{
-		Dispatcher.UIThread.Post(() => _plcRecipeConflictDetected.OnNext((local, plc)));
+		Avalonia.Threading.Dispatcher.UIThread.Post(() => _plcRecipeConflictDetected.OnNext((local, plc)));
 	}
 
-	private void RefreshMessagePanel(Result mutationResult)
+	private void RebuildMessagePanel()
 	{
-		messagePanel.RefreshReasons(mutationResult.Reasons);
-	}
-
-	private void NotifyConnectionStateChanged()
-	{
-		_connectionStateChanged.OnNext(Unit.Default);
+		var combinedReasons = _lastRecipeResult.Reasons.Concat(_lastPlcState.Reasons);
+		messagePanel.RefreshReasons(combinedReasons);
 	}
 }

@@ -26,7 +26,6 @@ public sealed class RecipeQueryService(
 	public IObservable<PlcExecutionInfo> ExecutionState => domainFacade.ExecutionState;
 	public bool IsRecipeActive => domainFacade.IsRecipeActive;
 	public PlcSyncStatus SyncStatus => domainFacade.SyncStatus;
-	public string? SyncLastError => domainFacade.SyncLastError;
 	public DateTimeOffset? LastSyncTime => domainFacade.LastSyncTime;
 	public bool IsSyncEnabled => domainFacade.IsSyncEnabled;
 
@@ -37,7 +36,8 @@ public sealed class RecipeQueryService(
 
 	public int GetDefaultActionId()
 	{
-		return configRegistry.GetAllActions().First().Id;
+		return configRegistry.GetAllActions().FirstOrDefault()?.Id
+			?? throw new InvalidOperationException("No actions are defined in the configuration.");
 	}
 
 	public string SerializeStepsForClipboard(IReadOnlyList<Step> steps)

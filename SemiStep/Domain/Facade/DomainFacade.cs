@@ -16,25 +16,19 @@ namespace Domain.Facade;
 
 public sealed class DomainFacade : IDisposable
 {
-	private readonly AppConfiguration _appConfiguration;
 	private readonly IClipboardService _clipboardService;
-	private readonly ConfigRegistry _configRegistry;
 	private readonly IS7Service _connectionService;
 	private readonly ICoreService _coreService;
 	private readonly ICsvService _csvService;
 	private readonly RecipeHistoryManager _historyManager;
 	private readonly ImportedRecipeValidator _importedRecipeValidator;
-	private readonly IPropertyParser _propertyParser;
 	private readonly RecipeStateManager _stateManager;
 	private readonly IPlcSyncService _syncService;
-	private Action<PlcConnectionState>? _connectionStateChangedRelay;
-
+	private readonly PlcLifecycleManager _plcLifecycleManager;
+	private readonly RecipeEditService _editService;
 	private bool _disposed;
-	private bool _isSyncEnabled;
-	private Recipe? _pendingPlcRecipe;
 
 	internal DomainFacade(
-		AppConfiguration appConfiguration,
 		ConfigRegistry configRegistry,
 		ICoreService coreService,
 		RecipeStateManager stateManager,
@@ -46,8 +40,6 @@ public sealed class DomainFacade : IDisposable
 		IPropertyParser propertyParser,
 		IPlcSyncService syncService)
 	{
-		_appConfiguration = appConfiguration;
-		_configRegistry = configRegistry;
 		_coreService = coreService;
 		_stateManager = stateManager;
 		_historyManager = historyManager;
@@ -55,8 +47,22 @@ public sealed class DomainFacade : IDisposable
 		_connectionService = connectionService;
 		_clipboardService = clipboardService;
 		_importedRecipeValidator = importedRecipeValidator;
-		_propertyParser = propertyParser;
 		_syncService = syncService;
+		_plcLifecycleManager = new PlcLifecycleManager(
+			connectionService,
+			coreService,
+			historyManager,
+			stateManager,
+			syncService,
+			(local, plc) => PlcRecipeConflictDetected?.Invoke(local, plc));
+		_editService = new RecipeEditService(
+			coreService,
+			stateManager,
+			historyManager,
+			propertyParser,
+			configRegistry,
+			syncService,
+			() => _plcLifecycleManager.IsSyncEnabled);
 	}
 
 	public Recipe CurrentRecipe => _stateManager.Current;
@@ -68,14 +74,17 @@ public sealed class DomainFacade : IDisposable
 	public bool CanUndo => _historyManager.CanUndo;
 	public bool CanRedo => _historyManager.CanRedo;
 
-	public bool IsSyncEnabled => _isSyncEnabled;
+	public bool IsSyncEnabled => _plcLifecycleManager.IsSyncEnabled;
 	public bool IsConnected => _connectionService.IsConnected;
 	public bool IsRecipeActive => _connectionService.IsRecipeActive;
 	public IObservable<PlcExecutionInfo> ExecutionState => _connectionService.ExecutionState;
 
 	public PlcSyncStatus SyncStatus => _syncService.Status;
-	public string? SyncLastError => _syncService.LastError;
 	public DateTimeOffset? LastSyncTime => _syncService.LastSyncTime;
+
+	public IObservable<Result<PlcSessionSnapshot>> PlcState => _syncService.PlcState;
+
+	public event Action<Recipe, Recipe>? PlcRecipeConflictDetected;
 
 	public void Dispose()
 	{
@@ -85,11 +94,7 @@ public sealed class DomainFacade : IDisposable
 		}
 
 		_disposed = true;
-
-		if (_connectionStateChangedRelay is not null)
-		{
-			_connectionService.StateChanged -= _connectionStateChangedRelay;
-		}
+		_plcLifecycleManager.Dispose();
 	}
 
 	public static CellState GetCellState(GridColumnDefinition column, ActionDefinition action)
@@ -100,85 +105,42 @@ public sealed class DomainFacade : IDisposable
 	public void Initialize()
 	{
 		SetNewRecipe();
-
-		_connectionStateChangedRelay = state =>
-		{
-			ConnectionStateChanged?.Invoke(state);
-
-			if (state == PlcConnectionState.Disconnected && _isSyncEnabled)
-			{
-				_syncService.Reset();
-			}
-			else if (state == PlcConnectionState.Connected && _isSyncEnabled)
-			{
-				_ = PerformReconnectReconciliationAsync().ContinueWith(
-					t => Log.Error(t.Exception, "Unhandled error in reconnect reconciliation"),
-					TaskContinuationOptions.OnlyOnFaulted);
-			}
-		};
-		_connectionService.StateChanged += _connectionStateChangedRelay;
+		_plcLifecycleManager.Initialize();
 	}
 
 	public Result AppendStep(int actionId)
 	{
-		var snapshot = _coreService.AppendStep(CurrentRecipe, actionId);
-
-		return ApplyIfSucceeded(snapshot);
+		return _editService.AppendStep(actionId);
 	}
 
 	public Result InsertStep(int index, int actionId)
 	{
-		var snapshot = _coreService.InsertStep(CurrentRecipe, index, actionId);
-
-		return ApplyIfSucceeded(snapshot);
+		return _editService.InsertStep(index, actionId);
 	}
 
 	public Result RemoveStep(int index)
 	{
-		var snapshot = _coreService.RemoveStep(CurrentRecipe, index);
-
-		return ApplyIfSucceeded(snapshot);
+		return _editService.RemoveStep(index);
 	}
 
 	public Result InsertSteps(int startIndex, IReadOnlyList<Step> steps)
 	{
-		var snapshot = _coreService.InsertSteps(CurrentRecipe, startIndex, steps);
-
-		return ApplyIfSucceeded(snapshot);
+		return _editService.InsertSteps(startIndex, steps);
 	}
 
 	public Result RemoveSteps(IReadOnlyList<int> indices)
 	{
-		var snapshot = _coreService.RemoveSteps(CurrentRecipe, indices);
-
-		return ApplyIfSucceeded(snapshot);
+		return _editService.RemoveSteps(indices);
 	}
 
 	public Result ChangeStepAction(int stepIndex, int newActionId)
 	{
-		var snapshot = _coreService.ChangeStepAction(CurrentRecipe, stepIndex, newActionId);
-
-		return ApplyIfSucceeded(snapshot);
+		return _editService.ChangeStepAction(stepIndex, newActionId);
 	}
 
 	public Result UpdateStepProperty(int stepIndex, string columnKey, string value)
 	{
-		var propertyResult = ResolvePropertyDefinition(stepIndex, columnKey);
-		if (propertyResult.IsFailed)
-		{
-			return propertyResult.ToResult();
-		}
-
-		var parseResult = _propertyParser.Parse(value, propertyResult.Value);
-		if (parseResult.IsFailed)
-		{
-			return parseResult.ToResult();
-		}
-
-		var snapshot = _coreService.UpdateStepProperty(
-			CurrentRecipe, stepIndex, columnKey, parseResult.Value);
-
-		return ApplyIfSucceeded(snapshot);
+		return _editService.UpdateStepProperty(stepIndex, columnKey, value);
 	}
 
 	public Result Undo()
@@ -197,7 +159,7 @@ public sealed class DomainFacade : IDisposable
 			return snapshot.ToResult();
 		}
 
-		if (_isSyncEnabled)
+		if (IsSyncEnabled)
 		{
 			_syncService.NotifyRecipeChanged(_stateManager.Current, _stateManager.IsValid);
 		}
@@ -221,7 +183,7 @@ public sealed class DomainFacade : IDisposable
 			return snapshot.ToResult();
 		}
 
-		if (_isSyncEnabled)
+		if (IsSyncEnabled)
 		{
 			_syncService.NotifyRecipeChanged(_stateManager.Current, _stateManager.IsValid);
 		}
@@ -229,9 +191,7 @@ public sealed class DomainFacade : IDisposable
 		return Result.Ok().WithReasons(snapshot.Reasons);
 	}
 
-	public async Task<Result> LoadRecipeAsync(
-		string filePath,
-		CancellationToken ct = default)
+	public async Task<Result> LoadRecipeAsync(string filePath, CancellationToken ct = default)
 	{
 		var loadResult = await _csvService.LoadAsync(filePath, ct);
 		if (loadResult.IsFailed)
@@ -255,7 +215,7 @@ public sealed class DomainFacade : IDisposable
 			return snapshot.ToResult();
 		}
 
-		if (_isSyncEnabled)
+		if (IsSyncEnabled)
 		{
 			_syncService.NotifyRecipeChanged(_stateManager.Current, _stateManager.IsValid);
 		}
@@ -263,9 +223,7 @@ public sealed class DomainFacade : IDisposable
 		return Result.Ok().WithReasons(snapshot.Reasons);
 	}
 
-	public async Task SaveRecipeAsync(
-		string filePath,
-		CancellationToken ct = default)
+	public async Task SaveRecipeAsync(string filePath, CancellationToken ct = default)
 	{
 		await _csvService.SaveAsync(_stateManager.Current, filePath, ct);
 		_stateManager.MarkSaved();
@@ -274,39 +232,6 @@ public sealed class DomainFacade : IDisposable
 	public void MarkSaved()
 	{
 		_stateManager.MarkSaved();
-	}
-
-	private Result ApplyIfSucceeded(Result<RecipeSnapshot> snapshot)
-	{
-		if (snapshot.IsFailed)
-		{
-			return snapshot.ToResult();
-		}
-
-		_historyManager.Push(_stateManager.Current);
-		_stateManager.Update(snapshot);
-
-		if (_isSyncEnabled)
-		{
-			_syncService.NotifyRecipeChanged(_stateManager.Current, _stateManager.IsValid);
-		}
-
-		return Result.Ok().WithReasons(snapshot.Reasons);
-	}
-
-	private Result<PropertyTypeDefinition> ResolvePropertyDefinition(
-		int stepIndex,
-		string columnKey)
-	{
-		var recipe = _stateManager.Current;
-
-		var validationResult = ValidateStepIndex(stepIndex);
-		if (validationResult.IsFailed)
-		{
-			return validationResult.ToResult<PropertyTypeDefinition>();
-		}
-
-		return _configRegistry.ResolvePropertyType(recipe, stepIndex, columnKey);
 	}
 
 	public string SerializeStepsForClipboard(IReadOnlyList<Step> steps)
@@ -333,48 +258,14 @@ public sealed class DomainFacade : IDisposable
 		return result;
 	}
 
-	public string? LastConnectionError { get; private set; }
-
-	public event Action<PlcConnectionState>? ConnectionStateChanged;
-	public event Action<Recipe, Recipe>? PlcRecipeConflictDetected;
-
 	public async Task<Result> EnableSync(PlcConfiguration config)
 	{
-		if (_isSyncEnabled)
-		{
-			return Result.Ok();
-		}
-
-		try
-		{
-			LastConnectionError = null;
-			_isSyncEnabled = true;
-			await _connectionService.ConnectAsync(config.Connection);
-		}
-		catch (Exception ex)
-		{
-			_isSyncEnabled = false;
-			LastConnectionError = ex.Message;
-			Log.Warning("PLC connection failed: {Message}", ex.Message);
-			return Result.Fail(ex.Message);
-		}
-
-		return Result.Ok();
+		return await _plcLifecycleManager.EnableSync(config);
 	}
 
 	public async Task DisableSync()
 	{
-		_isSyncEnabled = false;
-		_syncService.Reset();
-
-		try
-		{
-			await _connectionService.DisconnectAsync();
-		}
-		catch (Exception ex)
-		{
-			Log.Warning("Error while disconnecting from PLC: {Message}", ex.Message);
-		}
+		await _plcLifecycleManager.DisableSync();
 	}
 
 	public async Task<Result> LoadRecipeFromPlcAsync(CancellationToken ct = default)
@@ -400,7 +291,7 @@ public sealed class DomainFacade : IDisposable
 			return snapshot.ToResult();
 		}
 
-		if (_isSyncEnabled)
+		if (IsSyncEnabled)
 		{
 			_syncService.NotifyRecipeChanged(_stateManager.Current, _stateManager.IsValid);
 		}
@@ -410,18 +301,7 @@ public sealed class DomainFacade : IDisposable
 
 	public void ResolveConflict(bool keepLocal)
 	{
-		if (keepLocal)
-		{
-			_syncService.NotifyRecipeChanged(_stateManager.Current, _stateManager.IsValid);
-		}
-		else
-		{
-			if (_pendingPlcRecipe is not null)
-			{
-				LoadPlcRecipeIntoState(_pendingPlcRecipe);
-				_pendingPlcRecipe = null;
-			}
-		}
+		_plcLifecycleManager.ResolveConflict(keepLocal, _stateManager);
 	}
 
 	public void SetNewRecipe()
@@ -436,82 +316,6 @@ public sealed class DomainFacade : IDisposable
 		{
 			Log.Warning("Empty recipe analysis unexpectedly failed: {Errors}",
 				string.Join("; ", snapshot.Errors.Select(e => e.Message)));
-		}
-	}
-
-	private Result ValidateStepIndex(int stepIndex)
-	{
-		var recipe = _stateManager.Current;
-		if (stepIndex < 0 || stepIndex >= recipe.Steps.Count)
-		{
-			return Result.Fail($"Step index {stepIndex} is out of range for recipe with {recipe.Steps.Count} steps");
-		}
-		return Result.Ok();
-	}
-
-	private async Task PerformReconnectReconciliationAsync(CancellationToken ct = default)
-	{
-		var managingAreaResult = await _connectionService.ReadManagingAreaAsync(ct);
-		if (managingAreaResult.IsFailed)
-		{
-			Log.Warning(
-				"Could not read managing area during reconnect reconciliation: {Errors}",
-				string.Join("; ", managingAreaResult.Errors.Select(e => e.Message)));
-			_syncService.NotifyRecipeChanged(_stateManager.Current, _stateManager.IsValid);
-			return;
-		}
-
-		if (!managingAreaResult.Value.Committed)
-		{
-			_syncService.NotifyRecipeChanged(_stateManager.Current, _stateManager.IsValid);
-			return;
-		}
-
-		var plcRecipeResult = await _connectionService.ReadRecipeFromPlcAsync(ct);
-		if (plcRecipeResult.IsFailed)
-		{
-			Log.Warning(
-				"Could not read PLC recipe during reconciliation: {Errors}",
-				string.Join("; ", plcRecipeResult.Errors.Select(e => e.Message)));
-			_syncService.NotifyRecipeChanged(_stateManager.Current, _stateManager.IsValid);
-			return;
-		}
-
-		var plcRecipe = plcRecipeResult.Value;
-		var localRecipe = _stateManager.Current;
-
-		if (localRecipe.Steps.Count == 0 && plcRecipe.Steps.Count > 0)
-		{
-			LoadPlcRecipeIntoState(plcRecipe);
-			return;
-		}
-
-		if (plcRecipe.Steps.Count > 0 && !localRecipe.Equals(plcRecipe))
-		{
-			_pendingPlcRecipe = plcRecipe;
-			PlcRecipeConflictDetected?.Invoke(localRecipe, plcRecipe);
-			return;
-		}
-
-		_syncService.NotifyRecipeChanged(_stateManager.Current, _stateManager.IsValid);
-	}
-
-	private void LoadPlcRecipeIntoState(Recipe recipe)
-	{
-		_historyManager.Clear();
-		var snapshot = _coreService.AnalyzeRecipe(recipe);
-		_stateManager.Update(snapshot);
-
-		if (snapshot.IsFailed)
-		{
-			Log.Warning(
-				"PLC recipe analysis produced errors: {Errors}",
-				string.Join("; ", snapshot.Errors.Select(e => e.Message)));
-		}
-
-		if (_isSyncEnabled)
-		{
-			_syncService.NotifyRecipeChanged(_stateManager.Current, _stateManager.IsValid);
 		}
 	}
 }

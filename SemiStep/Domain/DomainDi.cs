@@ -19,7 +19,6 @@ public static class DomainDi
 		services.AddSingleton<RecipeHistoryManager>();
 		services.AddSingleton<ImportedRecipeValidator>();
 		services.AddSingleton(sp => new DomainFacade(
-			sp.GetRequiredService<AppConfiguration>(),
 			sp.GetRequiredService<ConfigRegistry>(),
 			sp.GetRequiredService<ICoreService>(),
 			sp.GetRequiredService<RecipeStateManager>(),
