@@ -32,6 +32,7 @@ namespace Tests.UI;
 public sealed class RecipeMutationCoordinatorLoadRecipeTests
 {
 	private const string TempFilePrefix = "SemiStep.CoordinatorTest";
+
 	[Fact]
 	public async Task LoadRecipeAsync_Success_ClearsMessagePanelBeforeAddingNewReasons()
 	{
@@ -127,32 +128,10 @@ public sealed class RecipeMutationCoordinatorLoadRecipeTests
 		}
 	}
 
-	private static async Task<(RecipeMutationCoordinator Coordinator, MessagePanelViewModel Panel)> BuildCoordinatorWithCsvAsync()
+	private static async Task<(RecipeMutationCoordinator Coordinator, MessagePanelViewModel Panel)>
+		BuildCoordinatorWithCsvAsync()
 	{
-		var configDir = TestConfigLocator.GetConfigDirectory("WithGroups");
-		var configLoadResult = await ConfigFacade.LoadAndValidateAsync(configDir);
-
-		var services = new ServiceCollection()
-			.AddSingleton(configLoadResult.Value)
-			.AddRecipe()
-			.AddDomain()
-			.AddCsv()
-			.AddSingleton<IClipboardService, StubClipboardService>()
-			.AddSingleton<IS7Service, StubIs7Service>()
-			.AddSingleton<IPlcSyncService, StubPlcSyncService>()
-			.BuildServiceProvider();
-
-		var facade = services.GetRequiredService<DomainFacade>();
-		facade.Initialize();
-
-		var configRegistry = services.GetRequiredService<ConfigRegistry>();
-		var panel = new MessagePanelViewModel();
-		var queryService = new RecipeQueryService(facade, configRegistry);
-		var appConfiguration = services.GetRequiredService<AppConfiguration>();
-		var coordinator = new RecipeMutationCoordinator(facade, appConfiguration, queryService, panel);
-		coordinator.Initialize();
-
-		return (coordinator, panel);
+		return await BuildCoordinatorAsync(services => services.AddCsv());
 	}
 
 	private static async Task<(
@@ -168,5 +147,62 @@ public sealed class RecipeMutationCoordinatorLoadRecipeTests
 		await coordinator.SaveRecipeAsync(tempFilePath);
 
 		return (coordinator, panel, tempFilePath);
+	}
+
+	[Fact]
+	public async Task SaveRecipeAsync_Failure_ReturnsFailed()
+	{
+		var (coordinator, panel) = await BuildCoordinatorWithThrowingCsvAsync();
+
+		try
+		{
+			var result = await coordinator.SaveRecipeAsync("any/path.csv");
+			Dispatcher.UIThread.RunJobs(null);
+
+			result.IsFailed.Should().BeTrue();
+		}
+		finally
+		{
+			coordinator.Dispose();
+			panel.Dispose();
+		}
+	}
+
+	private static async Task<(RecipeMutationCoordinator Coordinator, MessagePanelViewModel Panel)>
+		BuildCoordinatorWithThrowingCsvAsync()
+	{
+		return await BuildCoordinatorAsync(services =>
+			services.AddSingleton<ICsvService, FailingCsvService>());
+	}
+
+	private static async Task<(RecipeMutationCoordinator Coordinator, MessagePanelViewModel Panel)>
+		BuildCoordinatorAsync(Action<IServiceCollection> registerCsvService)
+	{
+		var configDir = TestConfigLocator.GetConfigDirectory("WithGroups");
+		var configLoadResult = await ConfigFacade.LoadAndValidateAsync(configDir);
+
+		var serviceCollection = new ServiceCollection()
+			.AddSingleton(configLoadResult.Value)
+			.AddRecipe()
+			.AddDomain()
+			.AddSingleton<IClipboardService, StubClipboardService>()
+			.AddSingleton<IS7Service, StubIs7Service>()
+			.AddSingleton<IPlcSyncService, StubPlcSyncService>();
+
+		registerCsvService(serviceCollection);
+
+		var services = serviceCollection.BuildServiceProvider();
+
+		var facade = services.GetRequiredService<DomainFacade>();
+		facade.Initialize();
+
+		var configRegistry = services.GetRequiredService<ConfigRegistry>();
+		var panel = new MessagePanelViewModel();
+		var queryService = new RecipeQueryService(facade, configRegistry);
+		var appConfiguration = services.GetRequiredService<AppConfiguration>();
+		var coordinator = new RecipeMutationCoordinator(facade, appConfiguration, queryService, panel);
+		coordinator.Initialize();
+
+		return (coordinator, panel);
 	}
 }

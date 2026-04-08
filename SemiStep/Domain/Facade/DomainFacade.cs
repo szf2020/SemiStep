@@ -104,7 +104,7 @@ public sealed class DomainFacade : IDisposable
 
 	public void Initialize()
 	{
-		SetNewRecipe();
+		_ = SetNewRecipe();
 		_plcLifecycleManager.Initialize();
 	}
 
@@ -223,10 +223,25 @@ public sealed class DomainFacade : IDisposable
 		return Result.Ok().WithReasons(snapshot.Reasons);
 	}
 
-	public async Task SaveRecipeAsync(string filePath, CancellationToken ct = default)
+	public async Task<Result> SaveRecipeAsync(string filePath, CancellationToken ct = default)
 	{
-		await _csvService.SaveAsync(_stateManager.Current, filePath, ct);
-		_stateManager.MarkSaved();
+		try
+		{
+			await _csvService.SaveAsync(_stateManager.Current, filePath, ct);
+			_stateManager.MarkSaved();
+
+			return Result.Ok();
+		}
+		catch (OperationCanceledException)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to save recipe to {FilePath}", filePath);
+
+			return Result.Fail(ex.Message);
+		}
 	}
 
 	public void MarkSaved()
@@ -299,12 +314,12 @@ public sealed class DomainFacade : IDisposable
 		return Result.Ok().WithReasons(snapshot.Reasons);
 	}
 
-	public void ResolveConflict(bool keepLocal)
+	public Result ResolveConflict(bool keepLocal)
 	{
-		_plcLifecycleManager.ResolveConflict(keepLocal, _stateManager);
+		return _plcLifecycleManager.ResolveConflict(keepLocal, _stateManager);
 	}
 
-	public void SetNewRecipe()
+	public Result SetNewRecipe()
 	{
 		_historyManager.Clear();
 		_stateManager.Reset();
@@ -317,5 +332,7 @@ public sealed class DomainFacade : IDisposable
 			Log.Warning("Empty recipe analysis unexpectedly failed: {Errors}",
 				string.Join("; ", snapshot.Errors.Select(e => e.Message)));
 		}
+
+		return snapshot.ToResult();
 	}
 }

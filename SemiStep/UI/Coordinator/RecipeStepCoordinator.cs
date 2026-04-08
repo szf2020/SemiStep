@@ -17,7 +17,7 @@ internal sealed class RecipeStepCoordinator(
 	Action<MutationSignal> publishSignal,
 	Action rebuildMessagePanel)
 {
-	public void AppendStep(int actionId)
+	public Result AppendStep(int actionId)
 	{
 		var result = domainFacade.AppendStep(actionId);
 		setLastRecipeResult(result);
@@ -25,14 +25,15 @@ internal sealed class RecipeStepCoordinator(
 
 		if (result.IsFailed)
 		{
-			return;
+			return result;
 		}
 
 		setSuggestedSelection(getCurrentRecipe().StepCount - 1);
 		publishSignal(new MutationSignal.StepAppended(getCurrentRecipe().StepCount - 1));
+		return result;
 	}
 
-	public void InsertStep(int index, int actionId)
+	public Result InsertStep(int index, int actionId)
 	{
 		var result = domainFacade.InsertStep(index, actionId);
 		setLastRecipeResult(result);
@@ -40,14 +41,15 @@ internal sealed class RecipeStepCoordinator(
 
 		if (result.IsFailed)
 		{
-			return;
+			return result;
 		}
 
 		setSuggestedSelection(index);
 		publishSignal(new MutationSignal.StepsInserted(index, 1));
+		return result;
 	}
 
-	public void RemoveStep(int index)
+	public Result RemoveStep(int index)
 	{
 		var result = domainFacade.RemoveStep(index);
 		setLastRecipeResult(result);
@@ -55,7 +57,7 @@ internal sealed class RecipeStepCoordinator(
 
 		if (result.IsFailed)
 		{
-			return;
+			return result;
 		}
 
 		var currentRecipe = getCurrentRecipe();
@@ -63,9 +65,10 @@ internal sealed class RecipeStepCoordinator(
 			? Math.Min(index, currentRecipe.StepCount - 1)
 			: null);
 		publishSignal(new MutationSignal.StepRemoved(index));
+		return result;
 	}
 
-	public void RemoveSteps(IReadOnlyList<int> indices)
+	public Result RemoveSteps(IReadOnlyList<int> indices)
 	{
 		var result = domainFacade.RemoveSteps(indices);
 		setLastRecipeResult(result);
@@ -73,7 +76,7 @@ internal sealed class RecipeStepCoordinator(
 
 		if (result.IsFailed)
 		{
-			return;
+			return result;
 		}
 
 		var currentRecipe = getCurrentRecipe();
@@ -81,9 +84,10 @@ internal sealed class RecipeStepCoordinator(
 			? Math.Min(indices.Min(), currentRecipe.StepCount - 1)
 			: null);
 		publishSignal(new MutationSignal.StepsRemoved([.. indices]));
+		return result;
 	}
 
-	public void InsertSteps(int startIndex, IReadOnlyList<Step> steps)
+	public Result InsertSteps(int startIndex, IReadOnlyList<Step> steps)
 	{
 		var result = domainFacade.InsertSteps(startIndex, steps);
 		setLastRecipeResult(result);
@@ -91,14 +95,15 @@ internal sealed class RecipeStepCoordinator(
 
 		if (result.IsFailed)
 		{
-			return;
+			return result;
 		}
 
 		setSuggestedSelection(startIndex);
 		publishSignal(new MutationSignal.StepsInserted(startIndex, steps.Count));
+		return result;
 	}
 
-	public void ChangeStepAction(int stepIndex, int newActionId)
+	public Result ChangeStepAction(int stepIndex, int newActionId)
 	{
 		var result = domainFacade.ChangeStepAction(stepIndex, newActionId);
 		setLastRecipeResult(result);
@@ -106,14 +111,15 @@ internal sealed class RecipeStepCoordinator(
 
 		if (result.IsFailed)
 		{
-			return;
+			return result;
 		}
 
 		setSuggestedSelection(stepIndex);
 		publishSignal(new MutationSignal.StepActionChanged(stepIndex));
+		return result;
 	}
 
-	public void UpdateStepProperty(int stepIndex, string columnKey, string value)
+	public Result UpdateStepProperty(int stepIndex, string columnKey, string value)
 	{
 		var result = domainFacade.UpdateStepProperty(stepIndex, columnKey, value);
 		setLastRecipeResult(result);
@@ -121,13 +127,14 @@ internal sealed class RecipeStepCoordinator(
 
 		if (result.IsFailed)
 		{
-			return;
+			return result;
 		}
 
 		publishSignal(new MutationSignal.PropertyUpdated(stepIndex));
+		return result;
 	}
 
-	public void Undo()
+	public Result Undo()
 	{
 		var result = domainFacade.Undo();
 		setLastRecipeResult(result);
@@ -135,14 +142,15 @@ internal sealed class RecipeStepCoordinator(
 
 		if (result.IsFailed)
 		{
-			return;
+			return result;
 		}
 
 		setSuggestedSelection(null);
 		publishSignal(new MutationSignal.RecipeReplaced());
+		return result;
 	}
 
-	public void Redo()
+	public Result Redo()
 	{
 		var result = domainFacade.Redo();
 		setLastRecipeResult(result);
@@ -150,19 +158,27 @@ internal sealed class RecipeStepCoordinator(
 
 		if (result.IsFailed)
 		{
-			return;
+			return result;
 		}
 
 		setSuggestedSelection(null);
 		publishSignal(new MutationSignal.RecipeReplaced());
+		return result;
 	}
 
-	public void NewRecipe()
+	public Result NewRecipe()
 	{
-		domainFacade.SetNewRecipe();
-		setLastRecipeResult(Result.Ok());
+		var result = domainFacade.SetNewRecipe();
+		setLastRecipeResult(result);
 		rebuildMessagePanel();
+
+		if (result.IsFailed)
+		{
+			return result;
+		}
+
 		setSuggestedSelection(null);
 		publishSignal(new MutationSignal.RecipeReplaced());
+		return result;
 	}
 }

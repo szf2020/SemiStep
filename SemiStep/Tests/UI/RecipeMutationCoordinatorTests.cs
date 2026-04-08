@@ -26,33 +26,33 @@ namespace Tests.UI;
 [Trait("Category", "Integration")]
 public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 {
-	private DomainFacade _facade = null!;
-	private MessagePanelViewModel _panel = null!;
+	private DomainFacade _domainFacade = null!;
+	private MessagePanelViewModel _messagePanel = null!;
 	private RecipeMutationCoordinator _coordinator = null!;
 
 	public async Task InitializeAsync()
 	{
 		var (services, facade) = await CoreTestHelper.BuildAsync("WithGroups");
-		_facade = facade;
+		_domainFacade = facade;
 		var configRegistry = services.GetRequiredService<ConfigRegistry>();
-		_panel = new MessagePanelViewModel();
-		var queryService = new RecipeQueryService(_facade, configRegistry);
+		_messagePanel = new MessagePanelViewModel();
+		var queryService = new RecipeQueryService(_domainFacade, configRegistry);
 		var appConfiguration = services.GetRequiredService<AppConfiguration>();
-		_coordinator = new RecipeMutationCoordinator(_facade, appConfiguration, queryService, _panel);
+		_coordinator = new RecipeMutationCoordinator(_domainFacade, appConfiguration, queryService, _messagePanel);
 		_coordinator.Initialize();
 	}
 
 	public Task DisposeAsync()
 	{
 		_coordinator.Dispose();
-		_panel.Dispose();
+		_messagePanel.Dispose();
 		return Task.CompletedTask;
 	}
 
 	[Fact]
 	public void AppendStep_EmitsStepAppendedSignal()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		var signals = new List<MutationSignal>();
 		using var sub = _coordinator.StateChanged.Subscribe(signals.Add);
 
@@ -65,7 +65,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void AppendStep_SetsSuggestedSelection_ToLastIndex()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		var selection = _coordinator.ConsumeSuggestedSelection();
@@ -76,7 +76,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void InsertStep_EmitsStepsInsertedSignal()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		var signals = new List<MutationSignal>();
 		using var sub = _coordinator.StateChanged.Subscribe(signals.Add);
@@ -90,7 +90,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void InsertStep_SetsSuggestedSelection_ToInsertedIndex()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		_coordinator.ConsumeSuggestedSelection();
 
@@ -103,7 +103,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void RemoveStep_EmitsStepRemovedSignal()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		_coordinator.ConsumeSuggestedSelection();
 		var signals = new List<MutationSignal>();
@@ -118,7 +118,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void RemoveStep_SuggestedSelection_IsNull_WhenRecipeBecomesEmpty()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		_coordinator.ConsumeSuggestedSelection();
 
@@ -131,7 +131,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void RemoveStep_SuggestedSelection_ClampedToLastIndex_WhenRemovingLast()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
@@ -146,7 +146,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void RemoveSteps_EmitsStepsRemovedSignal()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		_coordinator.ConsumeSuggestedSelection();
@@ -161,7 +161,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void ChangeStepAction_EmitsStepActionChangedSignal()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		_coordinator.ConsumeSuggestedSelection();
 		var signals = new List<MutationSignal>();
@@ -176,7 +176,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void UpdateStepProperty_EmitsPropertyUpdatedSignal_WithCorrectStepIndex()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		_coordinator.ConsumeSuggestedSelection();
 		var signals = new List<MutationSignal>();
@@ -191,7 +191,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void Undo_EmitsRecipeReplacedSignal()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		_coordinator.ConsumeSuggestedSelection();
 		var signals = new List<MutationSignal>();
@@ -205,7 +205,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void Redo_EmitsRecipeReplacedSignal()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 		_coordinator.Undo();
 		var signals = new List<MutationSignal>();
@@ -219,7 +219,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void NewRecipe_EmitsRecipeReplacedSignal()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		var signals = new List<MutationSignal>();
 		using var sub = _coordinator.StateChanged.Subscribe(signals.Add);
 
@@ -229,22 +229,22 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	}
 
 	[Fact]
-	public void NewRecipe_ClearsMessagePanel()
+	public void NewRecipe_ClearsPriorNonStructuralEntries()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(9999);
 		Dispatcher.UIThread.RunJobs(null);
 
 		_coordinator.NewRecipe();
 		Dispatcher.UIThread.RunJobs(null);
 
-		_panel.Entries.Should().BeEmpty();
+		_messagePanel.Entries.Should().NotContain(e => !e.IsStructural);
 	}
 
 	[Fact]
 	public void ConsumeSuggestedSelection_ReturnsValueOnce_ThenNull()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 
 		var first = _coordinator.ConsumeSuggestedSelection();
@@ -257,7 +257,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void AppendStep_Failure_DoesNotEmitSignal()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		var signals = new List<MutationSignal>();
 		using var sub = _coordinator.StateChanged.Subscribe(signals.Add);
 
@@ -269,18 +269,18 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void AppendStep_Failure_AddsErrorToMessagePanel()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 
 		_coordinator.AppendStep(9999);
 		Dispatcher.UIThread.RunJobs(null);
 
-		_panel.ErrorCount.Should().BeGreaterThan(0);
+		_messagePanel.ErrorCount.Should().BeGreaterThan(0);
 	}
 
 	[Fact]
 	public void IsDirty_True_AfterMutation()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 
@@ -290,7 +290,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void CanUndo_True_AfterMutation()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 
@@ -300,12 +300,44 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	[Fact]
 	public void CanRedo_True_AfterUndoingMutation()
 	{
-		_facade.SetNewRecipe();
+		_domainFacade.SetNewRecipe();
 		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
 
 		_coordinator.Undo();
 
 		_coordinator.CanRedo.Should().BeTrue();
+	}
+
+	[Fact]
+	public void AppendStep_Failure_ReturnsFailed()
+	{
+		_ = _domainFacade.SetNewRecipe();
+
+		var result = _coordinator.AppendStep(9999);
+
+		result.IsFailed.Should().BeTrue();
+	}
+
+	[Fact]
+	public void ChangeStepAction_Failure_ReturnsFailed()
+	{
+		_ = _domainFacade.SetNewRecipe();
+		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
+
+		var result = _coordinator.ChangeStepAction(0, 9999);
+
+		result.IsFailed.Should().BeTrue();
+	}
+
+	[Fact]
+	public void UpdateStepProperty_Failure_ReturnsFailed()
+	{
+		_ = _domainFacade.SetNewRecipe();
+		_coordinator.AppendStep(RecipeTestDriver.WaitActionId);
+
+		var result = _coordinator.UpdateStepProperty(0, "NonExistentColumn", "value");
+
+		result.IsFailed.Should().BeTrue();
 	}
 
 }

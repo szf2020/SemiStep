@@ -97,16 +97,17 @@ public class RecipeFileViewModel : ReactiveObject, IDisposable
 
 	private async Task SaveToFileAsync(string filePath)
 	{
-		try
+		var result = await _coordinator.SaveRecipeAsync(filePath);
+
+		if (result.IsFailed)
 		{
-			await _coordinator.SaveRecipeAsync(filePath);
-			CurrentFilePath = filePath;
-			_messagePanel.AddInfo($"Saved: {Path.GetFileName(filePath)}", FileSource);
+			_messagePanel.AddError($"Failed to save recipe: {result.Errors[0].Message}", FileSource);
+
+			return;
 		}
-		catch (Exception ex)
-		{
-			_messagePanel.AddError($"Failed to save recipe: {ex.Message}", FileSource);
-		}
+
+		CurrentFilePath = filePath;
+		_messagePanel.AddInfo($"Saved: {Path.GetFileName(filePath)}", FileSource);
 	}
 
 	private async Task LoadRecipeAsync()
@@ -117,26 +118,29 @@ public class RecipeFileViewModel : ReactiveObject, IDisposable
 			return;
 		}
 
-		try
+		var result = await _coordinator.LoadRecipeAsync(filePath);
+		if (result.IsFailed)
 		{
-			var result = await _coordinator.LoadRecipeAsync(filePath);
-			if (result.IsFailed)
-			{
-				return;
-			}
+			_messagePanel.AddError(result.Errors[0].Message, FileSource);
 
-			CurrentFilePath = filePath;
-			_messagePanel.AddInfo($"Loaded: {Path.GetFileName(filePath)}", FileSource);
+			return;
 		}
-		catch (Exception ex)
-		{
-			_messagePanel.AddError($"Failed to load recipe: {ex.Message}", FileSource);
-		}
+
+		CurrentFilePath = filePath;
+		_messagePanel.AddInfo($"Loaded: {Path.GetFileName(filePath)}", FileSource);
 	}
 
 	private void NewRecipe()
 	{
-		_coordinator.NewRecipe();
+		var result = _coordinator.NewRecipe();
+
+		if (result.IsFailed)
+		{
+			_messagePanel.AddError(result.Errors[0].Message, FileSource);
+
+			return;
+		}
+
 		CurrentFilePath = null;
 	}
 }
