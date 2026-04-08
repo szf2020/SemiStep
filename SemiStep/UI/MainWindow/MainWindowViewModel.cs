@@ -156,16 +156,30 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 			return;
 		}
 
+		var dialog = new PlcConflictDialog();
+
 		try
 		{
-			var dialog = new PlcConflictDialog();
 			await dialog.ShowDialog(MainWindow);
-			_coordinator.ResolveConflict(dialog.KeepLocal);
 		}
 		catch (Exception ex)
 		{
-			Log.Warning("Unexpected error while handling PLC recipe conflict: {Message}", ex.Message);
-			MessagePanel.AddError("Failed to resolve PLC recipe conflict — sync disabled", "PLC");
+			Log.Warning("Unexpected error while showing PLC conflict dialog: {Message}", ex.Message);
+			MessagePanel.AddError("Failed to show PLC conflict dialog — sync disabled", "PLC");
+
+			return;
+		}
+
+		if (!dialog.Confirmed)
+		{
+			return;
+		}
+
+		var result = _coordinator.ResolveConflict(dialog.KeepLocal);
+
+		if (result.IsFailed)
+		{
+			MessagePanel.AddError(result.Errors[0].Message, "PLC");
 		}
 	}
 

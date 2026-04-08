@@ -223,13 +223,11 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 			return;
 		}
 
-		try
+		var result = _coordinator.UpdateStepProperty(stepIndex, columnKey, value);
+
+		if (result.IsFailed)
 		{
-			_coordinator.UpdateStepProperty(stepIndex, columnKey, value);
-		}
-		catch (Exception ex)
-		{
-			_messagePanel.AddError($"Step {stepIndex + 1}: {ex.Message}", "RecipeGrid");
+			_messagePanel.AddError($"Step {stepIndex + 1}: {result.Errors[0].Message}", "RecipeGrid");
 		}
 	}
 
@@ -241,14 +239,12 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 			return;
 		}
 
-		try
-		{
-			_coordinator.ChangeStepAction(stepIndex, newActionId);
-		}
-		catch (Exception ex)
+		var result = _coordinator.ChangeStepAction(stepIndex, newActionId);
+
+		if (result.IsFailed)
 		{
 			_messagePanel.AddError(
-				$"Step {stepIndex + 1}: Failed to change action - {ex.Message}", "RecipeGrid");
+				$"Step {stepIndex + 1}: Failed to change action - {result.Errors[0].Message}", "RecipeGrid");
 		}
 	}
 

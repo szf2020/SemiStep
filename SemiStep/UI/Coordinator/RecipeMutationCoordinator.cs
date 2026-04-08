@@ -145,59 +145,70 @@ public sealed class RecipeMutationCoordinator : IDisposable
 		return result;
 	}
 
-	public void ResolveConflict(bool keepLocal)
+	public Result ResolveConflict(bool keepLocal)
 	{
-		_domainFacade.ResolveConflict(keepLocal);
+		var result = _domainFacade.ResolveConflict(keepLocal);
+
+		if (!keepLocal && result.IsSuccess)
+		{
+			_lastRecipeResult = result;
+			SuggestedSelection = null;
+			_stateChanged.OnNext(new MutationSignal.RecipeReplaced());
+		}
+
+		RebuildMessagePanel();
+
+		return result;
 	}
 
-	public void AppendStep(int actionId)
+	public Result AppendStep(int actionId)
 	{
-		_stepCoordinator.AppendStep(actionId);
+		return _stepCoordinator.AppendStep(actionId);
 	}
 
-	public void InsertStep(int index, int actionId)
+	public Result InsertStep(int index, int actionId)
 	{
-		_stepCoordinator.InsertStep(index, actionId);
+		return _stepCoordinator.InsertStep(index, actionId);
 	}
 
-	public void RemoveStep(int index)
+	public Result RemoveStep(int index)
 	{
-		_stepCoordinator.RemoveStep(index);
+		return _stepCoordinator.RemoveStep(index);
 	}
 
-	public void RemoveSteps(IReadOnlyList<int> indices)
+	public Result RemoveSteps(IReadOnlyList<int> indices)
 	{
-		_stepCoordinator.RemoveSteps(indices);
+		return _stepCoordinator.RemoveSteps(indices);
 	}
 
-	public void InsertSteps(int startIndex, IReadOnlyList<Step> steps)
+	public Result InsertSteps(int startIndex, IReadOnlyList<Step> steps)
 	{
-		_stepCoordinator.InsertSteps(startIndex, steps);
+		return _stepCoordinator.InsertSteps(startIndex, steps);
 	}
 
-	public void ChangeStepAction(int stepIndex, int newActionId)
+	public Result ChangeStepAction(int stepIndex, int newActionId)
 	{
-		_stepCoordinator.ChangeStepAction(stepIndex, newActionId);
+		return _stepCoordinator.ChangeStepAction(stepIndex, newActionId);
 	}
 
-	public void UpdateStepProperty(int stepIndex, string columnKey, string value)
+	public Result UpdateStepProperty(int stepIndex, string columnKey, string value)
 	{
-		_stepCoordinator.UpdateStepProperty(stepIndex, columnKey, value);
+		return _stepCoordinator.UpdateStepProperty(stepIndex, columnKey, value);
 	}
 
-	public void Undo()
+	public Result Undo()
 	{
-		_stepCoordinator.Undo();
+		return _stepCoordinator.Undo();
 	}
 
-	public void Redo()
+	public Result Redo()
 	{
-		_stepCoordinator.Redo();
+		return _stepCoordinator.Redo();
 	}
 
-	public void NewRecipe()
+	public Result NewRecipe()
 	{
-		_stepCoordinator.NewRecipe();
+		return _stepCoordinator.NewRecipe();
 	}
 
 	public async Task<Result> LoadRecipeAsync(string filePath)
@@ -219,11 +230,21 @@ public sealed class RecipeMutationCoordinator : IDisposable
 		return result;
 	}
 
-	public async Task SaveRecipeAsync(string filePath)
+	public async Task<Result> SaveRecipeAsync(string filePath)
 	{
-		await _domainFacade.SaveRecipeAsync(filePath);
+		var result = await _domainFacade.SaveRecipeAsync(filePath);
+
+		RebuildMessagePanel();
+
+		if (result.IsFailed)
+		{
+			return result;
+		}
+
 		SuggestedSelection = null;
 		_stateChanged.OnNext(new MutationSignal.MetadataChanged());
+
+		return result;
 	}
 
 	private void OnPlcStateChanged(Result<PlcSessionSnapshot> result)
@@ -246,6 +267,7 @@ public sealed class RecipeMutationCoordinator : IDisposable
 			{
 				return;
 			}
+
 			_plcRecipeConflictDetected.OnNext((local, plc));
 		});
 	}

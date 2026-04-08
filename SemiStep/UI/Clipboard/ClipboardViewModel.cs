@@ -93,7 +93,11 @@ public class ClipboardViewModel : ReactiveObject, IDisposable
 		var csvText = _coordinator.QueryService.SerializeStepsForClipboard(steps);
 		await _clipboard.SetTextAsync(csvText);
 
-		_coordinator.RemoveSteps(_recipeGrid.SelectedRowIndices);
+		var result = _coordinator.RemoveSteps(_recipeGrid.SelectedRowIndices);
+		if (result.IsFailed)
+		{
+			_messagePanel.AddError(result.Errors[0].Message, ClipboardSource);
+		}
 	}
 
 	private async Task PasteStepsAsync()
@@ -125,6 +129,10 @@ public class ClipboardViewModel : ReactiveObject, IDisposable
 			? _recipeGrid.SelectedRowIndices.Max() + 1
 			: _recipeGrid.RecipeRows.Count;
 
-		_coordinator.InsertSteps(insertIndex, recipeResult.Value.Steps);
+		var insertResult = _coordinator.InsertSteps(insertIndex, recipeResult.Value.Steps);
+		if (insertResult.IsFailed)
+		{
+			_messagePanel.AddError(insertResult.Errors[0].Message, ClipboardSource);
+		}
 	}
 }

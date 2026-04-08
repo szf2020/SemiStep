@@ -90,20 +90,26 @@ internal sealed class PlcLifecycleManager(
 		}
 	}
 
-	public void ResolveConflict(bool keepLocal, RecipeStateManager stateManager)
+	public Result ResolveConflict(bool keepLocal, RecipeStateManager stateManager)
 	{
 		if (keepLocal)
 		{
 			syncService.NotifyRecipeChanged(stateManager.Current, stateManager.IsValid);
+
+			return Result.Ok();
 		}
-		else
+
+		if (_pendingPlcRecipe is null)
 		{
-			if (_pendingPlcRecipe is not null)
-			{
-				LoadPlcRecipeIntoState(_pendingPlcRecipe);
-				_pendingPlcRecipe = null;
-			}
+			Log.Warning("ResolveConflict called with keepLocal=false but no pending PLC recipe exists.");
+
+			return Result.Fail("No pending PLC recipe to resolve.");
 		}
+
+		LoadPlcRecipeIntoState(_pendingPlcRecipe);
+		_pendingPlcRecipe = null;
+
+		return Result.Ok();
 	}
 
 	private void OnConnectionStateChanged(PlcConnectionState state)
