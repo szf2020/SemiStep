@@ -5,8 +5,6 @@ using Avalonia.ReactiveUI;
 
 using Microsoft.Extensions.DependencyInjection;
 
-using ReactiveUI;
-
 using UI.Dialogs;
 using UI.MainWindow;
 
@@ -60,7 +58,6 @@ public class App : Application
 	public static void Run(IServiceProvider serviceProvider)
 	{
 		ArgumentNullException.ThrowIfNull(serviceProvider);
-		RxApp.MainThreadScheduler = AvaloniaScheduler.Instance;
 		BuildAvaloniaApp()
 			.AfterSetup(builder =>
 			{

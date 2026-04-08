@@ -1,4 +1,6 @@
-﻿using Config.Facade;
+﻿using Avalonia.Threading;
+
+using Config.Facade;
 
 using Core;
 
@@ -37,8 +39,10 @@ public sealed class RecipeMutationCoordinatorLoadRecipeTests
 		try
 		{
 			panel.AddError("stale error", "Test");
+			Dispatcher.UIThread.RunJobs(null);
 
 			await coordinator.LoadRecipeAsync(tempFilePath);
+			Dispatcher.UIThread.RunJobs(null);
 
 			panel.Entries.Should().BeEmpty();
 		}
@@ -58,8 +62,10 @@ public sealed class RecipeMutationCoordinatorLoadRecipeTests
 		try
 		{
 			panel.AddError("pre-existing error", "Test");
+			Dispatcher.UIThread.RunJobs(null);
 
 			await coordinator.LoadRecipeAsync("nonexistent/path/recipe.csv");
+			Dispatcher.UIThread.RunJobs(null);
 
 			panel.Entries.Should().ContainSingle(e => e.Source == "Test");
 			panel.ErrorCount.Should().BeGreaterThan(0);

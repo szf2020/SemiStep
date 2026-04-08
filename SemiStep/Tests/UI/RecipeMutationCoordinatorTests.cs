@@ -1,4 +1,6 @@
-﻿using Config;
+﻿using Avalonia.Threading;
+
+using Config;
 
 using Domain;
 using Domain.Facade;
@@ -232,8 +234,10 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 	{
 		_facade.SetNewRecipe();
 		_panel.AddError("some error", "test");
+		Dispatcher.UIThread.RunJobs(null);
 
 		_coordinator.NewRecipe();
+		Dispatcher.UIThread.RunJobs(null);
 
 		_panel.Entries.Should().BeEmpty();
 	}
@@ -269,6 +273,7 @@ public sealed class RecipeMutationCoordinatorTests : IAsyncLifetime
 		_facade.SetNewRecipe();
 
 		_coordinator.AppendStep(9999);
+		Dispatcher.UIThread.RunJobs(null);
 
 		_panel.ErrorCount.Should().BeGreaterThan(0);
 	}

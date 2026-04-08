@@ -1,4 +1,6 @@
-﻿using FluentAssertions;
+﻿using Avalonia.Threading;
+
+using FluentAssertions;
 
 using FluentResults;
 
@@ -21,6 +23,7 @@ public sealed class MessagePanelViewModelTests
 		var panel = new MessagePanelViewModel();
 
 		panel.AddError("msg", "src");
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.ErrorCount.Should().Be(1);
 	}
@@ -31,6 +34,7 @@ public sealed class MessagePanelViewModelTests
 		var panel = new MessagePanelViewModel();
 
 		panel.AddError("test error", "src");
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.Entries.Should().ContainSingle(e => e.IsError);
 	}
@@ -41,6 +45,7 @@ public sealed class MessagePanelViewModelTests
 		var panel = new MessagePanelViewModel();
 
 		panel.AddInfo("msg", "src");
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.ErrorCount.Should().Be(0);
 		panel.WarningCount.Should().Be(0);
@@ -52,6 +57,7 @@ public sealed class MessagePanelViewModelTests
 		var panel = new MessagePanelViewModel();
 
 		panel.AddError("msg", "src");
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.HasErrors.Should().BeTrue();
 	}
@@ -76,7 +82,9 @@ public sealed class MessagePanelViewModelTests
 	public void ErrorCountText_Singular_WhenOneError()
 	{
 		var panel = new MessagePanelViewModel();
+
 		panel.AddError("msg", "src");
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.ErrorCountText.Should().Be("1 Error");
 	}
@@ -85,8 +93,11 @@ public sealed class MessagePanelViewModelTests
 	public void ErrorCountText_Plural_WhenTwoErrors()
 	{
 		var panel = new MessagePanelViewModel();
+
 		panel.AddError("msg1", "src");
+		Dispatcher.UIThread.RunJobs(null);
 		panel.AddError("msg2", "src");
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.ErrorCountText.Should().Be("2 Errors");
 	}
@@ -95,7 +106,9 @@ public sealed class MessagePanelViewModelTests
 	public void WarningCountText_Singular_WhenOneWarning()
 	{
 		var panel = new MessagePanelViewModel();
-		panel.RefreshReasons(new List<IReason> { new Warning("msg") });
+
+		panel.RefreshReasons([new Warning("msg")]);
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.WarningCountText.Should().Be("1 Warning");
 	}
@@ -104,8 +117,11 @@ public sealed class MessagePanelViewModelTests
 	public void StatusErrorSummary_BothErrorsAndWarnings()
 	{
 		var panel = new MessagePanelViewModel();
+
 		panel.AddError("e", "src");
-		panel.RefreshReasons(new List<IReason> { new Warning("w") });
+		Dispatcher.UIThread.RunJobs(null);
+		panel.RefreshReasons([new Warning("w")]);
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.StatusErrorSummary.Should().Be("1 Error, 1 Warning");
 	}
@@ -114,8 +130,11 @@ public sealed class MessagePanelViewModelTests
 	public void StatusErrorSummary_OnlyErrors()
 	{
 		var panel = new MessagePanelViewModel();
+
 		panel.AddError("e1", "src");
+		Dispatcher.UIThread.RunJobs(null);
 		panel.AddError("e2", "src");
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.StatusErrorSummary.Should().Be("2 Errors");
 	}
@@ -124,7 +143,9 @@ public sealed class MessagePanelViewModelTests
 	public void StatusErrorSummary_OnlyWarnings()
 	{
 		var panel = new MessagePanelViewModel();
-		panel.RefreshReasons(new List<IReason> { new Warning("w") });
+
+		panel.RefreshReasons([new Warning("w")]);
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.StatusErrorSummary.Should().Be("1 Warning");
 	}
@@ -141,10 +162,13 @@ public sealed class MessagePanelViewModelTests
 	public void Clear_ResetsCountsAndEntries()
 	{
 		var panel = new MessagePanelViewModel();
-		panel.AddError("e", "src");
-		panel.RefreshReasons(new List<IReason> { new Warning("w") });
 
+		panel.AddError("e", "src");
+		Dispatcher.UIThread.RunJobs(null);
+		panel.RefreshReasons([new Warning("w")]);
+		Dispatcher.UIThread.RunJobs(null);
 		panel.Clear();
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.ErrorCount.Should().Be(0);
 		panel.WarningCount.Should().Be(0);
@@ -155,9 +179,11 @@ public sealed class MessagePanelViewModelTests
 	public void Clear_SetsHasErrorsFalse()
 	{
 		var panel = new MessagePanelViewModel();
-		panel.AddError("e", "src");
 
+		panel.AddError("e", "src");
+		Dispatcher.UIThread.RunJobs(null);
 		panel.Clear();
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.HasErrors.Should().BeFalse();
 	}
@@ -168,6 +194,7 @@ public sealed class MessagePanelViewModelTests
 		var panel = new MessagePanelViewModel();
 
 		panel.AddError("e", "src");
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.HasEntries.Should().BeTrue();
 	}
@@ -184,8 +211,12 @@ public sealed class MessagePanelViewModelTests
 	public void ShowPanel_True_WhenHasEntriesAndVisible()
 	{
 		var panel = new MessagePanelViewModel();
+		panel.IsVisible = false;
+
 		panel.AddError("e", "src");
+		Dispatcher.UIThread.RunJobs(null);
 		panel.IsVisible = true;
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.ShowPanel.Should().BeTrue();
 	}
@@ -194,8 +225,11 @@ public sealed class MessagePanelViewModelTests
 	public void ShowPanel_False_WhenNotVisible()
 	{
 		var panel = new MessagePanelViewModel();
+
 		panel.AddError("e", "src");
+		Dispatcher.UIThread.RunJobs(null);
 		panel.IsVisible = false;
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.ShowPanel.Should().BeFalse();
 	}
@@ -204,9 +238,10 @@ public sealed class MessagePanelViewModelTests
 	public void RefreshReasons_AddsStructuralErrors()
 	{
 		var panel = new MessagePanelViewModel();
-		var reasons = new List<IReason> { new Error("some error") };
+		List<IReason> reasons = [new Error("some error")];
 
 		panel.RefreshReasons(reasons);
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.Entries.Should().ContainSingle(e => e.IsStructural && e.IsError);
 	}
@@ -215,9 +250,10 @@ public sealed class MessagePanelViewModelTests
 	public void RefreshReasons_AddsStructuralWarnings()
 	{
 		var panel = new MessagePanelViewModel();
-		var reasons = new List<IReason> { new Warning("some warning") };
+		List<IReason> reasons = [new Warning("some warning")];
 
 		panel.RefreshReasons(reasons);
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.Entries.Should().ContainSingle(e => e.IsStructural && e.IsWarning);
 	}
@@ -226,9 +262,11 @@ public sealed class MessagePanelViewModelTests
 	public void RefreshReasons_RemovesOldStructuralEntries_BeforeAddingNew()
 	{
 		var panel = new MessagePanelViewModel();
-		panel.RefreshReasons(new List<IReason> { new Error("old error") });
 
-		panel.RefreshReasons(new List<IReason>());
+		panel.RefreshReasons([new Error("old error")]);
+		Dispatcher.UIThread.RunJobs(null);
+		panel.RefreshReasons([]);
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.Entries.Should().BeEmpty();
 	}
@@ -237,9 +275,11 @@ public sealed class MessagePanelViewModelTests
 	public void RefreshReasons_PreservesNonStructuralEntries()
 	{
 		var panel = new MessagePanelViewModel();
-		panel.AddError("non-structural", "custom source");
 
-		panel.RefreshReasons(new List<IReason>());
+		panel.AddError("non-structural", "custom source");
+		Dispatcher.UIThread.RunJobs(null);
+		panel.RefreshReasons([]);
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.Entries.Should().ContainSingle(e => !e.IsStructural);
 	}
@@ -248,9 +288,11 @@ public sealed class MessagePanelViewModelTests
 	public void ClearCommand_RemovesNonStructuralEntries()
 	{
 		var panel = new MessagePanelViewModel();
-		panel.AddError("e", "src");
 
+		panel.AddError("e", "src");
+		Dispatcher.UIThread.RunJobs(null);
 		panel.ClearCommand.Execute().Subscribe();
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.Entries.Should().BeEmpty();
 	}
@@ -259,9 +301,11 @@ public sealed class MessagePanelViewModelTests
 	public void ClearCommand_PreservesStructuralEntries()
 	{
 		var panel = new MessagePanelViewModel();
-		panel.RefreshReasons(new List<IReason> { new Error("structural error") });
 
+		panel.RefreshReasons([new Error("structural error")]);
+		Dispatcher.UIThread.RunJobs(null);
 		panel.ClearCommand.Execute().Subscribe();
+		Dispatcher.UIThread.RunJobs(null);
 
 		panel.Entries.Should().ContainSingle(e => e.IsStructural);
 	}

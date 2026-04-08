@@ -201,6 +201,7 @@ internal sealed class PlcSyncCoordinator(
 			catch (Exception ex)
 			{
 				Log.Error(ex, "Unhandled exception in sync task");
+				LastError = ex.Message;
 				Status = PlcSyncStatus.Failed;
 			}
 		}, ct);
@@ -232,10 +233,10 @@ internal sealed class PlcSyncCoordinator(
 		if (activeResult.IsFailed)
 		{
 			var isDisconnected = activeResult.Errors.OfType<NotConnectedError>().Any();
-			Status = PlcSyncStatus.Failed;
 			LastError = isDisconnected
 				? "Not connected to PLC"
 				: activeResult.Errors[0].Message;
+			Status = PlcSyncStatus.Failed;
 
 			if (isDisconnected)
 			{
@@ -247,21 +248,21 @@ internal sealed class PlcSyncCoordinator(
 
 		if (activeResult.Value)
 		{
-			Status = PlcSyncStatus.Failed;
 			LastError = "Recipe is being executed on PLC";
+			Status = PlcSyncStatus.Failed;
 			Log.Warning("Sync blocked: recipe is being executed on PLC");
 
 			return;
 		}
 
-		Status = PlcSyncStatus.Syncing;
 		LastError = null;
+		Status = PlcSyncStatus.Syncing;
 
 		var writeResult = await transactionExecutor.WriteRecipeWithRetryAsync(snapshotToSync, ct);
 		if (writeResult.IsFailed)
 		{
-			Status = PlcSyncStatus.Failed;
 			LastError = writeResult.Errors[0].Message;
+			Status = PlcSyncStatus.Failed;
 			if (!writeResult.Errors.OfType<NotConnectedError>().Any())
 			{
 				Log.Error("Sync failed: {Message}", writeResult.Errors[0].Message);
@@ -271,8 +272,8 @@ internal sealed class PlcSyncCoordinator(
 		}
 
 		LastSyncTime = DateTimeOffset.UtcNow;
-		Status = PlcSyncStatus.Synced;
 		LastError = null;
+		Status = PlcSyncStatus.Synced;
 
 		lock (_lock)
 		{

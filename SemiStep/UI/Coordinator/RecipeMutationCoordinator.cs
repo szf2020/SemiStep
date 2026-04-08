@@ -27,7 +27,6 @@ public sealed class RecipeMutationCoordinator(
 	private readonly Subject<MutationSignal> _stateChanged = new();
 	private readonly Subject<(Recipe Local, Recipe Plc)> _plcRecipeConflictDetected = new();
 	private readonly Subject<Unit> _connectionStateChanged = new();
-	private readonly Lock _subjectLock = new();
 	private Action<string?>? _syncErrorChangedRelay;
 	private bool _initialized;
 
@@ -65,7 +64,7 @@ public sealed class RecipeMutationCoordinator(
 		domainFacade.ConnectionStateChanged += OnConnectionStateChanged;
 		syncService.StatusChanged += OnSyncStatusChanged;
 
-		_syncErrorChangedRelay = _ => NotifyConnectionStateChanged();
+		_syncErrorChangedRelay = _ => Dispatcher.UIThread.Post(NotifyConnectionStateChanged);
 		syncService.ErrorChanged += _syncErrorChangedRelay;
 
 		return this;
@@ -84,10 +83,7 @@ public sealed class RecipeMutationCoordinator(
 
 		_stateChanged.Dispose();
 		_plcRecipeConflictDetected.Dispose();
-		lock (_subjectLock)
-		{
-			_connectionStateChanged.Dispose();
-		}
+		_connectionStateChanged.Dispose();
 	}
 
 	public int? ConsumeSuggestedSelection()
@@ -105,7 +101,7 @@ public sealed class RecipeMutationCoordinator(
 		if (result.IsFailed)
 		{
 			var errorMessage = string.Join("; ", result.Errors.Select(e => e.Message));
-			Dispatcher.UIThread.Post(() => messagePanel.AddError($"Failed to enable sync: {errorMessage}", "PLC"));
+			messagePanel.AddError($"Failed to enable sync: {errorMessage}", "PLC");
 		}
 
 		return result;
@@ -311,20 +307,22 @@ public sealed class RecipeMutationCoordinator(
 
 	private void OnConnectionStateChanged(PlcConnectionState state)
 	{
-		NotifyConnectionStateChanged();
+		var ipAddress = appConfiguration.PlcConfiguration.Connection.IpAddress;
+		var isSyncEnabled = queryService.IsSyncEnabled;
 
-		// Disconnection events are suppressed when sync is not user-enabled, as they are
-		// expected during normal startup and do not represent a loss of user-initiated sync.
 		Dispatcher.UIThread.Post(() =>
 		{
-			var ipAddress = appConfiguration.PlcConfiguration.Connection.IpAddress;
+			NotifyConnectionStateChanged();
 
+			// Disconnection events are suppressed when sync is not user-enabled, as they
+			// are expected during normal startup and do not represent a loss of
+			// user-initiated sync.
 			switch (state)
 			{
 				case PlcConnectionState.Connected:
 					messagePanel.AddInfo($"Connected to PLC ({ipAddress})", "PLC");
 					break;
-				case PlcConnectionState.Disconnected when queryService.IsSyncEnabled:
+				case PlcConnectionState.Disconnected when isSyncEnabled:
 					messagePanel.AddError("PLC connection lost", "PLC");
 					break;
 			}
@@ -333,11 +331,12 @@ public sealed class RecipeMutationCoordinator(
 
 	private void OnSyncStatusChanged(PlcSyncStatus status)
 	{
-		NotifyConnectionStateChanged();
-
 		var lastError = syncService.LastError;
+
 		Dispatcher.UIThread.Post(() =>
 		{
+			NotifyConnectionStateChanged();
+
 			switch (status)
 			{
 				case PlcSyncStatus.Synced:
@@ -362,9 +361,6 @@ public sealed class RecipeMutationCoordinator(
 
 	private void NotifyConnectionStateChanged()
 	{
-		lock (_subjectLock)
-		{
-			_connectionStateChanged.OnNext(Unit.Default);
-		}
+		_connectionStateChanged.OnNext(Unit.Default);
 	}
 }
