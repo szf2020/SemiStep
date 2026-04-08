@@ -165,7 +165,7 @@ public class MainWindowViewModel : ReactiveObject, IDisposable
 		catch (Exception ex)
 		{
 			Log.Warning("Unexpected error while showing PLC conflict dialog: {Message}", ex.Message);
-			MessagePanel.AddError("Failed to show PLC conflict dialog — sync disabled", "PLC");
+			MessagePanel.AddError("Failed to show PLC conflict dialog", "PLC");
 
 			return;
 		}

@@ -94,6 +94,7 @@ internal sealed class PlcLifecycleManager(
 	{
 		if (keepLocal)
 		{
+			_pendingPlcRecipe = null;
 			syncService.NotifyRecipeChanged(stateManager.Current, stateManager.IsValid);
 
 			return Result.Ok();
