@@ -5,7 +5,7 @@ applyTo: "**/*.cs"
 # SemiStep — Copilot Code Review Instructions
 
 SemiStep is a recipe table editor/runtime for PLC integration (S7 protocol).
-Platform: .NET 10, C# 14, Avalonia 11.2, ReactiveUI (MVVM).
+Platform: .NET 10, C# 14, Avalonia 11.3.13, ReactiveUI (MVVM).
 
 ---
 
