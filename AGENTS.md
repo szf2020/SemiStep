@@ -4,8 +4,6 @@ SemiStep is a recipe table editor/runtime for PLC integration (S7 protocol).
 Platform: .NET 10, Windows, C# 14. UI: Avalonia 11.2 + ReactiveUI (MVVM).
 Solution: `SemiStep/SemiStep.slnx`. All commands run from repository root.
 
----
-
 ## Build
 
 ```powershell
@@ -14,8 +12,6 @@ dotnet build SemiStep/SemiStep.slnx                    # all projects
 dotnet run   --project SemiStep/Application/Application.csproj
 dotnet format SemiStep/SemiStep.slnx                   # pre-commit hook enforces this
 ```
-
----
 
 ## Test
 
@@ -36,8 +32,6 @@ directory and overlay only the differing files from `Tests/YamlConfigs/Invalid/{
 **Dispatcher flush in tests:** After awaiting `RecipeMutationCoordinator` async methods
 (`LoadRecipeAsync`, `LoadRecipeFromPlcAsync`), call `Dispatcher.UIThread.RunJobs(null)` before
 asserting on `MessagePanelViewModel` state to flush the pending Avalonia dispatcher queue.
-
----
 
 ## Code Style
 
@@ -114,7 +108,9 @@ No abbreviations in names.
 - Only for genuinely non-obvious business logic. No process notes (`// TODO`, `// in new version`).
 - English only.
 
----
+## Code investigation
+
+Whenever you need to explore code of nuget pkgs, get external methods signatures or explore external libs structure, first try to fetch information via mcp from github or webfetch or skills if any before trying to reverse engineer compiled files. The pkgs info may be retrieved from using directive or .csproj file.
 
 ## Troubleshooting
 

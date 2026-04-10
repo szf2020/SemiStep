@@ -191,9 +191,9 @@ public sealed class DomainFacade : IDisposable
 		return Result.Ok().WithReasons(snapshot.Reasons);
 	}
 
-	public async Task<Result> LoadRecipeAsync(string filePath, CancellationToken ct = default)
+	public async Task<Result> LoadRecipeAsync(string filePath)
 	{
-		var loadResult = await _csvService.LoadAsync(filePath, ct);
+		var loadResult = await _csvService.LoadAsync(filePath);
 		if (loadResult.IsFailed)
 		{
 			return loadResult.ToResult();
@@ -223,18 +223,14 @@ public sealed class DomainFacade : IDisposable
 		return Result.Ok().WithReasons(snapshot.Reasons);
 	}
 
-	public async Task<Result> SaveRecipeAsync(string filePath, CancellationToken ct = default)
+	public async Task<Result> SaveRecipeAsync(string filePath)
 	{
 		try
 		{
-			await _csvService.SaveAsync(_stateManager.Current, filePath, ct);
+			await _csvService.SaveAsync(_stateManager.Current, filePath);
 			_stateManager.MarkSaved();
 
 			return Result.Ok();
-		}
-		catch (OperationCanceledException)
-		{
-			throw;
 		}
 		catch (Exception ex)
 		{
@@ -283,9 +279,9 @@ public sealed class DomainFacade : IDisposable
 		await _plcLifecycleManager.DisableSync();
 	}
 
-	public async Task<Result> LoadRecipeFromPlcAsync(CancellationToken ct = default)
+	public async Task<Result> LoadRecipeFromPlcAsync()
 	{
-		var loadResult = await _connectionService.ReadRecipeFromPlcAsync(ct);
+		var loadResult = await _connectionService.ReadRecipeFromPlcAsync();
 		if (loadResult.IsFailed)
 		{
 			return loadResult.ToResult();

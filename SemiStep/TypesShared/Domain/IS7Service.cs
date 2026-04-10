@@ -11,8 +11,8 @@ public interface IS7Service : IAsyncDisposable
 	bool IsRecipeActive { get; }
 	IObservable<PlcExecutionInfo> ExecutionState { get; }
 	event Action<PlcConnectionState>? StateChanged;
-	Task ConnectAsync(PlcConnectionSettings settings, CancellationToken ct = default);
-	Task DisconnectAsync(CancellationToken ct = default);
-	Task<Result<PlcManagingAreaState>> ReadManagingAreaAsync(CancellationToken ct = default);
-	Task<Result<Recipe>> ReadRecipeFromPlcAsync(CancellationToken ct = default);
+	Task ConnectAsync(PlcConnectionSettings settings);
+	Task DisconnectAsync();
+	Task<Result<PlcManagingAreaState>> ReadManagingAreaAsync();
+	Task<Result<Recipe>> ReadRecipeFromPlcAsync();
 }

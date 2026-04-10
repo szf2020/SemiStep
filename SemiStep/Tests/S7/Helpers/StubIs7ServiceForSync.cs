@@ -31,22 +31,22 @@ internal sealed class StubIs7ServiceForSync : IS7Service
 		_connected = connected;
 	}
 
-	public Task ConnectAsync(PlcConnectionSettings settings, CancellationToken ct = default)
+	public Task ConnectAsync(PlcConnectionSettings settings)
 	{
 		return Task.CompletedTask;
 	}
 
-	public Task DisconnectAsync(CancellationToken ct = default)
+	public Task DisconnectAsync()
 	{
 		return Task.CompletedTask;
 	}
 
-	public Task<Result<PlcManagingAreaState>> ReadManagingAreaAsync(CancellationToken ct = default)
+	public Task<Result<PlcManagingAreaState>> ReadManagingAreaAsync()
 	{
 		return Task.FromResult(Result.Fail<PlcManagingAreaState>("Not connected"));
 	}
 
-	public Task<Result<Recipe>> ReadRecipeFromPlcAsync(CancellationToken ct = default)
+	public Task<Result<Recipe>> ReadRecipeFromPlcAsync()
 	{
 		return Task.FromResult(Result.Fail<Recipe>("Not connected"));
 	}

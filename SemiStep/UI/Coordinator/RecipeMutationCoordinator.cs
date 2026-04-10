@@ -9,7 +9,6 @@ using ReactiveUI;
 
 using TypesShared.Config;
 using TypesShared.Core;
-using TypesShared.Domain;
 using TypesShared.Plc;
 
 using UI.MessageService;

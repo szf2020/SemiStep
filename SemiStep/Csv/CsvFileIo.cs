@@ -7,11 +7,9 @@ internal static class CsvFileIo
 {
 	private static readonly Encoding _fileEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
 
-	internal static async Task<(string Body, CsvMetadata Metadata)> ReadRecipeFileAsync(
-		string filePath,
-		CancellationToken cancellationToken = default)
+	internal static async Task<(string Body, CsvMetadata Metadata)> ReadRecipeFileAsync(string filePath)
 	{
-		var fullText = await File.ReadAllTextAsync(filePath, _fileEncoding, cancellationToken);
+		var fullText = await File.ReadAllTextAsync(filePath, _fileEncoding);
 
 		var (metadata, linesConsumed) = CsvMetadata.Deserialize(fullText);
 		var body = ExtractBody(fullText, linesConsumed);
@@ -22,8 +20,7 @@ internal static class CsvFileIo
 	internal static async Task WriteRecipeFileAsync(
 		string csvBody,
 		CsvMetadata metadata,
-		string filePath,
-		CancellationToken cancellationToken = default)
+		string filePath)
 	{
 		var tempPath = filePath + ".tmp";
 
@@ -34,7 +31,7 @@ internal static class CsvFileIo
 			await using (var writer = new StreamWriter(stream, _fileEncoding))
 			{
 				CsvMetadata.Serialize(writer, metadata);
-				await writer.WriteAsync(csvBody.AsMemory(), cancellationToken);
+				await writer.WriteAsync(csvBody.AsMemory());
 			}
 
 			File.Move(tempPath, filePath, overwrite: true);

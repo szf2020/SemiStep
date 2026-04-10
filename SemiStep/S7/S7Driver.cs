@@ -18,7 +18,7 @@ internal sealed class S7Driver : IS7Driver
 		}
 	}
 
-	public async Task ConnectAsync(PlcConnectionSettings settings, CancellationToken ct = default)
+	public async Task ConnectAsync(PlcConnectionSettings settings)
 	{
 		_plc = new Plc(
 			CpuType.S71500,
@@ -27,10 +27,10 @@ internal sealed class S7Driver : IS7Driver
 			(short)settings.Rack,
 			(short)settings.Slot);
 
-		await _plc.OpenAsync(ct);
+		await _plc.OpenAsync();
 	}
 
-	public Task DisconnectAsync(CancellationToken ct = default)
+	public Task DisconnectAsync()
 	{
 		_plc?.Close();
 		_plc = null;

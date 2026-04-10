@@ -45,13 +45,13 @@ internal sealed class FakeS7Driver : IS7Driver
 		_dbReadFactories[dbNumber] = responseFactory;
 	}
 
-	public Task ConnectAsync(PlcConnectionSettings settings, CancellationToken ct = default)
+	public Task ConnectAsync(PlcConnectionSettings settings)
 	{
 		_connected = true;
 		return Task.CompletedTask;
 	}
 
-	public Task DisconnectAsync(CancellationToken ct = default)
+	public Task DisconnectAsync()
 	{
 		_connected = false;
 		return Task.CompletedTask;

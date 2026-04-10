@@ -10,14 +10,14 @@ namespace Csv;
 
 internal sealed class CsvService(CsvFileSerializer csvFileSerializer) : ICsvService
 {
-	public async Task<Result<Recipe>> LoadAsync(string filePath, CancellationToken cancellationToken = default)
+	public async Task<Result<Recipe>> LoadAsync(string filePath)
 	{
 		if (!File.Exists(filePath))
 		{
 			return Result.Fail<Recipe>($"Recipe file not found: {filePath}");
 		}
 
-		var (bodyText, metadata) = await CsvFileIo.ReadRecipeFileAsync(filePath, cancellationToken);
+		var (bodyText, metadata) = await CsvFileIo.ReadRecipeFileAsync(filePath);
 		var result = csvFileSerializer.Deserialize(bodyText);
 
 		if (result.IsFailed)
@@ -38,12 +38,12 @@ internal sealed class CsvService(CsvFileSerializer csvFileSerializer) : ICsvServ
 		return okResult;
 	}
 
-	public async Task SaveAsync(Recipe recipe, string filePath, CancellationToken cancellationToken = default)
+	public async Task SaveAsync(Recipe recipe, string filePath)
 	{
 		var csvBody = csvFileSerializer.Serialize(recipe);
 		var metadata = CsvFileIo.BuildSaveMetadata(csvBody);
 
-		await CsvFileIo.WriteRecipeFileAsync(csvBody, metadata, filePath, cancellationToken);
+		await CsvFileIo.WriteRecipeFileAsync(csvBody, metadata, filePath);
 
 		Log.Information("Saved recipe to {FilePath}: {StepCount} steps", filePath, recipe.StepCount);
 	}
