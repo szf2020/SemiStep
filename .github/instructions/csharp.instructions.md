@@ -2,6 +2,9 @@
 applyTo: "**/*.cs"
 ---
 
+<!-- Reviewer scope: apply these rules only to C# source files.
+     Do not review or comment on Markdown documents (plans, docs, README, etc.). -->
+
 # SemiStep — Copilot Code Review Instructions
 
 SemiStep is a recipe table editor/runtime for PLC integration (S7 protocol).
@@ -34,7 +37,6 @@ not personal preferences.
 - Throw exceptions only for truly exceptional conditions (programmer error, corrupted state).
 - Using exceptions for expected business logic failures (parsing, validation) is a finding.
 - Empty catch blocks (silently swallowing exceptions) are always a CRITICAL finding.
-- `OperationCanceledException` must be caught and rethrown before any broad `catch (Exception)`.
 
 ### Null safety
 
