@@ -129,9 +129,9 @@ internal sealed class PlcLifecycleManager(
 		}
 	}
 
-	private async Task PerformReconnectReconciliationAsync(CancellationToken ct = default)
+	private async Task PerformReconnectReconciliationAsync()
 	{
-		var managingAreaResult = await connectionService.ReadManagingAreaAsync(ct);
+		var managingAreaResult = await connectionService.ReadManagingAreaAsync();
 		if (managingAreaResult.IsFailed)
 		{
 			Log.Warning(
@@ -147,7 +147,7 @@ internal sealed class PlcLifecycleManager(
 			return;
 		}
 
-		var plcRecipeResult = await connectionService.ReadRecipeFromPlcAsync(ct);
+		var plcRecipeResult = await connectionService.ReadRecipeFromPlcAsync();
 		if (plcRecipeResult.IsFailed)
 		{
 			Log.Warning(

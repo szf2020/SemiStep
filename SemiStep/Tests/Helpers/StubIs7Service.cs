@@ -36,17 +36,17 @@ public sealed class StubIs7Service : IS7Service
 		StateChanged?.Invoke(state);
 	}
 
-	public Task ConnectAsync(PlcConnectionSettings settings, CancellationToken ct = default)
+	public Task ConnectAsync(PlcConnectionSettings settings)
 	{
 		return Task.CompletedTask;
 	}
 
-	public Task DisconnectAsync(CancellationToken ct = default)
+	public Task DisconnectAsync()
 	{
 		return Task.CompletedTask;
 	}
 
-	public Task<Result<PlcManagingAreaState>> ReadManagingAreaAsync(CancellationToken ct = default)
+	public Task<Result<PlcManagingAreaState>> ReadManagingAreaAsync()
 	{
 		if (ManagingAreaToReturn is not null)
 		{
@@ -56,7 +56,7 @@ public sealed class StubIs7Service : IS7Service
 		return Task.FromResult(Result.Fail<PlcManagingAreaState>("Not connected"));
 	}
 
-	public Task<Result<Recipe>> ReadRecipeFromPlcAsync(CancellationToken ct = default)
+	public Task<Result<Recipe>> ReadRecipeFromPlcAsync()
 	{
 		if (RecipeToReturn is not null)
 		{

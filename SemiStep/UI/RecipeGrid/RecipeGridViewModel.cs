@@ -151,37 +151,30 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 		{
 			case MutationSignal.PropertyUpdated(var stepIndex):
 				UpdateSingleRowInPlace(recipe, stepIndex);
-
 				break;
 
 			case MutationSignal.StepAppended(var index):
 				AppendRow(recipe, index);
-
 				break;
 
 			case MutationSignal.StepsInserted(var startIndex, var count):
 				InsertRows(recipe, startIndex, count);
-
 				break;
 
 			case MutationSignal.StepRemoved(var removedIndex):
 				RemoveRow(removedIndex);
-
 				break;
 
 			case MutationSignal.StepsRemoved(var removedIndices):
 				RemoveRows(removedIndices);
-
 				break;
 
 			case MutationSignal.StepActionChanged(var stepIndex):
 				RebuildRow(recipe, stepIndex);
-
 				break;
 
 			case MutationSignal.RecipeReplaced:
 				FullRebuild(recipe);
-
 				break;
 
 			case MutationSignal.MetadataChanged:
@@ -189,7 +182,6 @@ public class RecipeGridViewModel : ReactiveObject, IDisposable
 
 			default:
 				FullRebuild(recipe);
-
 				break;
 		}
 

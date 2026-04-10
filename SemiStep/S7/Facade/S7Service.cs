@@ -67,15 +67,15 @@ internal sealed class S7Service(
 
 	public event Action<PlcConnectionState>? StateChanged;
 
-	public async Task ConnectAsync(PlcConnectionSettings settings, CancellationToken ct = default)
+	public async Task ConnectAsync(PlcConnectionSettings settings)
 	{
 		_settings = settings;
 		_autoReconnectEnabled = true;
 
-		await ConnectInternalAsync(ct);
+		await ConnectInternalAsync();
 	}
 
-	public async Task DisconnectAsync(CancellationToken ct = default)
+	public async Task DisconnectAsync()
 	{
 		_autoReconnectEnabled = false;
 		var reconnectTaskToAwait = StopReconnectLoop();
@@ -106,30 +106,30 @@ internal sealed class S7Service(
 
 		if (transport.IsConnected)
 		{
-			await transport.DisconnectAsync(ct);
+			await transport.DisconnectAsync();
 		}
 
 		State = PlcConnectionState.Disconnected;
 		Log.Information("Disconnected from PLC");
 	}
 
-	public async Task<Result<PlcManagingAreaState>> ReadManagingAreaAsync(CancellationToken ct = default)
+	public async Task<Result<PlcManagingAreaState>> ReadManagingAreaAsync()
 	{
-		var result = await transactionExecutor.ReadManagingAreaAsync(ct);
+		var result = await transactionExecutor.ReadManagingAreaAsync();
 		if (result.IsFailed)
 		{
-			Log.Warning("Failed to read managing area from PLC: {Reason}", result.Errors[0].Message);
+			Log.Warning("Failed to read managing area from PLC: {Reason}", result.Errors.FirstOrDefault()?.Message ?? "(no message)");
 			return result.ToResult<PlcManagingAreaState>();
 		}
 		return result;
 	}
 
-	public async Task<Result<Recipe>> ReadRecipeFromPlcAsync(CancellationToken ct = default)
+	public async Task<Result<Recipe>> ReadRecipeFromPlcAsync()
 	{
-		var result = await transactionExecutor.ReadRecipeFromPlcAsync(ct);
+		var result = await transactionExecutor.ReadRecipeFromPlcAsync();
 		if (result.IsFailed)
 		{
-			Log.Warning("Failed to read recipe from PLC: {Reason}", result.Errors[0].Message);
+			Log.Warning("Failed to read recipe from PLC: {Reason}", result.Errors.FirstOrDefault()?.Message ?? "(no message)");
 		}
 		return result;
 	}
@@ -158,7 +158,7 @@ internal sealed class S7Service(
 		}
 	}
 
-	private async Task ConnectInternalAsync(CancellationToken ct)
+	private async Task ConnectInternalAsync()
 	{
 		if (_settings is null)
 		{
@@ -170,14 +170,14 @@ internal sealed class S7Service(
 
 		try
 		{
-			await transport.ConnectAsync(_settings, ct);
+			await transport.ConnectAsync(_settings);
 			State = PlcConnectionState.Connected;
 			Log.Information("Connected to PLC at {IpAddress}", _settings.IpAddress);
 
 			executionMonitor.Start();
 			StartKeepAlive();
 		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
+		catch (Exception ex)
 		{
 			State = PlcConnectionState.Disconnected;
 			Log.Error(ex, "Failed to connect to PLC at {IpAddress}", _settings.IpAddress);
@@ -279,7 +279,7 @@ internal sealed class S7Service(
 			try
 			{
 				await Task.Delay(delay, ct);
-				await ConnectInternalAsync(ct);
+				await ConnectInternalAsync();
 
 				lock (_stateLock)
 				{
